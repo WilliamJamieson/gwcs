@@ -8,6 +8,7 @@ from scipy import optimize
 from astropy import units as u
 from astropy.modeling.core import Model
 from astropy.modeling import utils as mutils
+from astropy.modeling.bounding_box import CompoundBoundingBox
 from astropy.modeling.models import (
     Identity, Mapping, Const1D, Shift, Polynomial2D,
     Sky2Pix_TAN, RotateCelestial2Native
@@ -349,16 +350,14 @@ class WCS(GWCSAPIMixin):
             # before evaluating it. The order Model.bounding_box is reversed.
             axes_ind = self._get_axes_indices()
             bbox = self.bounding_box
-            print("__call__ self.bounding_box:", bbox)
             if transform.n_inputs > 1:
-                if isinstance(bbox, mutils.ComplexBoundingBox):
+                if isinstance(bbox, CompoundBoundingBox):
                     transform.bounding_box = bbox.reverse(axes_ind)
                 else:
                     transform.bounding_box = [bbox[ind] for ind in axes_ind][::-1]
             else:
                 transform.bounding_box = bbox
 
-            print("__call__ transform.bounding_box:", bbox)
         result = transform(*args, **kwargs)
 
         if with_units:
@@ -1311,7 +1310,7 @@ class WCS(GWCSAPIMixin):
             axes_order = np.arange(transform_0.n_inputs)
 
         # Model.bounding_box is in python order, need to reverse it first.
-        if isinstance(bb, mutils.ComplexBoundingBox):
+        if isinstance(bb, CompoundBoundingBox):
             return bb.py_order(axes_order)
         else:
             return tuple(bb[::-1][i] for i in axes_order)
@@ -1346,7 +1345,7 @@ class WCS(GWCSAPIMixin):
             else:
                 # The axes in bounding_box in modeling follow python order
                 #transform_0.bounding_box = np.array(value)[axes_ind][::-1]
-                if isinstance(value, mutils.ComplexBoundingBox):
+                if isinstance(value, CompoundBoundingBox):
                     transform_0.bounding_box = value.reverse(axes_ind)
                 else:
                     transform_0.bounding_box = [value[ind] for ind in axes_ind][::-1]
