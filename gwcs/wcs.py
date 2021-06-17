@@ -348,10 +348,17 @@ class WCS(GWCSAPIMixin):
             # bounding boxes. Get the forward transform and assign the bounding_box to it
             # before evaluating it. The order Model.bounding_box is reversed.
             axes_ind = self._get_axes_indices()
+            bbox = self.bounding_box
+            print("__call__ self.bounding_box:", bbox)
             if transform.n_inputs > 1:
-                transform.bounding_box = [self.bounding_box[ind] for ind in axes_ind][::-1]
+                if isinstance(bbox, mutils.ComplexBoundingBox):
+                    transform.bounding_box = bbox.reverse(axes_ind)
+                else:
+                    transform.bounding_box = [bbox[ind] for ind in axes_ind][::-1]
             else:
-                transform.bounding_box = self.bounding_box
+                transform.bounding_box = bbox
+
+            print("__call__ transform.bounding_box:", bbox)
         result = transform(*args, **kwargs)
 
         if with_units:
@@ -1302,8 +1309,12 @@ class WCS(GWCSAPIMixin):
             axes_order = self.input_frame.axes_order
         except AttributeError:
             axes_order = np.arange(transform_0.n_inputs)
+
         # Model.bounding_box is in python order, need to reverse it first.
-        return tuple(bb[::-1][i] for i in axes_order)
+        if isinstance(bb, mutils.ComplexBoundingBox):
+            return bb.py_order(axes_order)
+        else:
+            return tuple(bb[::-1][i] for i in axes_order)
 
     @bounding_box.setter
     def bounding_box(self, value):
@@ -1335,7 +1346,10 @@ class WCS(GWCSAPIMixin):
             else:
                 # The axes in bounding_box in modeling follow python order
                 #transform_0.bounding_box = np.array(value)[axes_ind][::-1]
-                transform_0.bounding_box = [value[ind] for ind in axes_ind][::-1]
+                if isinstance(value, mutils.ComplexBoundingBox):
+                    transform_0.bounding_box = value.reverse(axes_ind)
+                else:
+                    transform_0.bounding_box = [value[ind] for ind in axes_ind][::-1]
         self.set_transform(frames[0], frames[1], transform_0)
 
     def _get_axes_indices(self):
