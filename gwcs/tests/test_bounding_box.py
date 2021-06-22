@@ -128,6 +128,12 @@ class TestModelArgument:
         assert isinstance(bbox, BoundingBox)
         assert bbox == ((0, 1), (2, 3), (-np.inf, np.inf))
 
+        # bounding_box is only a tuple
+        bounding_box = ((0, 1), (2, 3))
+        bbox = argument._add_bounding_box(bounding_box)
+        assert isinstance(bbox, BoundingBox)
+        assert bbox == ((0, 1), (2, 3), (-np.inf, np.inf))
+
         # bounding_box is dim > 1
         base_box = [(0, 1), (2, 3)]
         true_box = [(0, 1), (2, 3), (-np.inf, np.inf)]
@@ -153,6 +159,19 @@ class TestModelArgument:
             argument = ModelArgument('test', True, 7)
             assert argument.add_bounding_box(bounding_box) == mkAdd.return_value
             assert mkAdd.call_args_list == [mk.call(argument, bounding_box)]
+
+    def test_add_removed_axis(self):
+        # Test no change, due to not removed
+        argument = ModelArgument('test', False, 2)
+        assert (argument.add_removed_axis(np.array([0, 1])) == np.array([0, 1])).all()
+
+        # Test no change, due to removed and present
+        argument = ModelArgument('test', True, 2)
+        assert (argument.add_removed_axis(np.array([0, 1, 2])) == np.array([0, 1, 2])).all()
+
+        # Add change
+        argument = ModelArgument('test', True, 2)
+        assert (argument.add_removed_axis(np.array([0, 1])) == np.array([0, 1, 2])).all()
 
 
 class TestModelArguments:
@@ -282,6 +301,22 @@ class TestModelArguments:
                 mk.call(args[0], bounding_box),
                 mk.call(args[1], new_bbox[0]),
                 mk.call(args[2], new_bbox[1]),
+            ]
+
+    def test_add_removed_axes(self):
+        args = [ModelArgument(f"name{idx}", idx, mk.MagicMock())
+                for idx in range(3)]
+        arguments = ModelArguments(args)
+        axes_ind = mk.MagicMock()
+
+        new_axes_ind = [mk.MagicMock() for _ in range(3)]
+        with mk.patch.object(ModelArgument, 'add_removed_axis',
+                             autospec=True, side_effect=new_axes_ind) as mkAdd:
+            assert arguments.add_removed_axes(axes_ind) == new_axes_ind[2]
+            assert mkAdd.call_args_list == [
+                mk.call(args[0], axes_ind),
+                mk.call(args[1], new_axes_ind[0]),
+                mk.call(args[2], new_axes_ind[1]),
             ]
 
 
@@ -419,3 +454,15 @@ class TestCompoundBoundingBox:
                 assert bounding_box.get_bounding_box(**kwargs) == mkAdd.return_value
                 assert mkAdd.call_args_list == [mk.call(bounding_box, mkGet.return_value)]
                 assert mkGet.call_args_list == [mk.call(bounding_box, **kwargs)]
+
+    def test_add_removed_axes(self):
+        bbox = {1: (-1, 0), 2: (0, 1)}
+        bounding_box = CompoundBoundingBox(bbox, Gaussian2D(), slice_args=['y'])
+        axes_ind = mk.MagicMock()
+
+        with mk.patch.object(ModelArguments, 'add_removed_axes',
+                             autospec=True) as mkAdd:
+            with mk.patch.object(np, 'argsort', autospec=True) as mkSort:
+                assert bounding_box.add_removed_axes(axes_ind) == mkSort.return_value
+                assert mkSort.call_args_list == [mk.call(mkAdd.return_value)]
+                assert mkAdd.call_args_list == [mk.call(bounding_box.slice_args, axes_ind)]

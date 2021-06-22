@@ -316,11 +316,11 @@ class WCS(GWCSAPIMixin):
             frame_obj = frame
         return name, frame_obj
 
-    def _get_bounding_box(self, *args, **kwargs):
+    def _get_bounding_box(self, **kwargs):
         bbox = self.bounding_box
 
         if isinstance(bbox, CompoundBoundingBox):
-            return bbox.get_bounding_box(*args, **kwargs)
+            return bbox.get_bounding_box(**kwargs)
         else:
             return bbox
 
@@ -354,14 +354,15 @@ class WCS(GWCSAPIMixin):
         if 'fill_value' not in kwargs:
             kwargs['fill_value'] = np.nan
 
-        bbox = self._get_bounding_box(*args, **kwargs)
+        bbox = self._get_bounding_box(**kwargs)
         if bbox is not None:
             # Currently compound models do not attempt to combine individual model
             # bounding boxes. Get the forward transform and assign the bounding_box to it
             # before evaluating it. The order Model.bounding_box is reversed.
             axes_ind = self._get_axes_indices()
             if transform.n_inputs > 1:
-                transform.bounding_box = [bbox[ind] for ind in axes_ind][::-1]
+                flip = [bbox[ind] for ind in axes_ind][::-1]
+                transform.bounding_box = flip
             else:
                 transform.bounding_box = bbox
 
@@ -1340,11 +1341,17 @@ class WCS(GWCSAPIMixin):
         if value is None:
             transform_0.bounding_box = value
         else:
-            try:
-                # Make sure the dimensions of the new bbox are correct.
-                mutils._BoundingBox.validate(transform_0, value)
-            except Exception:
-                raise
+            if isinstance(value, CompoundBoundingBox):
+                try:
+                    CompoundBoundingBox.validate(transform_0, value)
+                except Exception:
+                    raise
+            else:
+                try:
+                    # Make sure the dimensions of the new bbox are correct.
+                    mutils._BoundingBox.validate(transform_0, value)
+                except Exception:
+                    raise
             # get the sorted order of axes' indices
             axes_ind = self._get_axes_indices()
             if transform_0.n_inputs == 1:
@@ -1365,6 +1372,10 @@ class WCS(GWCSAPIMixin):
         except AttributeError:
             # the case of a frame being a string
             axes_ind = np.arange(self.forward_transform.n_inputs)
+
+        bbox = self.bounding_box
+        if isinstance(bbox, CompoundBoundingBox):
+            axes_ind = bbox.add_removed_axes(axes_ind)
         return axes_ind
 
     def __str__(self):

@@ -127,6 +127,9 @@ class ModelArgument(_BaseModelArgument):
         return BoundingBox((-np.inf, np.inf))
 
     def _add_bounding_box(self, bounding_box: BoundingBox) -> BoundingBox:
+        if not isinstance(bounding_box, BoundingBox):
+            bounding_box = BoundingBox(bounding_box)
+
         if bounding_box.dimension == 1:
             new_bounding_box = [bounding_box]
         else:
@@ -141,6 +144,12 @@ class ModelArgument(_BaseModelArgument):
             return self._add_bounding_box(bounding_box)
         else:
             return bounding_box
+
+    def add_removed_axis(self, axes_ind: np.ndarray):
+        if self.remove and self.index not in axes_ind:
+            return np.append(axes_ind, self.index)
+        else:
+            return axes_ind
 
 
 class ModelArguments(object):
@@ -205,6 +214,12 @@ class ModelArguments(object):
             bounding_box = argument.add_bounding_box(bounding_box)
         return bounding_box
 
+    def add_removed_axes(self, axes_ind: np.ndarray):
+        for argument in self._arguments:
+            axes_ind = argument.add_removed_axis(axes_ind)
+        return axes_ind
+
+
 
 class CompoundBoundingBox(UserDict):
     def __init__(self, bounding_box: Dict[Any, BoundingBox],
@@ -266,3 +281,6 @@ class CompoundBoundingBox(UserDict):
 
     def get_bounding_box(self, **kwargs):
         return self._add_bounding_box(self._get_bounding_box(**kwargs))
+
+    def add_removed_axes(self, axes_ind: np.ndarray):
+        return np.argsort(self._slice_args.add_removed_axes(axes_ind))
