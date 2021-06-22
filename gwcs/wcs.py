@@ -8,7 +8,8 @@ from scipy import optimize
 from astropy import units as u
 from astropy.modeling.core import Model
 from astropy.modeling import utils as mutils
-from astropy.modeling.bounding_box import CompoundBoundingBox
+# from astropy.modeling.bounding_box import CompoundBoundingBox
+from .bounding_box import CompoundBoundingBox
 from astropy.modeling.models import (
     Identity, Mapping, Const1D, Shift, Polynomial2D,
     Sky2Pix_TAN, RotateCelestial2Native
@@ -140,6 +141,7 @@ class WCS(GWCSAPIMixin):
         self._initialize_wcs(forward_transform, input_frame, output_frame)
         self._pixel_shape = None
         self._pipeline = [Step(*step) for step in self._pipeline]
+        self._user_compound_bounding_box = None
 
     def _initialize_wcs(self, forward_transform, input_frame, output_frame):
         if forward_transform is not None:
@@ -314,6 +316,14 @@ class WCS(GWCSAPIMixin):
             frame_obj = frame
         return name, frame_obj
 
+    def _get_bounding_box(self, *args, **kwargs):
+        bbox = self.bounding_box
+
+        if isinstance(bbox, CompoundBoundingBox):
+            return bbox.get_bounding_box(*args, **kwargs)
+        else:
+            return bbox
+
     def __call__(self, *args, **kwargs):
         """
         Executes the forward transform.
@@ -344,17 +354,14 @@ class WCS(GWCSAPIMixin):
         if 'fill_value' not in kwargs:
             kwargs['fill_value'] = np.nan
 
-        if self.bounding_box is not None:
+        bbox = self._get_bounding_box(*args, **kwargs)
+        if bbox is not None:
             # Currently compound models do not attempt to combine individual model
             # bounding boxes. Get the forward transform and assign the bounding_box to it
             # before evaluating it. The order Model.bounding_box is reversed.
             axes_ind = self._get_axes_indices()
-            bbox = self.bounding_box
             if transform.n_inputs > 1:
-                if isinstance(bbox, CompoundBoundingBox):
-                    transform.bounding_box = bbox.reverse(axes_ind)
-                else:
-                    transform.bounding_box = [bbox[ind] for ind in axes_ind][::-1]
+                transform.bounding_box = [bbox[ind] for ind in axes_ind][::-1]
             else:
                 transform.bounding_box = bbox
 
@@ -1296,23 +1303,23 @@ class WCS(GWCSAPIMixin):
         Return the range of acceptable values for each input axis.
         The order of the axes is `~gwcs.coordinate_frames.CoordinateFrame.axes_order`.
         """
-        frames = self.available_frames
-        transform_0 = self.get_transform(frames[0], frames[1])
-        try:
-            bb = transform_0.bounding_box
-        except NotImplementedError:
-            return None
-        if transform_0.n_inputs == 1:
-            return bb
-        try:
-            axes_order = self.input_frame.axes_order
-        except AttributeError:
-            axes_order = np.arange(transform_0.n_inputs)
-
-        # Model.bounding_box is in python order, need to reverse it first.
-        if isinstance(bb, CompoundBoundingBox):
-            return bb.py_order(axes_order)
+        if self._user_compound_bounding_box is not None:
+            return self._user_compound_bounding_box
         else:
+            frames = self.available_frames
+            transform_0 = self.get_transform(frames[0], frames[1])
+            try:
+                bb = transform_0.bounding_box
+            except NotImplementedError:
+                return None
+            if transform_0.n_inputs == 1:
+                return bb
+            try:
+                axes_order = self.input_frame.axes_order
+            except AttributeError:
+                axes_order = np.arange(transform_0.n_inputs)
+
+            # Model.bounding_box is in python order, need to reverse it first.
             return tuple(bb[::-1][i] for i in axes_order)
 
     @bounding_box.setter
@@ -1346,8 +1353,9 @@ class WCS(GWCSAPIMixin):
                 # The axes in bounding_box in modeling follow python order
                 #transform_0.bounding_box = np.array(value)[axes_ind][::-1]
                 if isinstance(value, CompoundBoundingBox):
-                    transform_0.bounding_box = value.reverse(axes_ind)
+                    self._user_compound_bounding_box = value
                 else:
+                    # transform_0.bounding_box = value.reverse(axes_ind)
                     transform_0.bounding_box = [value[ind] for ind in axes_ind][::-1]
         self.set_transform(frames[0], frames[1], transform_0)
 
