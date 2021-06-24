@@ -1,12 +1,14 @@
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
 
 from collections import UserDict, namedtuple
-from astropy.modeling.core import Model
 from astropy.modeling.utils import _BoundingBox
 from astropy.utils import isiterable
 
 import numpy as np
-from typing import List, Dict, Any, Callable
+from typing import List, Dict, Any, Callable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from astropy.modeling.core import Model
 
 
 class BoundingBox(_BoundingBox):
@@ -64,7 +66,8 @@ class BoundingBox(_BoundingBox):
         """
 
         if isinstance(bounding_box, dict) or isinstance(bounding_box, CompoundBoundingBox):
-            return CompoundBoundingBox.validate(model, bounding_box, slice_args=slice_args)
+            return CompoundBoundingBox.validate(bounding_box, slice_args=slice_args,
+                                                model=model)
 
         nd = model.n_inputs
         if slice_args is not None:
@@ -116,11 +119,15 @@ class ModelArgument(_BaseModelArgument):
         else:
             return cls(name, remove, valid_index)
 
-    def get_slice(self, **kwargs):
+    def get_slice_value(self, *args, **kwargs):
         if self.name in kwargs:
             return kwargs[self.name]
+        elif self.index < len(args):
+            return args[self.index]
         else:
-            raise ValueError(f"Cannot find a valid input corresponding to {self.name} in: {kwargs}.")
+            raise ValueError("Cannot find a valid input corresponding to"
+                             f" key: {self.name} in: {kwargs} or"
+                             f" index: {self.index} in: {args}.")
 
     @staticmethod
     def _removed_bounding_box():
@@ -176,6 +183,10 @@ class ModelArguments(object):
     def removed(self):
         return [arg for arg in self._arguments if arg.remove]
 
+    @property
+    def removed_index(self):
+        return [arg.index for arg in self._arguments if arg.remove]
+
     @staticmethod
     def _validate_argument(model, arg):
         if isinstance(arg, list) or isinstance(arg, tuple):
@@ -201,8 +212,8 @@ class ModelArguments(object):
         else:
             return False
 
-    def get_slice(self, **kwargs) -> tuple:
-        slice_tuple = tuple([arg.get_slice(**kwargs) for arg in self._arguments])
+    def get_slice_index(self, *args, **kwargs) -> tuple:
+        slice_tuple = tuple([arg.get_slice_value(*args, **kwargs) for arg in self._arguments])
 
         if len(slice_tuple) == 1:
             return slice_tuple[0]
@@ -219,12 +230,21 @@ class ModelArguments(object):
             axes_ind = argument.add_removed_axis(axes_ind)
         return axes_ind
 
+    def _add_argument(self, *args, model: "Model" = None):
+        self._arguments.append(ModelArgument.validate(model, *args))
+
+    def add_arguments(self, *args, model: "Model" = None):
+        for arg in args:
+            self._add_argument(*arg, model=model)
+
+    def reset_arguments(self):
+        self._arguments = []
 
 
 class CompoundBoundingBox(UserDict):
     def __init__(self, bounding_box: Dict[Any, BoundingBox],
-                 model: Model=None, slice_args: ModelArguments=None,
-                 create_slice: Callable=None):
+                 model: "Model" = None, slice_args: ModelArguments = None,
+                 create_slice: Callable = None):
         super().__init__(bounding_box)
         self._model = model
         self._slice_args = ModelArguments.validate(model, slice_args)
@@ -243,10 +263,7 @@ class CompoundBoundingBox(UserDict):
         return self._slice_args.indices
 
     @classmethod
-    def validate(cls, model, bounding_box, slice_args=None):
-        if not isinstance(model, Model):
-            model = None
-
+    def validate(cls, bounding_box, slice_args=None, model=None):
         if isinstance(bounding_box, CompoundBoundingBox) and slice_args is None:
             slice_args = ModelArguments.validate(model,
                                                  bounding_box.slice_args)
@@ -260,7 +277,10 @@ class CompoundBoundingBox(UserDict):
 
         return new_box
 
-    def _get_slice(self, slice_index) -> BoundingBox:
+    def get_slice(self, slice_index) -> BoundingBox:
+        if isiterable(slice_index) and len(slice_index) == 1:
+            slice_index = slice_index[0]
+
         if slice_index in self:
             bbox = self[slice_index]
         elif self._create_slice is not None:
@@ -271,16 +291,21 @@ class CompoundBoundingBox(UserDict):
 
         return bbox
 
-    def _get_bounding_box(self, **kwargs) -> BoundingBox:
-        slice_index = self._slice_args.get_slice(**kwargs)
-
-        return self._get_slice(slice_index)
+    def _get_slice(self, *args, **kwargs) -> BoundingBox:
+        return self.get_slice(self._slice_args.get_slice_index(*args, **kwargs))
 
     def _add_bounding_box(self, bounding_box: BoundingBox):
         return self._slice_args.sorted.add_bounding_box(bounding_box)
 
-    def get_bounding_box(self, **kwargs):
-        return self._add_bounding_box(self._get_bounding_box(**kwargs))
+    def get_bounding_box(self, *args, **kwargs):
+        if kwargs.pop('add_removed', False):
+            return self._add_bounding_box(self._get_slice(*args, **kwargs))
+        else:
+            return self._get_slice(*args, **kwargs)
 
     def add_removed_axes(self, axes_ind: np.ndarray):
         return np.argsort(self._slice_args.add_removed_axes(axes_ind))
+
+    def set_slice_args(self, *args):
+        self._slice_args.reset_arguments()
+        self._slice_args.add_arguments(*args, model=self._model)

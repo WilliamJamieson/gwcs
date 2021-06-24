@@ -320,6 +320,7 @@ class WCS(GWCSAPIMixin):
         bbox = self.bounding_box
 
         if isinstance(bbox, CompoundBoundingBox):
+            kwargs['add_removed'] = True
             return bbox.get_bounding_box(**kwargs)
         else:
             return bbox
@@ -1343,7 +1344,8 @@ class WCS(GWCSAPIMixin):
         else:
             if isinstance(value, CompoundBoundingBox):
                 try:
-                    CompoundBoundingBox.validate(transform_0, value)
+                    CompoundBoundingBox.validate(bounding_box=value,
+                                                 model=transform_0)
                 except Exception:
                     raise
             else:
