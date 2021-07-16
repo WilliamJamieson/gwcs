@@ -87,6 +87,13 @@ class BoundingBox(_BoundingBox):
 
         return cls._validate(model, bounding_box, nd)
 
+    @property
+    def dimension(self):
+        if isinstance(self[0], tuple):
+            return len(self)
+        else:
+            return 1
+
 
 _BaseModelArgument = namedtuple('_BaseModelArgument', "name remove index")
 
