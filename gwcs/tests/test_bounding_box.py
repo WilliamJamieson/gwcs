@@ -1,5 +1,6 @@
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
 
+from astropy.modeling.core import Model
 from astropy.modeling.models import Gaussian1D, Gaussian2D
 from gwcs.bounding_box import BoundingBox, _BaseModelArgument, ModelArgument, ModelArguments, CompoundBoundingBox
 
@@ -493,13 +494,34 @@ class TestCompoundBoundingBox:
 
         assert create.call_args_list == [mk.call(model, 3)]
 
+    def test__get_inputs(self):
+        bbox = {1: (-1, 0), 2: (0, 1)}
+        bounding_box = CompoundBoundingBox(bbox, Gaussian2D(), slice_args=['y'])
+
+        args = [mk.MagicMock() for _ in range(3)]
+        kwargs = {f"test{idx}": mk.MagicMock() for idx in range(3)}
+
+        get_return = (mk.MagicMock(), mk.MagicMock())
+        with mk.patch.object(Model, '_get_renamed_inputs_as_positional',
+                             autospec=True, return_value=get_return) as mkGet:
+            # Has model
+            assert get_return == bounding_box._get_inputs(*args, **kwargs)
+            assert mkGet.call_args_list == \
+                [mk.call(bounding_box._model, *args, **kwargs)]
+            mkGet.reset_mock()
+
+            # Has no model
+            bounding_box._model = None
+            assert (tuple(args), kwargs) == bounding_box._get_inputs(*args, **kwargs)
+            assert mkGet.call_args_list == []
+
     def test__get_slice(self):
         bbox = {1: (-1, 0), 2: (0, 1)}
         bounding_box = CompoundBoundingBox(bbox, Gaussian2D(), slice_args=['y'])
 
         # Using **kwarg
-        assert bounding_box._get_slice(y=1) == (-1, 0)
-        assert bounding_box._get_slice(y=2) == (0, 1)
+        assert bounding_box._get_slice(y=1, x=7) == (-1, 0)
+        assert bounding_box._get_slice(y=2, x=7) == (0, 1)
 
         # Using *arg
         assert bounding_box._get_slice(0, 1) == (-1, 0)

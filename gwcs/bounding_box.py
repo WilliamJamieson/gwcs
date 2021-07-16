@@ -298,7 +298,15 @@ class CompoundBoundingBox(UserDict):
 
         return bbox
 
+    def _get_inputs(self, *args, **kwargs):
+        if self._model is not None:
+            args, kwargs = self._model._get_renamed_inputs_as_positional(*args, **kwargs)
+
+        return args, kwargs
+
     def _get_slice(self, *args, **kwargs) -> BoundingBox:
+        args, kwargs = self._get_inputs(*args, **kwargs)
+
         return self.get_slice(self._slice_args.get_slice_index(*args, **kwargs))
 
     def _add_bounding_box(self, bounding_box: BoundingBox):
