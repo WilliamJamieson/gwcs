@@ -7,8 +7,12 @@ import numpy.linalg as npla
 from scipy import optimize
 from astropy.modeling.core import Model # , fix_inputs
 from astropy.modeling import utils as mutils
-from astropy.modeling.models import (Shift, Polynomial2D, Sky2Pix_TAN,
-                                     RotateCelestial2Native, Mapping)
+from astropy.modeling.models import (
+    Identity, Mapping, Const1D, Shift, Polynomial2D,
+    Sky2Pix_TAN, RotateCelestial2Native
+)
+from astropy.modeling.bounding_box import BoundingBox
+from astropy.modeling import projections, fix_inputs
 from astropy.modeling.fitting import LinearLSQFitter
 import astropy.io.fits as fits
 
@@ -316,10 +320,11 @@ class WCS(GWCSAPIMixin):
             # bounding boxes. Get the forward transform and assign the bounding_box to it
             # before evaluating it. The order Model.bounding_box is reversed.
             axes_ind = self._get_axes_indices()
-            if transform.n_inputs > 1:
-                transform.bounding_box = [self.bounding_box[ind] for ind in axes_ind][::-1]
-            else:
-                transform.bounding_box = self.bounding_box
+            transform.bounding_box = self.bounding_box
+            # if transform.n_inputs > 1:
+            #     transform.bounding_box = [self.bounding_box[ind] for ind in axes_ind][::-1]
+            # else:
+            #     transform.bounding_box = self.bounding_box
         result = transform(*args, **kwargs)
 
         if with_units:
@@ -370,7 +375,7 @@ class WCS(GWCSAPIMixin):
             return result
 
         if self.input_frame.naxes == 1:
-            x1, x2 = self.bounding_box
+            x1, x2 = self.bounding_box[0]
 
             if len(np.shape(args[0])) > 0:
                 result[result] = (coords[result] >= x1) & (coords[result] <= x2)
@@ -1264,14 +1269,15 @@ class WCS(GWCSAPIMixin):
             bb = transform_0.bounding_box
         except NotImplementedError:
             return None
-        if transform_0.n_inputs == 1:
-            return bb
-        try:
-            axes_order = self.input_frame.axes_order
-        except AttributeError:
-            axes_order = np.arange(transform_0.n_inputs)
+        # if transform_0.n_inputs == 1:
+        #     return bb
+        # try:
+        #     axes_order = self.input_frame.axes_order
+        # except AttributeError:
+        #     axes_order = np.arange(transform_0.n_inputs)
         # Model.bounding_box is in python order, need to reverse it first.
-        return tuple(bb[::-1][i] for i in axes_order)
+        # return tuple(bb[::-1][i] for i in axes_order)
+        return bb
 
     @bounding_box.setter
     def bounding_box(self, value):
@@ -1293,17 +1299,18 @@ class WCS(GWCSAPIMixin):
         else:
             try:
                 # Make sure the dimensions of the new bbox are correct.
-                mutils._BoundingBox.validate(transform_0, value)
+                bbox = BoundingBox.validate(transform_0, value, ordering = 'Fortran')
             except Exception:
                 raise
             # get the sorted order of axes' indices
             axes_ind = self._get_axes_indices()
             if transform_0.n_inputs == 1:
-                transform_0.bounding_box = value
+                transform_0.bounding_box = bbox
             else:
                 # The axes in bounding_box in modeling follow python order
                 #transform_0.bounding_box = np.array(value)[axes_ind][::-1]
-                transform_0.bounding_box = [value[ind] for ind in axes_ind][::-1]
+                # transform_0.bounding_box = [value[ind] for ind in axes_ind][::-1]
+                transform_0.bounding_box = bbox
         self.set_transform(frames[0], frames[1], transform_0)
 
     def _get_axes_indices(self):
@@ -1702,7 +1709,7 @@ class WCS(GWCSAPIMixin):
             # validate user-supplied bounding box:
             frames = self.available_frames
             transform_0 = self.get_transform(frames[0], frames[1])
-            mutils._BoundingBox.validate(transform_0, bounding_box)
+            BoundingBox.validate(transform_0, bounding_box)
 
         if self.pixel_n_dim > self.world_n_dim:
             raise RuntimeError(
@@ -1715,6 +1722,392 @@ class WCS(GWCSAPIMixin):
         except ValueError:
             raise ValueError("Number of sampling values either must be 1 "
                              "or it must match the number of pixel axes.")
+
+        _, world_axes = self._separable_groups(detect_celestial=False)
+
+        hdr, bin_table_hdu = self._to_fits_tab(
+            hdr=None,
+            world_axes_group=world_axes,
+            use_cd=False,
+            bounding_box=bounding_box,
+            bin_ext=bin_ext_name,
+            coord_col_name=coord_col_name,
+            sampling=sampling
+        )
+
+        return hdr, bin_table_hdu
+
+    def to_fits(self, bounding_box=None, max_pix_error=0.25, degree=None,
+                max_inv_pix_error=0.25, inv_degree=None, npoints=32,
+                crpix=None, projection='TAN', bin_ext_name='WCS-TABLE',
+                coord_col_name='coordinates', sampling=1, verbose=False):
+        """
+        Construct a FITS WCS ``-TAB``-based approximation to the WCS
+        in the form of a FITS header and a binary table extension. For the
+        description of the FITS WCS ``-TAB`` convention, see
+        "Representations of spectral coordinates in FITS" in
+        `Greisen, E. W. et al. A&A 446 (2) 747-771 (2006)
+        <https://doi.org/10.1051/0004-6361:20053818>`_ . If WCS contains
+        celestial frame, PC/CD formalism will be used for the celestial axes.
+
+        .. note::
+            SIP distortion fitting requires that the WCS object has only two
+            celestial axes. When WCS does not contain celestial axes,
+            SIP fitting parameters (``max_pix_error``, ``degree``,
+            ``max_inv_pix_error``, ``inv_degree``, and ``projection``)
+            are ignored. When a WCS, in addition to celestial
+            frame, contains other types of axes, SIP distortion fitting is
+            disabled (ony linear terms are fitted for celestial frame).
+
+        Parameters
+        ----------
+        bounding_box : tuple, optional
+            Specifies the range of acceptable values for each input axis.
+            The order of the axes is
+            `~gwcs.coordinate_frames.CoordinateFrame.axes_order`.
+            For two image axes ``bounding_box`` is of the form
+            ``((xmin, xmax), (ymin, ymax))``.
+
+        max_pix_error : float, optional
+            Maximum allowed error over the domain of the pixel array. This
+            error is the equivalent pixel error that corresponds to the maximum
+            error in the output coordinate resulting from the fit based on
+            a nominal plate scale.
+
+        degree : int, iterable, None, optional
+            Degree of the SIP polynomial. Default value `None` indicates that
+            all allowed degree values (``[1...9]``) will be considered and
+            the lowest degree that meets accuracy requerements set by
+            ``max_pix_error`` will be returned. Alternatively, ``degree`` can be
+            an iterable containing allowed values for the SIP polynomial degree.
+            This option is similar to default `None` but it allows caller to
+            restrict the range of allowed SIP degrees used for fitting.
+            Finally, ``degree`` can be an integer indicating the exact SIP degree
+            to be fit to the WCS transformation. In this case
+            ``max_pixel_error`` is ignored.
+
+            .. note::
+                When WCS object has When ``degree`` is `None` and the WCS object has
+
+        max_inv_pix_error : float, optional
+            Maximum allowed inverse error over the domain of the pixel array
+            in pixel units. If None, no inverse is generated.
+
+        inv_degree : int, iterable, None, optional
+            Degree of the SIP polynomial. Default value `None` indicates that
+            all allowed degree values (``[1...9]``) will be considered and
+            the lowest degree that meets accuracy requerements set by
+            ``max_pix_error`` will be returned. Alternatively, ``degree`` can be
+            an iterable containing allowed values for the SIP polynomial degree.
+            This option is similar to default `None` but it allows caller to
+            restrict the range of allowed SIP degrees used for fitting.
+            Finally, ``degree`` can be an integer indicating the exact SIP degree
+            to be fit to the WCS transformation. In this case
+            ``max_inv_pixel_error`` is ignored.
+
+        npoints : int, optional
+            The number of points in each dimension to sample the bounding box
+            for use in the SIP fit. Minimum number of points is 3.
+
+        crpix : list of float, None, optional
+            Coordinates (1-based) of the reference point for the new FITS WCS.
+            When not provided, i.e., when set to `None` (default) the reference
+            pixel will be chosen near the center of the bounding box for axes
+            corresponding to the celestial frame.
+
+        projection : str, `~astropy.modeling.projections.Pix2SkyProjection`, optional
+            Projection to be used for the created FITS WCS. It can be specified
+            as a string of three characters specifying a FITS projection code
+            from Table 13 in
+            `Representations of World Coordinates in FITS \
+            <https://doi.org/10.1051/0004-6361:20021326>`_
+            (Paper I), Greisen, E. W., and Calabretta, M. R., A & A, 395,
+            1061-1075, 2002. Alternatively, it can be an instance of one of the
+            `astropy's Pix2Sky_* <https://docs.astropy.org/en/stable/modeling/\
+            reference_api.html#module-astropy.modeling.projections>`_
+            projection models inherited from
+            :py:class:`~astropy.modeling.projections.Pix2SkyProjection`.
+
+        bin_ext_name : str, optional
+            Extension name for the `~astropy.io.fits.BinTableHDU` HDU for those
+            axes groups that will be converted using FITW WCS' ``-TAB``
+            algorith. Extension version will be determined automatically
+            based on the number of separable group of axes.
+
+        coord_col_name : str, optional
+            Field name of the coordinate array in the structured array
+            stored in `~astropy.io.fits.BinTableHDU` data. This corresponds to
+            ``TTYPEi`` field in the FITS header of the binary table extension.
+
+        sampling : float, tuple, optional
+            The target "density" of grid nodes per pixel to be used when
+            creating the coordinate array for the ``-TAB`` FITS WCS convention.
+            It is equal to ``1/step`` where ``step`` is the distance between
+            grid nodes in pixels. ``sampling`` can be specified as a single
+            number to be used for all axes or as a `tuple` of numbers
+            that specify the sampling for each image axis.
+
+        verbose : bool, optional
+            Print progress of fits.
+
+        Returns
+        -------
+        hdr : `~astropy.io.fits.Header`
+            Header with WCS-TAB information associated (to be used) with image
+            data.
+
+        hdulist : a list of `~astropy.io.fits.BinTableHDU`
+            A Python list of binary table extensions containing the coordinate
+            array for TAB extensions; one extension per separable axes group.
+
+        Raises
+        ------
+        ValueError
+            When ``bounding_box`` is not defined either through the input
+            ``bounding_box`` parameter or this object's ``bounding_box``
+            property.
+
+        ValueError
+            When ``sampling`` is a `tuple` of length larger than 1 that
+            does not match the number of image axes.
+
+        RuntimeError
+            If the number of image axes (`~gwcs.WCS.pixel_n_dim`) is larger
+            than the number of world axes (`~gwcs.WCS.world_n_dim`).
+
+        """
+        if bounding_box is None:
+            if self.bounding_box is None:
+                raise ValueError(
+                    "Need a valid bounding_box to compute the footprint."
+                )
+            bounding_box = self.bounding_box
+
+        else:
+            # validate user-supplied bounding box:
+            frames = self.available_frames
+            transform_0 = self.get_transform(frames[0], frames[1])
+            BoundingBox.validate(transform_0, bounding_box)
+
+        if self.forward_transform.n_inputs == 1:
+            bounding_box = [bounding_box]
+
+        if self.pixel_n_dim > self.world_n_dim:
+            raise RuntimeError(
+                "The case when the number of input axes is larger than the "
+                "number of output axes is not supported."
+            )
+
+        try:
+            sampling = np.broadcast_to(sampling, (self.pixel_n_dim, ))
+        except ValueError:
+            raise ValueError("Number of sampling values either must be 1 "
+                             "or it must match the number of pixel axes.")
+
+        world_axes_groups, _, celestial_group = self._separable_groups(
+            detect_celestial=True
+        )
+
+        # Find celestial axes group and treat it separately from other axes:
+        if celestial_group:
+            # if world_axes_groups is empty, then we have only celestial axes
+            # and so we can allow arbitrary degree for SIP. When there are
+            # other axes types present, issue a warning and set 'degree' to 1
+            # because use of SIP when world_n_dim > 2 currently is not supported by
+            # astropy.wcs.WCS - see https://github.com/astropy/astropy/pull/11452
+            if world_axes_groups and (degree is None or np.max(degree) != 2):
+                if degree is not None:
+                    warnings.warn(
+                        "SIP distortion is not supported when the number\n"
+                        "of axes in WCS is larger than 2. Setting 'degree'\n"
+                        "to 1 and 'max_inv_pix_error' to None."
+                    )
+                degree = 1
+                max_inv_pix_error = None
+
+            hdr = self._to_fits_sip(
+                celestial_group=celestial_group,
+                keep_axis_position=True,
+                bounding_box=bounding_box,
+                max_pix_error=max_pix_error,
+                degree=degree,
+                max_inv_pix_error=max_inv_pix_error,
+                inv_degree=inv_degree,
+                npoints=npoints,
+                crpix=crpix,
+                projection=projection,
+                verbose=verbose
+            )
+            use_cd = 'A_ORDER' in hdr
+
+        else:
+            use_cd = False
+            hdr = fits.Header()
+            hdr['NAXIS'] = 0
+            hdr['WCSAXES'] = 0
+
+        # now handle non-celestial axes using -TAB convention for each
+        # separable axes group:
+        hdulist = []
+        for extver0, world_axes_group in enumerate(world_axes_groups):
+            # For each subset of separable axes call _to_fits_tab to
+            # convert that group to a single Bin TableHDU with a
+            # coordinate array for this group of axes:
+            hdr, bin_table_hdu = self._to_fits_tab(
+                hdr=hdr,
+                world_axes_group=world_axes_group,
+                use_cd=use_cd,
+                bounding_box=bounding_box,
+                bin_ext=(bin_ext_name, extver0 + 1),
+                coord_col_name=coord_col_name,
+                sampling=sampling
+            )
+            hdulist.append(bin_table_hdu)
+
+        hdr.add_comment('FITS WCS created by approximating a gWCS')
+
+        return hdr, hdulist
+
+
+    def _to_fits_tab(self, hdr, world_axes_group, use_cd, bounding_box,
+                     bin_ext, coord_col_name, sampling):
+        """
+        Construct a FITS WCS ``-TAB``-based approximation to the WCS
+        in the form of a FITS header and a binary table extension. For the
+        description of the FITS WCS ``-TAB`` convention, see
+        "Representations of spectral coordinates in FITS" in
+        `Greisen, E. W. et al. A&A 446 (2) 747-771 (2006)
+        <https://doi.org/10.1051/0004-6361:20053818>`_ .
+
+        Below we describe only parameters additional to the ones explained for
+        `to_fits_tab`.
+
+        .. warn::
+            For this helper function, parameters ``bounding_box`` and
+            ``sampling`` (when provided as a tuple) are expected to have
+            the same length as the number of input axes in the *full* WCS
+            object. That is, the number of elements in ``bounding_box`` and
+            ``sampling`` is not be affected by ``ignore_axes``.
+
+        Other Parameters
+        ----------------
+        hdr : astropy.io.fits.Header, None
+            The first time this function is called, ``hdr`` should be set to
+            `None` or be an empty :py:class:`~astropy.io.fits.Header` object.
+            On subsequent calls, updated header from the previous iteration
+            should be provided.
+
+        world_axes_group : tuple of dict
+            A list of world axes to represent through FITS' -TAB convention.
+            This is a list of dictionaries with each dicti
+
+        axes_mapping : dict
+            A dictionary that maps output axis index to a tuple of input
+            axis indices. In a typical scenario of two input image axes
+            and two output celestial axes for a FITS-like WCS,
+            this dictionary would look like ``{0: (0, 1), 1: (0, 1)}``
+            with the two non-separable input axes.
+
+        fix_axes : dict
+            A dictionary containing as keys image axes' indices to be
+            fixed and as values - the values to which inputs should be kept
+            fixed. For example, this dictionary may be used to indicate the
+            celestial axes that should not be included into -TAB approximation
+            because they will be approximated using -SIP.
+
+        use_cd : bool
+            When `True` - CD-matrix formalism will be used instead of the
+            PC-matrix formalism.
+
+        bin_ext : str, tuple of str and int
+            Extension name  and optionally version for the
+            `~astropy.io.fits.BinTableHDU` HDU. When only a string extension
+            name is provided, extension version will be set to 1.
+            When ``bin_ext`` is a tuple, first element should be extension
+            name and the second element is a positive integer extension version
+            number.
+
+        Returns
+        -------
+        hdr : `~astropy.io.fits.Header`
+            Header with WCS-TAB information associated (to be used) with image
+            data.
+
+        bin_table_hdu : `~astropy.io.fits.BinTableHDU`
+            Binary table extension containing the coordinate array.
+
+        Raises
+        ------
+        ValueError
+            When ``bounding_box`` is not defined either through the input
+            ``bounding_box`` parameter or this object's ``bounding_box``
+            property.
+
+        ValueError
+            When ``sampling`` is a `tuple` of length larger than 1 that
+            does not match the number of image axes.
+
+        ValueError
+            When extension version is smaller than 1.
+
+        TypeError
+
+        RuntimeError
+            If the number of image axes (`~gwcs.WCS.pixel_n_dim`) is larger
+            than the number of world axes (`~gwcs.WCS.world_n_dim`).
+
+        """
+        if isinstance(bin_ext, str):
+            bin_ext = (bin_ext, 1)
+
+        if isinstance(bounding_box, BoundingBox):
+            bounding_box = bounding_box.bounding_box(ordering='Fortran')
+        if isinstance(bounding_box, list):
+            for index, bbox in enumerate(bounding_box):
+                if isinstance(bbox, BoundingBox):
+                    bounding_box[index] = bbox.bounding_box(ordering='Fortran')
+
+        # identify input axes:
+        input_axes = []
+        world_axes_idx = []
+        for ax in world_axes_group:
+            world_axes_idx.append(ax.axis)
+            input_axes.extend(ax.input_axes)
+        input_axes = sorted(set(input_axes))
+        n_inputs = len(input_axes)
+        n_outputs = len(world_axes_group)
+        world_axes_idx.sort()
+
+        # Create initial header and deal with non-degenerate axes
+        if hdr is None:
+            hdr = fits.Header()
+            hdr['NAXIS'] = n_inputs, 'number of array dimensions'
+            hdr['WCSAXES'] = n_outputs
+            hdr.insert('WCSAXES', ('WCSNAME', f'{self.output_frame.name}'), after=True)
+
+        else:
+            hdr['NAXIS'] += n_inputs
+            hdr['WCSAXES'] += n_outputs
+
+        # see what axes have been already populated in the header:
+        used_hdr_axes = []
+        for v in hdr['naxis*'].keys():
+            try:
+                used_hdr_axes.append(int(v.split('NAXIS')[1]) - 1)
+            except ValueError:
+                continue
+
+        degenerate_axis_start = max(
+            self.pixel_n_dim + 1,
+            max(used_hdr_axes) + 1 if used_hdr_axes else 1
+        )
+
+        # Deal with non-degenerate axes and add NAXISi to the header:
+        offset = hdr.index('NAXIS')
+
+        for iax in input_axes:
+            iiax = int(np.searchsorted(used_hdr_axes, iax))
+            hdr.insert(iiax + offset + 1, (f'NAXIS{iax + 1:d}', int(max(bounding_box[iiax])) + 1))
 
         # 1D grid coordinates:
         gcrds = []
