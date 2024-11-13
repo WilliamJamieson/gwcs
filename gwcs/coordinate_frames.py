@@ -192,10 +192,10 @@ def get_ctype_from_ucd(ucd):
 @dataclass
 class FrameProperties:
     naxes: InitVar[int]
-    axes_type: tuple[str]
-    unit: tuple[u.Unit] = None
-    axes_names: tuple[str] = None
-    axis_physical_types: list[str] = None
+    axes_type: tuple[str, ...]
+    unit: tuple[u.Unit] | None = None
+    axes_names: tuple[str, ...] | None = None
+    axis_physical_types: list[str] | None = None
 
     def __post_init__(self, naxes):
         if isinstance(self.axes_type, str):
@@ -246,7 +246,7 @@ class FrameProperties:
             self.axis_physical_types = tuple(ph_type)
 
     @property
-    def _default_axis_physical_type(self):
+    def _default_axis_physical_type(self) -> tuple[str, ...]:
         """
         The default physical types to use for this frame if none are specified
         by the user.
@@ -355,7 +355,7 @@ class BaseCoordinateFrame(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def _native_world_axis_object_components(self):
+    def _native_world_axis_object_components(self) -> list[tuple[str, int, str]]:
         """
         This property holds the "native" frame order of the components.
 
@@ -394,7 +394,7 @@ class CoordinateFrame(BaseCoordinateFrame):
 
     def __init__(self, naxes, axes_type, axes_order, reference_frame=None,
                  unit=None, axes_names=None,
-                 name=None, axis_physical_types=None):
+                 name=None, axis_physical_types=None) -> None:
         self._naxes = naxes
         self._axes_order = tuple(axes_order)
         self._reference_frame = reference_frame
@@ -420,14 +420,14 @@ class CoordinateFrame(BaseCoordinateFrame):
 
         super().__init__()
 
-    def _default_axis_physical_type(self, axes_type):
+    def _default_axis_physical_type(self, axes_type) -> tuple[str, ...]:
         """
         The default physical types to use for this frame if none are specified
         by the user.
         """
         return tuple("custom:{}".format(t) for t in axes_type)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         fmt = '<{0}(name="{1}", unit={2}, axes_names={3}, axes_order={4}'.format(
             self.__class__.__name__, self.name,
             self.unit, self.axes_names, self.axes_order)
@@ -436,43 +436,43 @@ class CoordinateFrame(BaseCoordinateFrame):
         fmt += ")>"
         return fmt
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self._name is not None:
             return self._name
         return self.__class__.__name__
 
-    def _sort_property(self, property):
+    def _sort_property(self, property: list | tuple) -> tuple:
         sorted_prop = sorted(zip(property, self.axes_order),
                                  key=lambda x: x[1])
         return tuple([t[0] for t in sorted_prop])
 
     @property
-    def name(self):
+    def name(self) -> str:
         """ A custom name of this frame."""
         return self._name
 
     @name.setter
-    def name(self, val):
+    def name(self, val: str) -> None:
         """ A custom name of this frame."""
         self._name = val
 
     @property
-    def naxes(self):
+    def naxes(self) -> int:
         """ The number of axes in this frame."""
         return self._naxes
 
     @property
-    def unit(self):
+    def unit(self) -> tuple[u.Unit, ...]:
         """The unit of this frame."""
         return self._sort_property(self._prop.unit)
 
     @property
-    def axes_names(self):
+    def axes_names(self) -> tuple[str, ...]:
         """ Names of axes in the frame."""
         return self._sort_property(self._prop.axes_names)
 
     @property
-    def axes_order(self):
+    def axes_order(self) -> tuple[int, ...]:
         """ A tuple of indices which map inputs to axes."""
         return self._axes_order
 
@@ -482,29 +482,29 @@ class CoordinateFrame(BaseCoordinateFrame):
         return self._reference_frame
 
     @property
-    def axes_type(self):
+    def axes_type(self) -> tuple[str, ...]:
         """ Type of this frame : 'SPATIAL', 'SPECTRAL', 'TIME'. """
         return self._sort_property(self._prop.axes_type)
 
     @property
-    def axis_physical_types(self):
+    def axis_physical_types(self) -> tuple[str, ...]:
         """
         The axis physical types for this frame.
 
         These physical types are the types in frame order, not transform order.
         """
-        apt = self._prop.axis_physical_types or self._default_axis_physical_types
+        apt = self._prop.axis_physical_types or self._prop._default_axis_physical_type
         return self._sort_property(apt)
 
     @property
-    def world_axis_object_classes(self):
+    def world_axis_object_classes(self): 
         return {f"{at}{i}" if i != 0 else at: (u.Quantity,
                      (),
                      {'unit': unit})
                 for i, (at, unit) in enumerate(zip(self.axes_type, self.unit))}
 
     @property
-    def _native_world_axis_object_components(self):
+    def _native_world_axis_object_components(self) -> list[tuple[str, int, str]]:
         return [(f"{at}{i}" if i != 0 else at, 0, 'value') for i, at in enumerate(self._prop.axes_type)]
 
 
