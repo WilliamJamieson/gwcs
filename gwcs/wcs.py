@@ -260,12 +260,19 @@ class WCS(GWCSAPIMixin):
     def forward_transform(self):
         """
         Return the total forward transform - from input to output coordinate frame.
-
         """
-        if self._pipeline:
-            return functools.reduce(lambda x, y: x | y, [step.transform for step in self._pipeline[:-1]])
-        else:
+        if not self._pipeline:
             return None
+
+        transform = functools.reduce(lambda x, y: x | y, [step.transform for step in self._pipeline[:-1]])
+
+        if self.bounding_box is not None:
+            # Currently compound models do not attempt to combine individual model
+            # bounding boxes. Get the forward transform and assign the bounding_box to it
+            # before evaluating it. The order Model.bounding_box is reversed.
+            transform.bounding_box = self.bounding_box
+
+        return transform
 
     @property
     def backward_transform(self):
@@ -389,12 +396,6 @@ class WCS(GWCSAPIMixin):
             args = self._add_units_input(args, self.input_frame)
         if not transform.uses_quantity and input_is_quantity:
             args = self._remove_units_input(args, self.input_frame)
-
-        if self.bounding_box is not None:
-            # Currently compound models do not attempt to combine individual model
-            # bounding boxes. Get the forward transform and assign the bounding_box to it
-            # before evaluating it. The order Model.bounding_box is reversed.
-            transform.bounding_box = self.bounding_box
 
         return transform(*args,
                          with_bounding_box=with_bounding_box,
@@ -1293,6 +1294,10 @@ class WCS(GWCSAPIMixin):
 
         frames = self.available_frames
         transform_0 = self.get_transform(frames[0], frames[1])
+
+        if transform_0 is None:
+            return None
+
         try:
             bb = transform_0.bounding_box
         except NotImplementedError:
