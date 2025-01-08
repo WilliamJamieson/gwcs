@@ -5,6 +5,8 @@ from astropy import utils as astutil
 from astropy.utils.misc import isiterable
 from astropy.wcs.wcsapi.low_level_api import VALID_UCDS, validate_physical_types
 
+__all__ = ["FrameProperties"]
+
 
 @dataclass
 class FrameProperties:

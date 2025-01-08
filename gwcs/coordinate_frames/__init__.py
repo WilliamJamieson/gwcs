@@ -116,18 +116,18 @@ in the coordinate frames before the transform is called:
 
 """
 
-from ._coordinate_frames import (
-    BaseCoordinateFrame,
-    CelestialFrame,
-    CompositeFrame,
+from ._base_coordinate_frame import BaseCoordinateFrame
+from ._celestial_frame import CelestialFrame
+from ._composite_frame import CompositeFrame
+from ._coordinate_frame import (
     CoordinateFrame,
-    EmptyFrame,
-    Frame2D,
-    SpectralFrame,
-    StokesFrame,
-    TemporalFrame,
     get_ctype_from_ucd,
 )
+from ._empty_frame import EmptyFrame
+from ._frame2d import Frame2D
+from ._spectral_frame import SpectralFrame
+from ._stokes_frame import StokesFrame
+from ._temporal_frame import TemporalFrame
 
 __all__ = [
     "BaseCoordinateFrame",
