@@ -31,7 +31,7 @@ from gwcs.coordinate_frames import (
     CoordinateFrame,
     get_ctype_from_ucd,
 )
-from gwcs.utils import _toindex, is_high_level
+from gwcs.utils import is_high_level, to_index
 
 from ._exception import NoConvergence
 from ._pipeline import ForwardTransform, Pipeline
@@ -82,7 +82,7 @@ class _WorldAxisInfo:
         self.input_axes = input_axes
 
 
-class WCS(GWCSAPIMixin, Pipeline):
+class WCS(Pipeline, GWCSAPIMixin):
     """
     Basic WCS class.
 
@@ -110,7 +110,7 @@ class WCS(GWCSAPIMixin, Pipeline):
         output_frame: CoordinateFrame | None = None,
         name: str | None = None,
     ) -> None:
-        super(GWCSAPIMixin, self).__init__(forward_transform, input_frame, output_frame)
+        super().__init__(forward_transform, input_frame, output_frame)
 
         self._approx_inverse = None
         self._name = "" if name is None else name
@@ -1207,7 +1207,7 @@ class WCS(GWCSAPIMixin, Pipeline):
         # workaround an issue with bbox with quantity, interval needs to be a cquantity,
         # not a list of quantities strip units
         if center:
-            vertices = _toindex(vertices)
+            vertices = to_index(vertices)
 
         result = np.asarray(self.__call__(*vertices, with_bounding_box=False))
 

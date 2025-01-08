@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TypeAlias
 
 import numpy as np
 from astropy.coordinates import SkyCoord, SpectralCoord, StokesCoord
+from astropy.modeling.bounding_box import CompoundBoundingBox, ModelBoundingBox
 from astropy.time import Time
 from astropy.units import Quantity
-
-if TYPE_CHECKING:
-    from typing import TypeAlias
 
 try:
     from astropy.units.typing import Real as _Real
@@ -17,11 +15,29 @@ except ImportError:
 
     _Real: TypeAlias = int | float | Fraction | np.integer | np.floating
 
+__all__ = [
+    "BoundingBox",
+    "Bounds",
+    "HighLevelObject",
+    "Interval",
+    "LowLevelArrays",
+    "LowLevelUnitArrays",
+    "LowLevelUnitValue",
+    "LowLevelValue",
+    "OutputLowLevelArray",
+    "Real",
+    "WorldAxisClass",
+    "WorldAxisComponent",
+    "WorldAxisComponents",
+]
+
 # Avoid pylance warning
 Real = _Real
 
 Interval: TypeAlias = tuple[Real, Real]
 Bounds: TypeAlias = tuple[Interval, ...] | None
+
+BoundingBox: TypeAlias = ModelBoundingBox | CompoundBoundingBox | None
 
 # This is to represent a single  value from a low-level function.
 LowLevelValue: TypeAlias = Real | np.ndarray

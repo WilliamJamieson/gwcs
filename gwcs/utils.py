@@ -49,7 +49,7 @@ class CoordinateFrameError(Exception):
         super().__init__(message)
 
 
-def _toindex(value):
+def to_index(value):
     """
     Convert value to an int or an int array.
 
@@ -61,11 +61,11 @@ def _toindex(value):
 
     Examples
     --------
-    >>> _toindex(np.array([-0.5, 0.49999]))
+    >>> to_index(np.array([-0.5, 0.49999]))
     array([0, 0])
-    >>> _toindex(np.array([0.5, 1.49999]))
+    >>> to_index(np.array([0.5, 1.49999]))
     array([1, 1])
-    >>> _toindex(np.array([1.5, 2.49999]))
+    >>> to_index(np.array([1.5, 2.49999]))
     array([2, 2])
     """
     return np.asarray(np.floor(np.asarray(value) + 0.5), dtype=int)
