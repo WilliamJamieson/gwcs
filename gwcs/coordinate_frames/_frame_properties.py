@@ -5,18 +5,20 @@ from astropy import utils as astutil
 from astropy.utils.misc import isiterable
 from astropy.wcs.wcsapi.low_level_api import VALID_UCDS, validate_physical_types
 
+from ._axis import AxesType
+
 __all__ = ["FrameProperties"]
 
 
 @dataclass
 class FrameProperties:
     naxes: InitVar[int]
-    axes_type: tuple[str]
-    unit: tuple[u.Unit] = None
-    axes_names: tuple[str] = None
+    axes_type: AxesType
+    unit: tuple[u.Unit, ...] = None
+    axes_names: tuple[str, ...] = None
     axis_physical_types: list[str] = None
 
-    def __post_init__(self, naxes):
+    def __post_init__(self, naxes: int):
         if isinstance(self.axes_type, str):
             self.axes_type = (self.axes_type,)
         else:
@@ -33,7 +35,7 @@ class FrameProperties:
                 raise ValueError(msg)
             self.unit = tuple(u.Unit(au) for au in unit)
         else:
-            self.unit = tuple(u.dimensionless_unscaled for na in range(naxes))
+            self.unit = tuple(u.dimensionless_unscaled for _ in range(naxes))
 
         if self.axes_names is not None:
             if isinstance(self.axes_names, str):

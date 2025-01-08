@@ -383,11 +383,11 @@ class GWCSAPIMixin(BaseGwcs, HighLevelWCSMixin):
         return False
 
     @property
-    def world_axis_object_classes(self) -> WorldAxisComponents:
+    def world_axis_object_classes(self) -> WorldAxisClasses:
         return self.output_frame.world_axis_object_classes
 
     @property
-    def world_axis_object_components(self) -> WorldAxisClasses:
+    def world_axis_object_components(self) -> WorldAxisComponents:
         return self.output_frame.world_axis_object_components
 
     @property

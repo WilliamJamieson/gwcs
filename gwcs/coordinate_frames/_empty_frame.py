@@ -7,24 +7,24 @@ class EmptyFrame(BaseCoordinateFrame):
     for input frame by the WCS object.
     """
 
-    def __init__(self, name=None):
+    def __init__(self, name: str | None = None) -> None:
         self._name = "detector" if name is None else name
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'<{type(self).__name__}(name="{self.name}")>'
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self._name is not None:
             return self._name
         return type(self).__name__
 
     @property
-    def name(self):
+    def name(self) -> str:
         """A custom name of this frame."""
         return self._name
 
     @name.setter
-    def name(self, val):
+    def name(self, val: str) -> None:
         """A custom name of this frame."""
         self._name = val
 

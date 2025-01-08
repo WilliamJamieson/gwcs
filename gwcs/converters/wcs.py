@@ -72,7 +72,7 @@ class FrameConverter(Converter):
         kwargs = {"name": node["name"]}
 
         if "axes_type" in node and "naxes" in node:
-            kwargs.update({"axes_type": node["axes_type"], "naxes": node["naxes"]})
+            kwargs.update({"axes_type": str(node["axes_type"]), "naxes": node["naxes"]})
 
         if "axes_names" in node:
             kwargs["axes_names"] = node["axes_names"]

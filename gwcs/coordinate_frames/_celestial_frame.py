@@ -1,6 +1,9 @@
 from astropy import coordinates as coord
 from astropy import units as u
 
+from gwcs._typing import AxisPhysicalTypes, WorldAxisClasses, WorldAxisComponents
+
+from ._axis import AxisType
 from ._coordinate_frame import CoordinateFrame
 
 __all__ = ["CelestialFrame"]
@@ -35,12 +38,12 @@ class CelestialFrame(CoordinateFrame):
 
     def __init__(
         self,
-        axes_order=None,
-        reference_frame=None,
-        unit=None,
-        axes_names=None,
-        name=None,
-        axis_physical_types=None,
+        axes_order: tuple[int, ...] | None = None,
+        reference_frame: coord.BaseCoordinateFrame = None,
+        unit: list[u.Unit] | None = None,
+        axes_names: list[str] | None = None,
+        name: str | None = None,
+        axis_physical_types: AxisPhysicalTypes | None = None,
     ):
         naxes = 2
         if (
@@ -60,7 +63,7 @@ class CelestialFrame(CoordinateFrame):
             axes_order = self.native_axes_order
         if unit is None:
             unit = tuple([u.degree] * naxes)
-        axes_type = ["SPATIAL"] * naxes
+        axes_type = (AxisType.SPATIAL,) * naxes
 
         pht = axis_physical_types or self._default_axis_physical_types(
             reference_frame, axes_names
@@ -76,7 +79,9 @@ class CelestialFrame(CoordinateFrame):
             axis_physical_types=pht,
         )
 
-    def _default_axis_physical_types(self, reference_frame, axes_names):
+    def _default_axis_physical_types(
+        self, reference_frame: coord.BaseCoordinateFrame, axes_names: list[str]
+    ) -> AxisPhysicalTypes:
         if isinstance(reference_frame, coord.Galactic):
             return "pos.galactic.lon", "pos.galactic.lat"
         if isinstance(
@@ -91,7 +96,7 @@ class CelestialFrame(CoordinateFrame):
         return tuple(f"custom:{t}" for t in axes_names)
 
     @property
-    def world_axis_object_classes(self):
+    def world_axis_object_classes(self) -> WorldAxisClasses:
         return {
             "celestial": (
                 coord.SkyCoord,
@@ -101,7 +106,7 @@ class CelestialFrame(CoordinateFrame):
         }
 
     @property
-    def _native_world_axis_object_components(self):
+    def _native_world_axis_object_components(self) -> WorldAxisComponents:
         return [
             ("celestial", 0, lambda sc: sc.spherical.lon.to_value(self._prop.unit[0])),
             ("celestial", 1, lambda sc: sc.spherical.lat.to_value(self._prop.unit[1])),

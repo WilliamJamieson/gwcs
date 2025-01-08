@@ -4,7 +4,11 @@ import abc
 
 import numpy as np
 from astropy import units as u
+from astropy.coordinates import BaseCoordinateFrame as _BaseCoordinateFrame
 
+from gwcs._typing import AxisPhysicalTypes, WorldAxisClasses, WorldAxisComponents
+
+from ._axis import AxesType
 from ._frame_properties import FrameProperties
 
 
@@ -55,7 +59,7 @@ class BaseCoordinateFrame(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def reference_frame(self):
+    def reference_frame(self) -> _BaseCoordinateFrame:
         """
         The reference frame of the coordinates described by this frame.
 
@@ -64,7 +68,7 @@ class BaseCoordinateFrame(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def axes_type(self):
+    def axes_type(self) -> AxesType:
         """
         An upcase string describing the type of the axis.
 
@@ -73,14 +77,14 @@ class BaseCoordinateFrame(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def axis_physical_types(self):
+    def axis_physical_types(self) -> AxisPhysicalTypes:
         """
         The UCD 1+ physical types for the axes, in frame order.
         """
 
     @property
     @abc.abstractmethod
-    def world_axis_object_classes(self):
+    def world_axis_object_classes(self) -> WorldAxisClasses:
         """
         The APE 14 object classes for this frame.
 
@@ -90,7 +94,7 @@ class BaseCoordinateFrame(abc.ABC):
         """
 
     @property
-    def world_axis_object_components(self):
+    def world_axis_object_components(self) -> WorldAxisComponents:
         """
         The APE 14 object components for this frame.
 
@@ -110,7 +114,7 @@ class BaseCoordinateFrame(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def _native_world_axis_object_components(self):
+    def _native_world_axis_object_components(self) -> WorldAxisComponents:
         """
         This property holds the "native" frame order of the components.
 

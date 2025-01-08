@@ -1,8 +1,16 @@
 from collections import defaultdict
+from collections.abc import Generator
 
 import numpy as np
 
-from ._coordinate_frame import CoordinateFrame
+from gwcs._typing import (
+    WorldAxisClass,
+    WorldAxisClasses,
+    WorldAxisComponent,
+    WorldAxisComponents,
+)
+
+from ._coordinate_frame import BaseCoordinateFrame, CoordinateFrame
 
 __all__ = ["CompositeFrame"]
 
@@ -19,7 +27,7 @@ class CompositeFrame(CoordinateFrame):
         Name for this frame.
     """
 
-    def __init__(self, frames, name=None):
+    def __init__(self, frames: list[BaseCoordinateFrame], name: str | None = None):
         self._frames = frames[:]
         naxes = sum([frame._naxes for frame in self._frames])
 
@@ -59,17 +67,17 @@ class CompositeFrame(CoordinateFrame):
         self._axis_physical_types = tuple(ph_type)
 
     @property
-    def frames(self):
+    def frames(self) -> list[BaseCoordinateFrame]:
         """
         The constituient frames that comprise this `CompositeFrame`.
         """
         return self._frames
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return repr(self.frames)
 
     @property
-    def _wao_classes_rename_map(self):
+    def _wao_classes_rename_map(self) -> Generator[WorldAxisClass, None, None]:
         mapper = defaultdict(dict)
         seen_names = []
         for frame in self.frames:
@@ -83,7 +91,7 @@ class CompositeFrame(CoordinateFrame):
         return mapper
 
     @property
-    def _wao_renamed_components_iter(self):
+    def _wao_renamed_components_iter(self) -> Generator[WorldAxisComponent, None, None]:
         mapper = self._wao_classes_rename_map
         for frame in self.frames:
             renamed_components = []
@@ -96,7 +104,7 @@ class CompositeFrame(CoordinateFrame):
             yield frame, renamed_components
 
     @property
-    def _wao_renamed_classes_iter(self):
+    def _wao_renamed_classes_iter(self) -> Generator[WorldAxisClass, None, None]:
         mapper = self._wao_classes_rename_map
         for frame in self.frames:
             for key, value in frame.world_axis_object_classes.items():
@@ -104,7 +112,7 @@ class CompositeFrame(CoordinateFrame):
                 yield rename if rename else key, value
 
     @property
-    def world_axis_object_components(self):
+    def world_axis_object_components(self) -> WorldAxisComponents:
         out = [None] * self.naxes
 
         for frame, components in self._wao_renamed_components_iter:
@@ -118,5 +126,5 @@ class CompositeFrame(CoordinateFrame):
         return out
 
     @property
-    def world_axis_object_classes(self):
+    def world_axis_object_classes(self) -> WorldAxisClasses:
         return dict(self._wao_renamed_classes_iter)

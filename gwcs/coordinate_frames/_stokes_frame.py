@@ -1,6 +1,9 @@
 from astropy import units as u
 from astropy.coordinates import StokesCoord
 
+from gwcs._typing import AxisPhysicalTypes, WorldAxisClasses, WorldAxisComponents
+
+from ._axis import AxisType
 from ._coordinate_frame import CoordinateFrame
 
 __all__ = ["StokesFrame"]
@@ -20,16 +23,16 @@ class StokesFrame(CoordinateFrame):
 
     def __init__(
         self,
-        axes_order=(0,),
-        axes_names=("stokes",),
-        name=None,
-        axis_physical_types=None,
+        axes_order: tuple[int, ...] = (0,),
+        axes_names: tuple[str, ...] = ("stokes",),
+        name: str | None = None,
+        axis_physical_types: AxisPhysicalTypes | None = None,
     ):
         pht = axis_physical_types or self._default_axis_physical_types()
 
         super().__init__(
             1,
-            ["STOKES"],
+            (AxisType.STOKES,),
             axes_order,
             name=name,
             axes_names=axes_names,
@@ -37,11 +40,11 @@ class StokesFrame(CoordinateFrame):
             axis_physical_types=pht,
         )
 
-    def _default_axis_physical_types(self):
+    def _default_axis_physical_types(self) -> AxisPhysicalTypes:
         return ("phys.polarization.stokes",)
 
     @property
-    def world_axis_object_classes(self):
+    def world_axis_object_classes(self) -> WorldAxisClasses:
         return {
             "stokes": (
                 StokesCoord,
@@ -51,5 +54,5 @@ class StokesFrame(CoordinateFrame):
         }
 
     @property
-    def _native_world_axis_object_components(self):
+    def _native_world_axis_object_components(self) -> WorldAxisComponents:
         return [("stokes", 0, "value")]

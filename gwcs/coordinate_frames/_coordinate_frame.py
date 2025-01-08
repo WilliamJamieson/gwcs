@@ -1,21 +1,34 @@
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
 
 import numbers
+from typing import TypeVar
 
 import numpy as np
 from astropy import units as u
+from astropy.coordinates import BaseCoordinateFrame
 from astropy.wcs.wcsapi.high_level_api import (
     high_level_objects_to_values,
     values_to_high_level_objects,
 )
 
-from ._base_coordinate_frame import BaseCoordinateFrame
+from gwcs._typing import (
+    AxisPhysicalTypes,
+    HighLevelObjects,
+    LowLevelArrays,
+    WorldAxisClasses,
+    WorldAxisComponents,
+)
+
+from ._axis import AxesType
+from ._base_coordinate_frame import BaseCoordinateFrame as _BaseCoordinateFrame
 from ._frame_properties import FrameProperties
 
 __all__ = ["CoordinateFrame"]
 
+T = TypeVar("T")
 
-class CoordinateFrame(BaseCoordinateFrame):
+
+class CoordinateFrame(_BaseCoordinateFrame):
     """
     Base class for Coordinate Frames.
 
@@ -23,7 +36,7 @@ class CoordinateFrame(BaseCoordinateFrame):
     ----------
     naxes : int
         Number of axes.
-    axes_type : str
+    axes_type : AxesType
         One of ["SPATIAL", "SPECTRAL", "TIME"]
     axes_order : tuple of int
         A dimension in the input data that corresponds to this axis.
@@ -40,15 +53,15 @@ class CoordinateFrame(BaseCoordinateFrame):
 
     def __init__(
         self,
-        naxes,
-        axes_type,
-        axes_order,
-        reference_frame=None,
-        unit=None,
-        axes_names=None,
-        name=None,
-        axis_physical_types=None,
-    ):
+        naxes: int,
+        axes_type: AxesType,
+        axes_order: tuple[int, ...],
+        reference_frame: BaseCoordinateFrame = None,
+        unit: list[u.Unit] | None = None,
+        axes_names: list[str] | None = None,
+        name: str | None = None,
+        axis_physical_types: AxisPhysicalTypes | None = None,
+    ) -> None:
         self._naxes = naxes
         self._axes_order = tuple(axes_order)
         self._reference_frame = reference_frame
@@ -75,14 +88,14 @@ class CoordinateFrame(BaseCoordinateFrame):
 
         super().__init__()
 
-    def _default_axis_physical_types(self, axes_type):
+    def _default_axis_physical_types(self, axes_type: AxesType) -> AxisPhysicalTypes:
         """
         The default physical types to use for this frame if none are specified
         by the user.
         """
         return tuple(f"custom:{t}" for t in axes_type)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         fmt = (
             f'<{self.__class__.__name__}(name="{self.name}", unit={self.unit}, '
             f"axes_names={self.axes_names}, axes_order={self.axes_order}"
@@ -92,59 +105,59 @@ class CoordinateFrame(BaseCoordinateFrame):
         fmt += ")>"
         return fmt
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self._name is not None:
             return self._name
         return self.__class__.__name__
 
-    def _sort_property(self, prop):
+    def _sort_property(self, prop: list[T]) -> tuple[T, ...]:
         sorted_prop = sorted(
             zip(prop, self.axes_order, strict=False), key=lambda x: x[1]
         )
         return tuple([t[0] for t in sorted_prop])
 
     @property
-    def name(self):
+    def name(self) -> str:
         """A custom name of this frame."""
         return self._name
 
     @name.setter
-    def name(self, val):
+    def name(self, val: str) -> None:
         """A custom name of this frame."""
         self._name = val
 
     @property
-    def naxes(self):
+    def naxes(self) -> int:
         """The number of axes in this frame."""
         return self._naxes
 
     @property
-    def unit(self):
+    def unit(self) -> tuple[u.Unit, ...]:
         """The unit of this frame."""
         return self._sort_property(self._prop.unit)
 
     @property
-    def axes_names(self):
+    def axes_names(self) -> tuple[str, ...]:
         """Names of axes in the frame."""
         return self._sort_property(self._prop.axes_names)
 
     @property
-    def axes_order(self):
+    def axes_order(self) -> tuple[int, ...]:
         """A tuple of indices which map inputs to axes."""
         return self._axes_order
 
     @property
-    def reference_frame(self):
+    def reference_frame(self) -> BaseCoordinateFrame:
         """Reference frame, used to convert to world coordinate objects."""
         return self._reference_frame
 
     @property
-    def axes_type(self):
+    def axes_type(self) -> AxesType:
         """Type of this frame : 'SPATIAL', 'SPECTRAL', 'TIME'."""
         return self._sort_property(self._prop.axes_type)
 
     @property
-    def axis_physical_types(self):
+    def axis_physical_types(self) -> tuple[str, ...]:
         """
         The axis physical types for this frame.
 
@@ -153,21 +166,21 @@ class CoordinateFrame(BaseCoordinateFrame):
         return self._sort_property(self._prop.axis_physical_types)
 
     @property
-    def world_axis_object_classes(self):
+    def world_axis_object_classes(self) -> WorldAxisClasses:
         return {
             f"{at}{i}" if i != 0 else at: (u.Quantity, (), {"unit": unit})
             for i, (at, unit) in enumerate(zip(self.axes_type, self.unit, strict=False))
         }
 
     @property
-    def _native_world_axis_object_components(self):
+    def _native_world_axis_object_components(self) -> WorldAxisComponents:
         return [
             (f"{at}{i}" if i != 0 else at, 0, "value")
             for i, at in enumerate(self._prop.axes_type)
         ]
 
     @property
-    def serialized_classes(self):
+    def serialized_classes(self) -> bool:
         """
         This property is used by the low level WCS API in Astropy.
 
@@ -175,7 +188,7 @@ class CoordinateFrame(BaseCoordinateFrame):
         """
         return False
 
-    def to_high_level_coordinates(self, *values):
+    def to_high_level_coordinates(self, *values: LowLevelArrays) -> HighLevelObjects:
         """
         Convert "values" to high level coordinate objects described by this frame.
 
@@ -211,7 +224,9 @@ class CoordinateFrame(BaseCoordinateFrame):
             high_level = high_level[0]
         return high_level
 
-    def from_high_level_coordinates(self, *high_level_coords):
+    def from_high_level_coordinates(
+        self, *high_level_coords: HighLevelObjects
+    ) -> LowLevelArrays:
         """
         Convert high level coordinate objects to "values" as described by this frame.
 

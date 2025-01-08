@@ -4,6 +4,9 @@ import numpy as np
 from astropy import time
 from astropy import units as u
 
+from gwcs._typing import AxisPhysicalTypes, Real, WorldAxisClasses, WorldAxisComponents
+
+from ._axis import AxisType
 from ._coordinate_frame import CoordinateFrame
 
 __all__ = ["TemporalFrame"]
@@ -32,12 +35,12 @@ class TemporalFrame(CoordinateFrame):
 
     def __init__(
         self,
-        reference_frame,
-        unit=u.s,
-        axes_order=(0,),
-        axes_names=None,
-        name=None,
-        axis_physical_types=None,
+        reference_frame: time.Time,
+        unit: u.Unit = u.s,
+        axes_order: tuple[int, ...] = (0,),
+        axes_names: list[str] | None = None,
+        name: str | None = None,
+        axis_physical_types: AxisPhysicalTypes = None,
     ):
         axes_names = (
             axes_names
@@ -49,7 +52,7 @@ class TemporalFrame(CoordinateFrame):
 
         super().__init__(
             naxes=1,
-            axes_type="TIME",
+            axes_type=AxisType.TIME,
             axes_order=axes_order,
             axes_names=axes_names,
             reference_frame=reference_frame,
@@ -62,10 +65,16 @@ class TemporalFrame(CoordinateFrame):
             with contextlib.suppress(AttributeError):
                 self._attrs[a] = getattr(self.reference_frame, a)
 
-    def _default_axis_physical_types(self):
+    def _default_axis_physical_types(self) -> AxisPhysicalTypes:
         return ("time",)
 
-    def _convert_to_time(self, dt, *, unit, **kwargs):
+    def _convert_to_time(
+        self,
+        dt: Real | time.TimeDelta | time.Time | np.ndarray | u.Quantity,
+        *,
+        unit: u.Unit,
+        **kwargs,
+    ) -> time.Time:
         if (
             not isinstance(dt, time.TimeDelta) and isinstance(dt, time.Time)
         ) or isinstance(self.reference_frame.value, np.ndarray):
@@ -77,7 +86,7 @@ class TemporalFrame(CoordinateFrame):
         return self.reference_frame + dt
 
     @property
-    def world_axis_object_classes(self):
+    def world_axis_object_classes(self) -> WorldAxisClasses:
         comp = (
             time.Time,
             (),
@@ -88,7 +97,7 @@ class TemporalFrame(CoordinateFrame):
         return {"temporal": comp}
 
     @property
-    def _native_world_axis_object_components(self):
+    def _native_world_axis_object_components(self) -> WorldAxisComponents:
         if isinstance(self.reference_frame.value, np.ndarray):
             return [("temporal", 0, "value")]
 

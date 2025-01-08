@@ -116,6 +116,7 @@ in the coordinate frames before the transform is called:
 
 """
 
+from ._axis import AxisType
 from ._base_coordinate_frame import BaseCoordinateFrame
 from ._celestial_frame import CelestialFrame
 from ._composite_frame import CompositeFrame
@@ -128,6 +129,7 @@ from ._temporal_frame import TemporalFrame
 from ._utils import get_ctype_from_ucd
 
 __all__ = [
+    "AxisType",
     "BaseCoordinateFrame",
     "CelestialFrame",
     "CompositeFrame",

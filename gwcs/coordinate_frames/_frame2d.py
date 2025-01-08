@@ -1,5 +1,8 @@
 from astropy import units as u
 
+from gwcs._typing import AxisPhysicalTypes
+
+from ._axis import AxesType, AxisType
 from ._coordinate_frame import CoordinateFrame
 
 __all__ = ["Frame2D"]
@@ -23,15 +26,15 @@ class Frame2D(CoordinateFrame):
 
     def __init__(
         self,
-        axes_order=(0, 1),
-        unit=(u.pix, u.pix),
-        axes_names=("x", "y"),
-        name=None,
-        axes_type=None,
-        axis_physical_types=None,
-    ):
+        axes_order: tuple[int, ...] = (0, 1),
+        unit: tuple[u.Unit, ...] = (u.pix, u.pix),
+        axes_names: tuple[str, ...] = ("x", "y"),
+        name: str | None = None,
+        axes_type: AxesType | None = None,
+        axis_physical_types: AxisPhysicalTypes | None = None,
+    ) -> None:
         if axes_type is None:
-            axes_type = ["SPATIAL", "SPATIAL"]
+            axes_type = (AxisType.SPATIAL, AxisType.SPATIAL)
         pht = axis_physical_types or self._default_axis_physical_types(
             axes_names, axes_type
         )
@@ -46,7 +49,9 @@ class Frame2D(CoordinateFrame):
             axis_physical_types=pht,
         )
 
-    def _default_axis_physical_types(self, axes_names, axes_type):
+    def _default_axis_physical_types(
+        self, axes_names: tuple[str, ...], axes_type: AxesType
+    ) -> AxisPhysicalTypes:
         if axes_names is not None and all(axes_names):
             ph_type = axes_names
         else:

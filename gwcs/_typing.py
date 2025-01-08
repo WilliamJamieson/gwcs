@@ -3,7 +3,12 @@ from __future__ import annotations
 from typing import TypeAlias, Union
 
 import numpy as np
-from astropy.coordinates import SkyCoord, SpectralCoord, StokesCoord
+from astropy.coordinates import (
+    BaseCoordinateFrame,
+    SkyCoord,
+    SpectralCoord,
+    StokesCoord,
+)
 from astropy.modeling import Model
 from astropy.modeling.bounding_box import CompoundBoundingBox, ModelBoundingBox
 from astropy.time import Time
@@ -17,10 +22,12 @@ except ImportError:
     _Real: TypeAlias = int | float | Fraction | np.integer | np.floating
 
 __all__ = [
+    "AxisPhysicalTypes",
     "BoundingBox",
     "BoundingBoxTuple",
     "Bounds",
     "HighLevelObject",
+    "HighLevelObjects",
     "Interval",
     "LowLevelArrays",
     "LowLevelUnitArrays",
@@ -58,6 +65,7 @@ LowLevelUnitArrays: TypeAlias = tuple[LowLevelUnitValue, ...]
 OutputLowLevelArray: TypeAlias = LowLevelValue | LowLevelArrays
 
 HighLevelObject: TypeAlias = Time | SkyCoord | SpectralCoord | StokesCoord | Quantity
+HighLevelObjects: TypeAlias = tuple[HighLevelObject, ...]
 
 LowOrHigh: TypeAlias = tuple[LowLevelValue | HighLevelObject, ...]
 
@@ -70,3 +78,5 @@ WorldAxisComponents: TypeAlias = list[WorldAxisComponent]
 WorldAxisClasses: TypeAlias = dict[str, WorldAxisClass]
 
 Mdl: TypeAlias = Union[Model, None]  # noqa: UP007
+
+AxisPhysicalTypes: TypeAlias = tuple[str | BaseCoordinateFrame, ...]
