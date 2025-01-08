@@ -17,6 +17,7 @@ except ImportError:
 
 __all__ = [
     "BoundingBox",
+    "BoundingBoxTuple",
     "Bounds",
     "HighLevelObject",
     "Interval",
@@ -24,6 +25,7 @@ __all__ = [
     "LowLevelUnitArrays",
     "LowLevelUnitValue",
     "LowLevelValue",
+    "LowOrHigh",
     "OutputLowLevelArray",
     "Real",
     "WorldAxisClass",
@@ -38,6 +40,7 @@ Interval: TypeAlias = tuple[Real, Real]
 Bounds: TypeAlias = tuple[Interval, ...] | None
 
 BoundingBox: TypeAlias = ModelBoundingBox | CompoundBoundingBox | None
+BoundingBoxTuple: TypeAlias = tuple[Real | Interval, ...] | None
 
 # This is to represent a single  value from a low-level function.
 LowLevelValue: TypeAlias = Real | np.ndarray
@@ -53,6 +56,8 @@ LowLevelUnitArrays: TypeAlias = tuple[LowLevelUnitValue, ...]
 OutputLowLevelArray: TypeAlias = LowLevelValue | LowLevelArrays
 
 HighLevelObject: TypeAlias = Time | SkyCoord | SpectralCoord | StokesCoord | Quantity
+
+LowOrHigh: TypeAlias = tuple[LowLevelValue | HighLevelObject, ...]
 
 WorldAxisComponent: TypeAlias = tuple[str, str | int, str]
 WorldAxisClass: TypeAlias = tuple[

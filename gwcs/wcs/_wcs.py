@@ -1,4 +1,6 @@
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
+from __future__ import annotations
+
 import functools
 import itertools
 import sys
@@ -12,6 +14,7 @@ from astropy.modeling import fix_inputs, projections
 from astropy.modeling.bounding_box import ModelBoundingBox as Bbox
 from astropy.modeling.models import (
     Mapping,
+    Pix2SkyProjection,
     RotateCelestial2Native,
     Shift,
     Sky2Pix_TAN,
@@ -24,11 +27,12 @@ from astropy.wcs.wcsapi.high_level_api import (
 )
 from scipy import optimize
 
+from gwcs._typing import BoundingBoxTuple, LowLevelArrays, LowOrHigh, Real
 from gwcs.api import GWCSAPIMixin
 from gwcs.coordinate_frames import (
+    BaseCoordinateFrame,
     CelestialFrame,
     CompositeFrame,
-    CoordinateFrame,
     get_ctype_from_ucd,
 )
 from gwcs.utils import is_high_level, to_index
@@ -49,7 +53,15 @@ _ITER_INV_KWARGS = ["tolerance", "maxiter", "adaptive", "detect_divergence", "qu
 
 
 class _WorldAxisInfo:
-    def __init__(self, axis, frame, world_axis_order, cunit, ctype, input_axes):
+    def __init__(
+        self,
+        axis: int,
+        frame: BaseCoordinateFrame,
+        world_axis_order: int,
+        cunit: str,
+        ctype: str,
+        input_axes: tuple[int, ...],
+    ):
         """
         A class for holding information about a world axis from an output frame.
 
@@ -58,7 +70,7 @@ class _WorldAxisInfo:
         axis : int
             Output axis number [in the forward transformation].
 
-        frame : cf.CoordinateFrame
+        frame : BaseCoordinateFrame
             Coordinate frame to which this axis belongs.
 
         world_axis_order : int
@@ -94,9 +106,9 @@ class WCS(Pipeline, GWCSAPIMixin):
         ``transform`` is the transform from this frame to the next one or
         ``output_frame``.  The last tuple is (transform, None), where None indicates
         the end of the pipeline.
-    input_frame : str, `~gwcs.coordinate_frames.CoordinateFrame`
+    input_frame : str, `~gwcs.coordinate_frames.BaseCoordinateFrame`
         A coordinates object or a string name.
-    output_frame : str, `~gwcs.coordinate_frames.CoordinateFrame`
+    output_frame : str, `~gwcs.coordinate_frames.BaseCoordinateFrame`
         A coordinates object or a string name.
     name : str
         a name for this WCS
@@ -106,8 +118,8 @@ class WCS(Pipeline, GWCSAPIMixin):
     def __init__(
         self,
         forward_transform: ForwardTransform = None,
-        input_frame: CoordinateFrame | None = None,
-        output_frame: CoordinateFrame | None = None,
+        input_frame: BaseCoordinateFrame | None = None,
+        output_frame: BaseCoordinateFrame | None = None,
         name: str | None = None,
     ) -> None:
         super().__init__(forward_transform, input_frame, output_frame)
@@ -117,7 +129,7 @@ class WCS(Pipeline, GWCSAPIMixin):
         self._pixel_shape = None
 
     def _add_units_input(
-        self, arrays: list[np.ndarray], frame: CoordinateFrame | None
+        self, arrays: list[np.ndarray], frame: BaseCoordinateFrame | None
     ) -> tuple[u.Quantity, ...]:
         if frame is not None:
             return tuple(
@@ -128,7 +140,7 @@ class WCS(Pipeline, GWCSAPIMixin):
         return arrays
 
     def _remove_units_input(
-        self, arrays: list[u.Quantity], frame: CoordinateFrame | None
+        self, arrays: list[u.Quantity], frame: BaseCoordinateFrame | None
     ) -> tuple[np.ndarray, ...]:
         if frame is not None:
             return tuple(
@@ -140,12 +152,12 @@ class WCS(Pipeline, GWCSAPIMixin):
 
     def __call__(
         self,
-        *args,
+        *args: LowLevelArrays,
         with_bounding_box: bool = True,
-        fill_value: float | np.number = np.nan,
+        fill_value: Real = np.nan,
         with_units: bool = False,
         **kwargs,
-    ):
+    ) -> LowLevelArrays:
         """
         Executes the forward transform.
 
@@ -180,13 +192,13 @@ class WCS(Pipeline, GWCSAPIMixin):
 
     def _call_forward(
         self,
-        *args,
-        from_frame: CoordinateFrame | None = None,
-        to_frame: CoordinateFrame | None = None,
+        *args: LowLevelArrays,
+        from_frame: BaseCoordinateFrame | None = None,
+        to_frame: BaseCoordinateFrame | None = None,
         with_bounding_box: bool = True,
-        fill_value: float | np.number = np.nan,
+        fill_value: Real = np.nan,
         **kwargs,
-    ):
+    ) -> LowLevelArrays:
         """
         Executes the forward transform, but values only.
         """
@@ -214,7 +226,7 @@ class WCS(Pipeline, GWCSAPIMixin):
             *args, with_bounding_box=with_bounding_box, fill_value=fill_value, **kwargs
         )
 
-    def in_image(self, *args, **kwargs):
+    def in_image(self, *args: LowOrHigh, **kwargs) -> bool | np.ndarray:
         """
         This method tests if one or more of the input world coordinates are
         contained within forward transformation's image and that it maps to
@@ -251,12 +263,12 @@ class WCS(Pipeline, GWCSAPIMixin):
 
     def invert(
         self,
-        *args,
+        *args: LowOrHigh,
         with_bounding_box: bool = True,
-        fill_value: float | np.number = np.nan,
+        fill_value: Real = np.nan,
         with_units: bool = False,
         **kwargs,
-    ):
+    ) -> LowLevelArrays:
         """
         Invert coordinates from output frame to input frame using analytical or
         user-supplied inverse. When neither analytical nor user-supplied
@@ -320,11 +332,11 @@ class WCS(Pipeline, GWCSAPIMixin):
 
     def _call_backward(
         self,
-        *args,
+        *args: LowLevelArrays,
         with_bounding_box: bool = True,
-        fill_value: float | np.number = np.nan,
+        fill_value: Real = np.nan,
         **kwargs,
-    ):
+    ) -> LowLevelArrays:
         try:
             transform = self.backward_transform
         except NotImplementedError:
@@ -365,7 +377,7 @@ class WCS(Pipeline, GWCSAPIMixin):
 
         return result
 
-    def outside_footprint(self, world_arrays):
+    def outside_footprint(self, world_arrays: LowOrHigh) -> LowOrHigh:
         world_arrays = list(world_arrays)
 
         axes_types = set(self.output_frame.axes_type)
@@ -416,7 +428,9 @@ class WCS(Pipeline, GWCSAPIMixin):
             )
         return world_arrays
 
-    def out_of_bounds(self, pixel_arrays, fill_value=np.nan):
+    def out_of_bounds(
+        self, pixel_arrays: LowLevelArrays, fill_value=np.nan
+    ) -> LowLevelArrays:
         if np.isscalar(pixel_arrays) or self.input_frame.naxes == 1:
             pixel_arrays = [pixel_arrays]
 
@@ -437,16 +451,16 @@ class WCS(Pipeline, GWCSAPIMixin):
 
     def numerical_inverse(
         self,
-        *args,
-        tolerance=1e-5,
-        maxiter=30,
-        adaptive=True,
-        detect_divergence=True,
-        quiet=True,
-        with_bounding_box=True,
-        fill_value=np.nan,
+        *args: LowOrHigh,
+        tolerance: Real = 1e-5,
+        maxiter: int = 30,
+        adaptive: bool = True,
+        detect_divergence: bool = True,
+        quiet: bool = True,
+        with_bounding_box: bool = True,
+        fill_value: Real = np.nan,
         **kwargs,
-    ):
+    ) -> LowLevelArrays:
         """
         Invert coordinates from output frame to input frame using numerical
         inverse.
@@ -1058,20 +1072,20 @@ class WCS(Pipeline, GWCSAPIMixin):
 
     def transform(
         self,
-        from_frame: str | CoordinateFrame,
-        to_frame: str | CoordinateFrame,
-        *args,
+        from_frame: str | BaseCoordinateFrame,
+        to_frame: str | BaseCoordinateFrame,
+        *args: LowOrHigh,
         with_units: bool = False,
         **kwargs,
-    ):
+    ) -> LowOrHigh:
         """
         Transform positions between two frames.
 
         Parameters
         ----------
-        from_frame : str or `~gwcs.coordinate_frames.CoordinateFrame`
+        from_frame : str or `~gwcs.coordinate_frames.BaseCoordinateFrame`
             Initial coordinate frame.
-        to_frame : str, or instance of `~gwcs.coordinate_frames.CoordinateFrame`
+        to_frame : str, or instance of `~gwcs.coordinate_frames.BaseCoordinateFrame`
             Coordinate frame into which to transform.
         args : float or array-like
             Inputs in ``from_frame``, separate inputs for each dimension.
@@ -1118,19 +1132,11 @@ class WCS(Pipeline, GWCSAPIMixin):
         return self._name
 
     @name.setter
-    def name(self, value):
+    def name(self, value: str) -> None:
         """Set the name for the WCS."""
         self._name = value
 
-    def _get_axes_indices(self):
-        try:
-            axes_ind = np.argsort(self.input_frame.axes_order)
-        except AttributeError:
-            # the case of a frame being a string
-            axes_ind = np.arange(self.forward_transform.n_inputs)
-        return axes_ind
-
-    def __str__(self):
+    def __str__(self) -> str:
         from astropy.table import Table
 
         col1 = [step.frame for step in self._pipeline]
@@ -1147,13 +1153,18 @@ class WCS(Pipeline, GWCSAPIMixin):
         t = Table([col1, col2], names=["From", "Transform"])
         return str(t)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"<WCS(output_frame={self.output_frame}, input_frame={self.input_frame}, "
             f"forward_transform={self.forward_transform})>"
         )
 
-    def footprint(self, bounding_box=None, center=False, axis_type="all"):
+    def footprint(
+        self,
+        bounding_box: BoundingBoxTuple | None = None,
+        center: bool = False,
+        axis_type: str = "all",
+    ) -> np.ndarray:
         """
         Return the footprint in world coordinates.
 
@@ -1234,7 +1245,7 @@ class WCS(Pipeline, GWCSAPIMixin):
             return np.array([result]).T
         return result.T
 
-    def fix_inputs(self, fixed):
+    def fix_inputs(self, fixed: dict) -> WCS:
         """
         Return a new unique WCS by fixing inputs to constant values.
 
@@ -1265,16 +1276,16 @@ class WCS(Pipeline, GWCSAPIMixin):
 
     def to_fits_sip(
         self,
-        bounding_box=None,
-        max_pix_error=0.25,
-        degree=None,
-        max_inv_pix_error=0.25,
-        inv_degree=None,
-        npoints=32,
-        crpix=None,
-        projection="TAN",
-        verbose=False,
-    ):
+        bounding_box: BoundingBoxTuple | None = None,
+        max_pix_error: Real = 0.25,
+        degree: int | list[int] | None = None,
+        max_inv_pix_error: Real = 0.25,
+        inv_degree: int | list[int] | None = None,
+        npoints: int = 32,
+        crpix: list[Real] | None = None,
+        projection: str | Pix2SkyProjection = "TAN",
+        verbose: bool = False,
+    ) -> fits.Header:
         """
         Construct a SIP-based approximation to the WCS for the axes
         corresponding to the `~gwcs.coordinate_frames.CelestialFrame`
@@ -1948,11 +1959,11 @@ class WCS(Pipeline, GWCSAPIMixin):
 
     def to_fits_tab(
         self,
-        bounding_box=None,
-        bin_ext_name="WCS-TABLE",
-        coord_col_name="coordinates",
-        sampling=1,
-    ):
+        bounding_box: BoundingBoxTuple | None = None,
+        bin_ext_name: str = "WCS-TABLE",
+        coord_col_name: str = "coordinates",
+        sampling: Real | tuple[Real, ...] = 1,
+    ) -> tuple[fits.Header, fits.BinTableHDU]:
         """
         Construct a FITS WCS ``-TAB``-based approximation to the WCS
         in the form of a FITS header and a binary table extension. For the
@@ -1966,7 +1977,7 @@ class WCS(Pipeline, GWCSAPIMixin):
         bounding_box : tuple, optional
             Specifies the range of acceptable values for each input axis.
             The order of the axes is
-            `~gwcs.coordinate_frames.CoordinateFrame.axes_order`.
+            `~gwcs.coordinate_frames.BaseCoordinateFrame.axes_order`.
             For two image axes ``bounding_box`` is of the form
             ``((xmin, xmax), (ymin, ymax))``.
 
@@ -2061,19 +2072,19 @@ class WCS(Pipeline, GWCSAPIMixin):
 
     def to_fits(
         self,
-        bounding_box=None,
-        max_pix_error=0.25,
-        degree=None,
-        max_inv_pix_error=0.25,
-        inv_degree=None,
-        npoints=32,
-        crpix=None,
-        projection="TAN",
-        bin_ext_name="WCS-TABLE",
-        coord_col_name="coordinates",
-        sampling=1,
-        verbose=False,
-    ):
+        bounding_box: BoundingBoxTuple | None = None,
+        max_pix_error: Real = 0.25,
+        degree: int | list[int] | None = None,
+        max_inv_pix_error: Real = 0.25,
+        inv_degree: int | list[int] | None = None,
+        npoints: int = 32,
+        crpix: list[Real] | None = None,
+        projection: str | Pix2SkyProjection = "TAN",
+        bin_ext_name: str = "WCS-TABLE",
+        coord_col_name: str = "coordinates",
+        sampling: Real | tuple[Real, ...] = 1,
+        verbose: bool = False,
+    ) -> tuple[fits.Header, fits.BinTableHDU]:
         """
         Construct a FITS WCS ``-TAB``-based approximation to the WCS
         in the form of a FITS header and a binary table extension. For the
@@ -2097,7 +2108,7 @@ class WCS(Pipeline, GWCSAPIMixin):
         bounding_box : tuple, optional
             Specifies the range of acceptable values for each input axis.
             The order of the axes is
-            `~gwcs.coordinate_frames.CoordinateFrame.axes_order`.
+            `~gwcs.coordinate_frames.BaseCoordinateFrame.axes_order`.
             For two image axes ``bounding_box`` is of the form
             ``((xmin, xmax), (ymin, ymax))``.
 

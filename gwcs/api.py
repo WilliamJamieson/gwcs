@@ -19,6 +19,7 @@ from ._typing import (
     Bounds,
     LowLevelArrays,
     OutputLowLevelArray,
+    Real,
     WorldAxisClasses,
     WorldAxisComponents,
 )
@@ -70,7 +71,7 @@ class GWCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin):
         from_frame: BaseCoordinateFrame | None = None,
         to_frame: BaseCoordinateFrame | None = None,
         with_bounding_box: bool = True,
-        fill_value: float | np.number = np.nan,
+        fill_value: Real = np.nan,
         **kwargs,
     ) -> LowLevelArrays:
         """
@@ -82,7 +83,7 @@ class GWCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin):
         self,
         *args: LowLevelArrays,
         with_bounding_box: bool = True,
-        fill_value: float | np.number = np.nan,
+        fill_value: Real = np.nan,
         **kwargs,
     ) -> LowLevelArrays:
         """
