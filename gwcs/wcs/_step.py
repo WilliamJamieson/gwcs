@@ -3,7 +3,7 @@ from typing import NamedTuple, TypeAlias, Union
 
 from astropy.modeling.core import Model
 
-from gwcs.coordinate_frames import CoordinateFrame, EmptyFrame
+from gwcs.coordinate_frames import BaseCoordinateFrame, EmptyFrame
 
 __all__ = [
     "IndexedStep",
@@ -12,7 +12,7 @@ __all__ = [
 ]
 
 
-StepTuple: TypeAlias = tuple[CoordinateFrame, Union[Model, None]]  # noqa: UP007
+StepTuple: TypeAlias = tuple[BaseCoordinateFrame, Union[Model, None]]  # noqa: UP007
 
 
 class Step:
@@ -28,11 +28,11 @@ class Step:
         The transform of the last step should be `None`.
     """
 
-    def __init__(self, frame: str | CoordinateFrame | None, transform=None):
+    def __init__(self, frame: str | BaseCoordinateFrame | None, transform=None):
         # Allow for a string to be passed in for the frame but be turned into a
         # frame object
         self.frame = (
-            frame if isinstance(frame, CoordinateFrame) else EmptyFrame(name=frame)
+            frame if isinstance(frame, BaseCoordinateFrame) else EmptyFrame(name=frame)
         )
         self.transform = transform
 
@@ -42,7 +42,7 @@ class Step:
 
     @frame.setter
     def frame(self, val):
-        if not isinstance(val, CoordinateFrame | str):
+        if not isinstance(val, BaseCoordinateFrame | str):
             msg = '"frame" should be an instance of CoordinateFrame or a string.'
             raise TypeError(msg)
 

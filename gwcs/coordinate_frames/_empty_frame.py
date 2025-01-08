@@ -1,7 +1,7 @@
-from ._coordinate_frame import CoordinateFrame
+from ._base_coordinate_frame import BaseCoordinateFrame
 
 
-class EmptyFrame(CoordinateFrame):
+class EmptyFrame(BaseCoordinateFrame):
     """
     Represents a "default" detector frame. This is for use as the default value
     for input frame by the WCS object.
@@ -66,10 +66,4 @@ class EmptyFrame(CoordinateFrame):
 
     @property
     def _native_world_axis_object_components(self):
-        self._raise_error()
-
-    def to_high_level_coordinates(self, *values):
-        self._raise_error()
-
-    def from_high_level_coordinates(self, *high_level_coords):
         self._raise_error()
