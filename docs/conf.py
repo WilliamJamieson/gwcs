@@ -149,7 +149,10 @@ extensions += ["sphinx_asdf"]  # noqa: F405
 nitpicky = True
 nitpick_ignore = [
     ("py:class", "gwcs.api.GWCSAPIMixin"),
+    ("py:class", "gwcs.api.BaseGwcs"),
     ("py:class", "gwcs.wcs._pipeline.Pipeline"),
+    ("py:class", "gwcs.wcs._inverse.InverseMixin"),
+    ("py:class", "gwcs.wcs._fits.FitsMixin"),
     ("py:obj", "astropy.modeling.projections.projcodes"),
     ("py:attr", "gwcs.WCS.bounding_box"),
     ("py:meth", "gwcs.WCS.footprint"),
