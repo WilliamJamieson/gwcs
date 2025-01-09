@@ -115,6 +115,33 @@ class BaseGwcs(BaseLowLevelWCS, abc.ABC):
         Executes the backward transform, but values only.
         """
 
+    @abc.abstractmethod
+    def __call__(
+        self,
+        *args: LowLevelArrays,
+        with_bounding_box: bool = True,
+        fill_value: Real = np.nan,
+        with_units: bool = False,
+        **kwargs,
+    ) -> LowLevelArrays:
+        """
+        Executes the forward transform.
+
+        args : float or array-like
+            Inputs in the input coordinate system, separate inputs
+            for each dimension.
+        with_bounding_box : bool, optional
+             If True(default) values in the result which correspond to
+             any of the inputs being outside the bounding_box are set
+             to ``fill_value``.
+        fill_value : float, optional
+            Output value for inputs outside the bounding_box
+            (default is np.nan).
+        with_units : bool, optional
+            If ``True`` then high level Astropy objects will be returned.
+            Optional, default=False.
+        """
+
 
 class GWCSAPIMixin(BaseGwcs, HighLevelWCSMixin):
     """
