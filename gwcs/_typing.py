@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import TypeAlias
+from typing import TypeAlias, Union
 
 import numpy as np
 from astropy.coordinates import SkyCoord, SpectralCoord, StokesCoord
+from astropy.modeling import Model
 from astropy.modeling.bounding_box import CompoundBoundingBox, ModelBoundingBox
 from astropy.time import Time
 from astropy.units import Quantity
@@ -26,6 +27,7 @@ __all__ = [
     "LowLevelUnitValue",
     "LowLevelValue",
     "LowOrHigh",
+    "Mdl",
     "OutputLowLevelArray",
     "Real",
     "WorldAxisClass",
@@ -66,3 +68,5 @@ WorldAxisClass: TypeAlias = tuple[
 
 WorldAxisComponents: TypeAlias = list[WorldAxisComponent]
 WorldAxisClasses: TypeAlias = dict[str, WorldAxisClass]
+
+Mdl: TypeAlias = Union[Model, None]  # noqa: UP007

@@ -6,7 +6,8 @@ from astropy.modeling import Model
 from astropy.modeling.bounding_box import CompoundBoundingBox, ModelBoundingBox
 from astropy.units import Unit
 
-from gwcs.coordinate_frames import CoordinateFrame, EmptyFrame
+from gwcs._typing import Mdl
+from gwcs.coordinate_frames import BaseCoordinateFrame, EmptyFrame
 from gwcs.utils import CoordinateFrameError
 
 from ._exception import GwcsBoundingBoxWarning, GwcsFrameExistsError
@@ -16,7 +17,6 @@ __all__ = ["ForwardTransform", "Pipeline"]
 
 # Type aliases due to the use of the `|` for type hints not working with Model
 ForwardTransform: TypeAlias = Union[Model, list[Step | StepTuple], None]  # noqa: UP007
-Mdl: TypeAlias = Union[Model, None]  # noqa: UP007
 
 
 class Pipeline:
@@ -31,8 +31,8 @@ class Pipeline:
     def __init__(
         self,
         forward_transform: ForwardTransform = None,
-        input_frame: str | CoordinateFrame | None = None,
-        output_frame: str | CoordinateFrame | None = None,
+        input_frame: str | BaseCoordinateFrame | None = None,
+        output_frame: str | BaseCoordinateFrame | None = None,
     ) -> None:
         self._pipeline: list[Step] = []
         self._initialize_pipeline(forward_transform, input_frame, output_frame)
@@ -40,8 +40,8 @@ class Pipeline:
     def _initialize_pipeline(
         self,
         forward_transform: ForwardTransform,
-        input_frame: str | CoordinateFrame | None,
-        output_frame: str | CoordinateFrame | None,
+        input_frame: str | BaseCoordinateFrame | None,
+        output_frame: str | BaseCoordinateFrame | None,
     ) -> None:
         """
         Initialize a pipeline from a forward transform specification.
@@ -52,11 +52,11 @@ class Pipeline:
             The forward transform to initialize the pipeline with.
             - Can be a single model which acts as the entire transform.
             - List of steps for the pipeline
-            - List of tuples[CoordinateFrame, Model] for the pipeline
+            - List of tuples[BaseCoordinateFrame, Model] for the pipeline
             - None for an empty pipeline
-        input_frame : `~gwcs.coordinate_frames.CoordinateFrame` or None
+        input_frame : `~gwcs.coordinate_frames.BaseCoordinateFrame` or None
             The input frame of the pipeline.
-        output_frame : `~gwcs.coordinate_frames.CoordinateFrame` or None
+        output_frame : `~gwcs.coordinate_frames.BaseCoordinateFrame` or None
             The output frame of the pipeline. This must be specified if
             forward_transform is not a list of steps.
 
@@ -179,14 +179,14 @@ class Pipeline:
         self._check_last_step()
 
     @staticmethod
-    def _handle_empty_frame(frame: CoordinateFrame) -> CoordinateFrame | None:
+    def _handle_empty_frame(frame: BaseCoordinateFrame) -> BaseCoordinateFrame | None:
         """
         Handle the case where the frame is an EmptyFrame.
         """
         return None if isinstance(frame, EmptyFrame) else frame
 
     @property
-    def input_frame(self) -> CoordinateFrame | None:
+    def input_frame(self) -> BaseCoordinateFrame | None:
         """
         Return the input frame name of the pipeline.
         """
@@ -195,7 +195,7 @@ class Pipeline:
         )
 
     @property
-    def output_frame(self) -> CoordinateFrame | None:
+    def output_frame(self) -> BaseCoordinateFrame | None:
         """
         Return the output frame name of the pipeline.
         """
@@ -216,28 +216,28 @@ class Pipeline:
         return reduce(lambda x, y: x | y, transforms)
 
     @staticmethod
-    def _frame_name(frame: str | CoordinateFrame) -> str:
+    def _frame_name(frame: str | BaseCoordinateFrame) -> str:
         """
         Return the name of the frame.
 
         Parameters
         ----------
-        frame : str or `~gwcs.coordinate_frames.CoordinateFrame`
+        frame : str or `~gwcs.coordinate_frames.BaseCoordinateFrame`
             Name of the frame or the frame object.
 
         Returns
         -------
         Name of the frame.
         """
-        return frame.name if isinstance(frame, CoordinateFrame) else frame
+        return frame.name if isinstance(frame, BaseCoordinateFrame) else frame
 
-    def _frame_index(self, frame: str | CoordinateFrame) -> int:
+    def _frame_index(self, frame: str | BaseCoordinateFrame) -> int:
         """
         Return the index of the given frame in the pipeline.
 
         Parameters
         ----------
-        frame : str or `~gwcs.coordinate_frames.CoordinateFrame`
+        frame : str or `~gwcs.coordinate_frames.BaseCoordinateFrame`
             Name of the frame or the frame object.
 
         Returns
@@ -250,7 +250,7 @@ class Pipeline:
             msg = f"Frame {self._frame_name(frame)} is not in the available frames"
             raise CoordinateFrameError(msg) from err
 
-    def _get_step(self, frame: str | CoordinateFrame) -> IndexedStep:
+    def _get_step(self, frame: str | BaseCoordinateFrame) -> IndexedStep:
         """
         Get the index and step corresponding to the given frame.
         """
@@ -259,16 +259,16 @@ class Pipeline:
         return IndexedStep(index, self._pipeline[index])
 
     def get_transform(
-        self, from_frame: str | CoordinateFrame, to_frame: str | CoordinateFrame
+        self, from_frame: str | BaseCoordinateFrame, to_frame: str | BaseCoordinateFrame
     ) -> Mdl:
         """
         Return a transform between two coordinate frames.
 
         Parameters
         ----------
-        from_frame : str or `~gwcs.coordinate_frames.CoordinateFrame`
+        from_frame : str or `~gwcs.coordinate_frames.BaseCoordinateFrame`
             Initial coordinate frame name of object.
-        to_frame : str or `~gwcs.coordinate_frames.CoordinateFrame`
+        to_frame : str or `~gwcs.coordinate_frames.BaseCoordinateFrame`
             End coordinate frame name or object.
 
         Returns
@@ -300,8 +300,8 @@ class Pipeline:
 
     def set_transform(
         self,
-        from_frame: str | CoordinateFrame,
-        to_frame: str | CoordinateFrame,
+        from_frame: str | BaseCoordinateFrame,
+        to_frame: str | BaseCoordinateFrame,
         transform: Model,
     ) -> None:
         """
@@ -309,9 +309,9 @@ class Pipeline:
 
         Parameters
         ----------
-        from_frame : str or `~gwcs.coordinate_frames.CoordinateFrame`
+        from_frame : str or `~gwcs.coordinate_frames.BaseCoordinateFrame`
             Initial coordinate frame.
-        to_frame : str, or instance of `~gwcs.coordinate_frames.CoordinateFrame`
+        to_frame : str, or instance of `~gwcs.coordinate_frames.BaseCoordinateFrame`
             End coordinate frame.
         transform : `~astropy.modeling.Model`
             Transform between ``from_frame`` and ``to_frame``.
@@ -330,7 +330,7 @@ class Pipeline:
         self._pipeline[from_index].transform = transform
 
     def insert_transform(
-        self, frame: str | CoordinateFrame, transform: Model, after: bool = False
+        self, frame: str | BaseCoordinateFrame, transform: Model, after: bool = False
     ) -> None:
         """
         Insert a transform before (default) or after a coordinate frame.
@@ -339,7 +339,7 @@ class Pipeline:
 
         Parameters
         ----------
-        frame : str or `~gwcs.coordinate_frames.CoordinateFrame`
+        frame : str or `~gwcs.coordinate_frames.BaseCoordinateFrame`
             Coordinate frame which sets the point of insertion.
         transform : `~astropy.modeling.Model`
             New transform to be inserted in the pipeline
@@ -363,34 +363,34 @@ class Pipeline:
 
     def insert_frame(
         self,
-        input_frame: str | CoordinateFrame,
+        input_frame: str | BaseCoordinateFrame,
         transform: Model,
-        output_frame: str | CoordinateFrame,
+        output_frame: str | BaseCoordinateFrame,
     ) -> None:
         """
         Insert a new frame into an existing pipeline. This frame must be
         anchored to a frame already in the pipeline by a transform. This
         existing frame is identified solely by its name, although an entire
-        `~gwcs.coordinate_frames.CoordinateFrame` can be passed (e.g., the
+        `~gwcs.coordinate_frames.BaseCoordinateFrame` can be passed (e.g., the
         `input_frame` or `output_frame` attribute). This frame is never
         modified.
 
         Parameters
         ----------
-        input_frame : str or `~gwcs.coordinate_frames.CoordinateFrame`
+        input_frame : str or `~gwcs.coordinate_frames.BaseCoordinateFrame`
             Coordinate frame at start of new transform
         transform : `~astropy.modeling.Model`
             New transform to be inserted in the pipeline
-        output_frame: str or `~gwcs.coordinate_frames.CoordinateFrame`
+        output_frame: str or `~gwcs.coordinate_frames.BaseCoordinateFrame`
             Coordinate frame at end of new transform
         """
 
-        def get_index(frame: str | CoordinateFrame) -> int | None:
+        def get_index(frame: str | BaseCoordinateFrame) -> int | None:
             try:
                 index = self._frame_index(frame)
             except CoordinateFrameError as err:
                 index = None
-                if not isinstance(frame, CoordinateFrame):
+                if not isinstance(frame, BaseCoordinateFrame):
                     msg = (
                         f"New coordinate frame {self._frame_name(frame)} "
                         "must be defined"
@@ -476,7 +476,8 @@ class Pipeline:
         """
         Set the range of acceptable values for each input axis.
 
-        The order of the axes is `~gwcs.coordinate_frames.CoordinateFrame.axes_order`.
+        The order of the axes is
+        `~gwcs.coordinate_frames.BaseCoordinateFrame.axes_order`.
         For two inputs and axes_order(0, 1) the bounding box is
         ((xlow, xhigh), (ylow, yhigh)).
 

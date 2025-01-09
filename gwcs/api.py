@@ -18,6 +18,7 @@ from ._typing import (
     BoundingBox,
     Bounds,
     LowLevelArrays,
+    Mdl,
     OutputLowLevelArray,
     Real,
     WorldAxisClasses,
@@ -25,15 +26,12 @@ from ._typing import (
 )
 from .coordinate_frames import BaseCoordinateFrame
 
-__all__ = ["GWCSAPIMixin"]
+__all__ = ["BaseGwcs", "GWCSAPIMixin"]
 
 
-class GWCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin):
+class BaseGwcs(BaseLowLevelWCS, abc.ABC):
     """
-    A mix-in class that is intended to be inherited by the
-    :class:`~gwcs.wcs.WCS` class and provides the low- and high-level
-    WCS API described in the astropy APE 14
-    (https://doi.org/10.5281/zenodo.1188875).
+    Base class for a GWCS object.
     """
 
     @property
@@ -59,9 +57,36 @@ class GWCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin):
 
     @property
     @abc.abstractmethod
+    def available_frames(self) -> list[str]:
+        """
+        List of all the frame names in this WCS in their order in the pipeline
+        """
+
+    @property
+    @abc.abstractmethod
     def bounding_box(self) -> BoundingBox:
         """
         The bounding box of the WCS.
+        """
+
+    @abc.abstractmethod
+    def get_transform(
+        self, from_frame: str | BaseCoordinateFrame, to_frame: str | BaseCoordinateFrame
+    ) -> Mdl:
+        """
+        Return a transform between two coordinate frames.
+
+        Parameters
+        ----------
+        from_frame : str or `~gwcs.coordinate_frames.CoordinateFrame`
+            Initial coordinate frame name of object.
+        to_frame : str or `~gwcs.coordinate_frames.CoordinateFrame`
+            End coordinate frame name or object.
+
+        Returns
+        -------
+        transform : `~astropy.modeling.Model`
+            Transform between two frames.
         """
 
     @abc.abstractmethod
@@ -89,6 +114,15 @@ class GWCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin):
         """
         Executes the backward transform, but values only.
         """
+
+
+class GWCSAPIMixin(BaseGwcs, HighLevelWCSMixin):
+    """
+    A mix-in class that is intended to be inherited by the
+    :class:`~gwcs.wcs.WCS` class and provides the low- and high-level
+    WCS API described in the astropy APE 14
+    (https://doi.org/10.5281/zenodo.1188875).
+    """
 
     # Low Level APE 14 API
     @property
