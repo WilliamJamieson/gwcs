@@ -326,19 +326,7 @@ See also
 Reference/API
 -------------
 
-.. automodapi:: gwcs.wcs
-  :inherited-members:
+.. toctree::
+  :maxdepth: 2
 
-.. automodapi:: gwcs.coordinate_frames
-  :inherited-members:
-
-.. automodapi:: gwcs.wcstools
-
-.. automodapi:: gwcs.selector
-  :inherited-members:
-
-.. automodapi:: gwcs.spectroscopy
-  :inherited-members:
-
-.. automodapi:: gwcs.geometry
-  :inherited-members:
+  api.rst
