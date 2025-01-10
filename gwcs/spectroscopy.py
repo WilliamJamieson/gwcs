@@ -8,6 +8,8 @@ import numpy as np
 from astropy.modeling.core import Model
 from astropy.modeling.parameters import Parameter
 
+from gwcs._typing import Real
+
 __all__ = [
     "AnglesFromGratingEquation3D",
     "SellmeierGlass",
@@ -33,9 +35,9 @@ class WavelengthFromGratingEquation(Model):
 
     Parameters
     ----------
-    groove_density : int
+    groove_density
         Grating ruling density in units of 1/length.
-    spectral_order : int
+    spectral_order
         Spectral order.
 
     Examples
@@ -62,7 +64,7 @@ class WavelengthFromGratingEquation(Model):
     spectral_order = Parameter(default=1)
     """ Spectral order."""
 
-    def __init__(self, groove_density, spectral_order, **kwargs):
+    def __init__(self, groove_density: int, spectral_order: int, **kwargs) -> None:
         super().__init__(
             groove_density=groove_density, spectral_order=spectral_order, **kwargs
         )
@@ -75,7 +77,7 @@ class WavelengthFromGratingEquation(Model):
         return (alpha_in + alpha_out) / (groove_density * spectral_order)
 
     @property
-    def return_units(self):
+    def return_units(self) -> dict[str, u.Unit] | None:
         if self.groove_density.unit is None:
             return None
         return {"wavelength": u.Unit(1 / self.groove_density.unit)}
@@ -88,9 +90,9 @@ class AnglesFromGratingEquation3D(Model):
 
     Parameters
     ----------
-    groove_density : int
+    groove_density
         Grating ruling density in units of 1/m.
-    order : int
+    order
         Spectral order.
 
     Examples
@@ -118,7 +120,7 @@ class AnglesFromGratingEquation3D(Model):
     spectral_order = Parameter(default=1)
     """ Spectral order."""
 
-    def __init__(self, groove_density, spectral_order, **kwargs):
+    def __init__(self, groove_density: int, spectral_order: int, **kwargs) -> None:
         super().__init__(
             groove_density=groove_density, spectral_order=spectral_order, **kwargs
         )
@@ -143,7 +145,7 @@ class AnglesFromGratingEquation3D(Model):
         return alpha_out, beta_out, gamma_out
 
     @property
-    def input_units(self):
+    def input_units(self) -> dict[str, u.Unit] | None:
         if self.groove_density.unit is None:
             return None
         return {
@@ -192,9 +194,9 @@ class SellmeierGlass(Model):
 
     Parameters
     ----------
-    B_coef : ndarray
+    B_coef
         Iterable of size 3 containing B coefficients.
-    C_coef : ndarray
+    C_coef
         Iterable of size 3 containing c coefficients in
         units of ``u.um**2``.
 
@@ -214,7 +216,7 @@ class SellmeierGlass(Model):
 
     References
     ----------
-    .. [1] https://en.wikipedia.org/wiki/Sellmeier_equation
+    .. https://en.wikipedia.org/wiki/Sellmeier_equation
 
     Notes
     -----
@@ -241,7 +243,7 @@ class SellmeierGlass(Model):
     C_coef = Parameter(default=np.array([0, 0, 0]))
     """ C1, C2, C3 coefficients in units of um ** 2. """
 
-    def __init__(self, B_coef, C_coef, **kwargs):
+    def __init__(self, B_coef: np.ndarray, C_coef: np.ndarray, **kwargs):
         super().__init__(B_coef, C_coef)
         self.inputs = ("wavelength",)
         self.outputs = ("n",)
@@ -259,7 +261,7 @@ class SellmeierGlass(Model):
         )
 
     @property
-    def input_units(self):
+    def input_units(self) -> dict[str, u.Unit] | None:
         if self.C_coef.unit is None:
             return None
         return {"wavelength": u.um}
@@ -271,23 +273,23 @@ class SellmeierZemax(Model):
 
     Parameters
     ----------
-    temperature : float
+    temperature
         Temperature of the material in ``u.Kelvin``.
-    ref_temperature : float
+    ref_temperature
         Reference emperature of the glass in ``u.Kelvin``.
-    ref_pressure : float
+    ref_pressure
         Reference pressure in ATM.
-    pressure : float
+    pressure
         Measured pressure in ATM.
-    B_coef : ndarray
+    B_coef
         Iterable of size 3 containing B coefficients.
-    C_coef : ndarray
+    C_coef
         Iterable of size 3 containing C coefficients in
         units of ``u.um**2``.
-    D_coef : ndarray
+    D_coef
         Iterable of size 3 containing constants to describe the
         behavior of the material.
-    E_coef : ndarray
+    E_coef
         Iterable of size 3 containing constants to describe the
         behavior of the material.
 
@@ -316,14 +318,14 @@ class SellmeierZemax(Model):
 
     def __init__(
         self,
-        temperature=temperature,
-        ref_temperature=ref_temperature,
-        ref_pressure=ref_pressure,
-        pressure=pressure,
-        B_coef=B_coef,
-        C_coef=C_coef,
-        D_coef=D_coef,
-        E_coef=E_coef,
+        temperature: Real = temperature,
+        ref_temperature: Real = ref_temperature,
+        ref_pressure: Real = ref_pressure,
+        pressure: Real = pressure,
+        B_coef: np.ndarray = B_coef,
+        C_coef: np.ndarray = C_coef,
+        D_coef: np.ndarray = D_coef,
+        E_coef: np.ndarray = E_coef,
         **kwargs,
     ):
         super().__init__(

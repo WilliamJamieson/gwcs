@@ -11,6 +11,8 @@ from astropy.coordinates import (
 )
 from astropy.modeling import Model
 from astropy.modeling.bounding_box import CompoundBoundingBox, ModelBoundingBox
+from astropy.modeling.models import Mapping as _Mapping
+from astropy.modeling.projections import Projection as _Projection
 from astropy.time import Time
 from astropy.units import Quantity
 
@@ -34,8 +36,10 @@ __all__ = [
     "LowLevelUnitValue",
     "LowLevelValue",
     "LowOrHigh",
+    "Mapping",
     "Mdl",
     "OutputLowLevelArray",
+    "Projection",
     "Real",
     "WorldAxisClass",
     "WorldAxisComponent",
@@ -78,5 +82,7 @@ WorldAxisComponents: TypeAlias = list[WorldAxisComponent]
 WorldAxisClasses: TypeAlias = dict[str, WorldAxisClass]
 
 Mdl: TypeAlias = Union[Model, None]  # noqa: UP007
+Mapping: TypeAlias = Union[_Mapping, None]  # noqa: UP007
+Projection: TypeAlias = Union[_Projection, None]  # noqa: UP007
 
 AxisPhysicalTypes: TypeAlias = tuple[str | BaseCoordinateFrame, ...]

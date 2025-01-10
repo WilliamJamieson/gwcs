@@ -558,12 +558,6 @@ class Pipeline:
         """
         Return the total backward transform if available - from output to input
         coordinate system.
-
-        Raises
-        ------
-        NotImplementedError :
-            An analytical inverse does not exist.
-
         """
         try:
             backward = self.forward_transform.inverse

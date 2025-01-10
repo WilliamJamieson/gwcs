@@ -12,10 +12,7 @@ Reference/API
 .. automodapi:: gwcs.wcstools
 
 .. automodapi:: gwcs.selector
-  :inherited-members:
 
 .. automodapi:: gwcs.spectroscopy
-  :inherited-members:
 
 .. automodapi:: gwcs.geometry
-  :inherited-members:

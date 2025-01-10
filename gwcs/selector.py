@@ -67,12 +67,17 @@ label mappers.
 
 """
 
+from __future__ import annotations
+
 import contextlib
 import warnings
+from typing import Any
 
 import numpy as np
 from astropy.modeling import models as astmodels
 from astropy.modeling.core import Model
+
+from gwcs._typing import Mapping, Real
 
 from . import region
 from .utils import RegionError, to_index
@@ -135,22 +140,29 @@ class _LabelMapper(Model):
         The name of this transform.
     """
 
-    def __init__(self, mapper, no_label, inputs_mapping=None, name=None, **kwargs):
+    def __init__(
+        self,
+        mapper: Any,
+        no_label: str | int,
+        inputs_mapping: Mapping = None,
+        name: str | None = None,
+        **kwargs,
+    ) -> None:
         self._no_label = no_label
         self._inputs_mapping = inputs_mapping
         self._mapper = mapper
         super().__init__(name=name, **kwargs)
 
     @property
-    def mapper(self):
+    def mapper(self) -> Any:
         return self._mapper
 
     @property
-    def inputs_mapping(self):
+    def inputs_mapping(self) -> Mapping:
         return self._inputs_mapping
 
     @property
-    def no_label(self):
+    def no_label(self) -> str | int:
         return self._no_label
 
     def evaluate(self, *args):
@@ -164,22 +176,23 @@ class LabelMapperArray(_LabelMapper):
 
     Parameters
     ----------
-    mapper : ndarray
+    mapper
         An array of integers or strings where the values
         correspond to a label in `~gwcs.selector.RegionsSelector` model.
         For pixels for which the transform is not defined the value should
         be set to 0 or " ".
-    inputs_mapping : `~astropy.modeling.mappings.Mapping`
+    inputs_mapping
         An optional Mapping model to be prepended to the LabelMapper
         with the purpose to filter the inputs or change their order
         so that the output of it is (x, y) values to index the array.
-    name : str
+    name
         The name of this transform.
 
-    Use case:
-    For an IFU observation, the array represents the detector and its
-    values correspond to the IFU slice label.
-
+    Notes
+    -----
+    - Use case:
+        For an IFU observation, the array represents the detector and its
+        values correspond to the IFU slice label.
     """
 
     n_inputs = 2
@@ -188,7 +201,13 @@ class LabelMapperArray(_LabelMapper):
     linear = False
     fittable = False
 
-    def __init__(self, mapper, inputs_mapping=None, name=None, **kwargs):
+    def __init__(
+        self,
+        mapper: np.ndarray,
+        inputs_mapping: int | str | None = None,
+        name: str | None = None,
+        **kwargs,
+    ) -> None:
         if mapper.dtype.type is not np.str_:
             mapper = np.asanyarray(mapper, dtype=int)
             _no_label = 0
@@ -207,16 +226,18 @@ class LabelMapperArray(_LabelMapper):
         return result
 
     @classmethod
-    def from_vertices(cls, shape, regions):
+    def from_vertices(
+        cls, shape: tuple[int, ...], regions: dict[int | str, list[list[int]]]
+    ) -> LabelMapperArray:
         """
         Create a `~gwcs.selector.LabelMapperArray` from
         polygon vertices stores in a dict.
 
         Parameters
         ----------
-        shape : tuple
+        shape
             shape of mapper array
-        regions: dict
+        regions
             {region_label : list_of_polygon_vertices}
             The keys in this dictionary should match the region labels
             in `~gwcs.selector.RegionsSelector`.
@@ -227,7 +248,6 @@ class LabelMapperArray(_LabelMapper):
 
         Returns
         -------
-        mapper : `~gwcs.selector.LabelMapperArray`
             This models is used with `~gwcs.selector.RegionsSelector`.
             A model which takes the same inputs as `~gwcs.selector.RegionsSelector`
             and returns a label.
@@ -262,18 +282,18 @@ class LabelMapperDict(_LabelMapper):
 
     Parameters
     ----------
-    inputs : tuple of str
+    inputs
         Names for the inputs, e.g. ('alpha', 'beta', lam')
-    mapper : dict
+    mapper
         Maps key values to transforms.
-    inputs_mapping : `~astropy.modeling.mappings.Mapping`
+    inputs_mapping
         An optional Mapping model to be prepended to the LabelMapper
         with the purpose to filter the inputs or change their order.
         It returns a number which is one of the keys of ``mapper``.
-    atol : float
+    atol
         Absolute tolerance when comparing inputs to ``mapper.keys``.
         It is passed to np.isclose.
-    name : str
+    name
         The name of this transform.
     """
 
@@ -285,8 +305,14 @@ class LabelMapperDict(_LabelMapper):
     n_outputs = 1
 
     def __init__(
-        self, inputs, mapper, inputs_mapping=None, atol=10**-8, name=None, **kwargs
-    ):
+        self,
+        inputs: tuple[str, ...],
+        mapper: dict[str, astmodels.Model],
+        inputs_mapping: Mapping = None,
+        atol: Real = 10**-8,
+        name: str | None = None,
+        **kwargs,
+    ) -> None:
         self._atol = atol
         _no_label = 0
         self._inputs = inputs
@@ -300,29 +326,29 @@ class LabelMapperDict(_LabelMapper):
         self.outputs = ("labels",)
 
     @property
-    def n_inputs(self):
+    def n_inputs(self) -> int:
         return self._n_inputs
 
     @property
-    def inputs(self):
+    def inputs(self) -> tuple[str, ...]:
         """
         The name(s) of the input variable(s) on which a model is evaluated.
         """
         return self._inputs
 
     @inputs.setter
-    def inputs(self, val):
+    def inputs(self, val: tuple[str, ...]) -> None:
         """
         The name(s) of the input variable(s) on which a model is evaluated.
         """
         self._inputs = val
 
     @property
-    def atol(self):
+    def atol(self) -> Real:
         return self._atol
 
     @atol.setter
-    def atol(self, val):
+    def atol(self, val: Real) -> None:
         self._atol = val
 
     def evaluate(self, *args):
@@ -363,17 +389,17 @@ class LabelMapperRange(_LabelMapper):
 
     Parameters
     ----------
-    inputs : tuple of str
+    inputs
         Names for the inputs, e.g. ('alpha', 'beta', 'lambda')
-    mapper : dict
+    mapper
         Maps tuples of length 2 to transforms.
-    inputs_mapping : `~astropy.modeling.mappings.Mapping`
+    inputs_mapping
         An optional Mapping model to be prepended to the LabelMapper
         with the purpose to filter the inputs or change their order.
-    atol : float
+    atol
         Absolute tolerance when comparing inputs to ``mapper.keys``.
         It is passed to np.isclose.
-    name : str
+    name
         The name of this transform.
     """
 
@@ -384,7 +410,14 @@ class LabelMapperRange(_LabelMapper):
     linear = False
     fittable = False
 
-    def __init__(self, inputs, mapper, inputs_mapping=None, name=None, **kwargs):
+    def __init__(
+        self,
+        inputs: tuple[str, ...],
+        mapper: dict[str, astmodels.Model],
+        inputs_mapping: Mapping = None,
+        name: str | None = None,
+        **kwargs,
+    ) -> None:
         if self._has_overlapping(np.array(list(mapper.keys()))):
             msg = "Overlapping ranges of values are not supported."
             raise ValueError(msg)
@@ -400,25 +433,25 @@ class LabelMapperRange(_LabelMapper):
         self.outputs = ("labels",)
 
     @property
-    def n_inputs(self):
+    def n_inputs(self) -> int:
         return self._n_inputs
 
     @property
-    def inputs(self):
+    def inputs(self) -> tuple[str, ...]:
         """
         The name(s) of the input variable(s) on which a model is evaluated.
         """
         return self._inputs
 
     @inputs.setter
-    def inputs(self, val):
+    def inputs(self, val: tuple[str, ...]) -> None:
         """
         The name(s) of the input variable(s) on which a model is evaluated.
         """
         self._inputs = val
 
     @staticmethod
-    def _has_overlapping(ranges):
+    def _has_overlapping(ranges) -> bool:
         """
         Test a list of tuple representing ranges of values has no overlapping ranges.
         """
@@ -498,25 +531,26 @@ class LabelMapperRange(_LabelMapper):
 class RegionsSelector(Model):
     """
     This model defines discontinuous transforms.
+
     It maps inputs to their corresponding transforms.
-    It uses an instance of `_LabelMapper` as a proxy to map inputs to
+    It uses an instance of `~gwcs.selector._LabelMapper` as a proxy to map inputs to
     the correct region.
 
     Parameters
     ----------
-    inputs : list of str
+    inputs
         Names of the inputs.
-    outputs : list of str
+    outputs
         Names of the outputs.
-    selector : dict
+    selector
         Mapping of region labels to transforms.
         Labels can be of type int or str, transforms are of type
-        `~astropy.modeling.Model`.
-    label_mapper : a subclass of `~gwcs.selector._LabelMapper`
+        `~astropy.modeling.core.Model`.
+    label_mapper
         A model which maps locations to region labels.
-    undefined_transform_value : float, np.nan (default)
+    undefined_transform_value
         Value to be returned if there's no transform defined for the inputs.
-    name : str
+    name
         The name of this transform.
     """
 
@@ -527,14 +561,14 @@ class RegionsSelector(Model):
 
     def __init__(
         self,
-        inputs,
-        outputs,
-        selector,
-        label_mapper,
-        undefined_transform_value=np.nan,
-        name=None,
+        inputs: list[str],
+        outputs: list[str],
+        selector: dict[str, astmodels.Model],
+        label_mapper: _LabelMapper,
+        undefined_transform_value: Real = np.nan,
+        name: str | None = None,
         **kwargs,
-    ):
+    ) -> None:
         self._inputs = inputs
         self._outputs = outputs
         self._n_inputs = len(inputs)
@@ -600,7 +634,7 @@ class RegionsSelector(Model):
         """
         Parameters
         ----------
-        args : float or ndarray
+        args
             Input pixel coordinate, one input for each dimension.
 
         """
@@ -639,49 +673,49 @@ class RegionsSelector(Model):
         return outputs
 
     @property
-    def undefined_transform_value(self):
+    def undefined_transform_value(self) -> Real:
         return self._undefined_transform_value
 
     @undefined_transform_value.setter
-    def undefined_transform_value(self, value):
+    def undefined_transform_value(self, value: Real) -> None:
         self._undefined_transform_value = value
 
     @property
-    def outputs(self):
+    def outputs(self) -> list[str]:
         """The name(s) of the output(s) of the model."""
         return self._outputs
 
     @property
-    def selector(self):
+    def selector(self) -> dict[str, astmodels.Model]:
         return self._selector
 
     @property
-    def inputs(self):
+    def inputs(self) -> list[str]:
         """
         The name(s) of the input variable(s) on which a model is evaluated.
         """
         return self._inputs
 
     @inputs.setter
-    def inputs(self, val):
+    def inputs(self, val: list[str]) -> None:
         """
         The name(s) of the input variable(s) on which a model is evaluated.
         """
         self._inputs = val
 
     @outputs.setter
-    def outputs(self, val):
+    def outputs(self, val: list[str]) -> None:
         """
         The name(s) of the output variable(s).
         """
         self._outputs = val
 
     @property
-    def n_inputs(self):
+    def n_inputs(self) -> int:
         return self._n_inputs
 
     @property
-    def n_outputs(self):
+    def n_outputs(self) -> int:
         return self._n_outputs
 
 
@@ -694,24 +728,32 @@ class LabelMapper(_LabelMapper):
 
     Parameters
     ----------
-    mapper : `~astropy.modeling.Model`
+    inputs
+        Names of the inputs.
+    mapper
         A function which returns a region.
-    no_label : str or int
+    no_label
         "" or 0
         A return value for a location which has no corresponding label.
-    inputs_mapping : `~astropy.modeling.mappings.Mapping` or tuple
+    inputs_mapping
         An optional Mapping model to be prepended to the LabelMapper
         with the purpose to filter the inputs or change their order.
         If tuple, a `~astropy.modeling.mappings.Mapping` model will be created from it.
-    name : str
+    name
         The name of this transform.
     """
 
     n_outputs = 1
 
     def __init__(
-        self, inputs, mapper, no_label=np.nan, inputs_mapping=None, name=None, **kwargs
-    ):
+        self,
+        inputs: list[str],
+        mapper: astmodels.Model,
+        no_label: str | int = np.nan,
+        inputs_mapping: Mapping | tuple = None,
+        name: str | None = None,
+        **kwargs,
+    ) -> None:
         self._no_label = no_label
         self._inputs = inputs
         self._n_inputs = len(inputs)
@@ -732,33 +774,33 @@ class LabelMapper(_LabelMapper):
         self.outputs = ("label",)
 
     @property
-    def inputs(self):
+    def inputs(self) -> list[str]:
         """
         The name(s) of the input variable(s) on which a model is evaluated.
         """
         return self._inputs
 
     @inputs.setter
-    def inputs(self, val):
+    def inputs(self, val: list[str]) -> None:
         """
         The name(s) of the input variable(s) on which a model is evaluated.
         """
         self._inputs = val
 
     @property
-    def n_inputs(self):
+    def n_inputs(self) -> int:
         return self._n_inputs
 
     @property
-    def mapper(self):
+    def mapper(self) -> astmodels.Model:
         return self._mapper
 
     @property
-    def inputs_mapping(self):
+    def inputs_mapping(self) -> Mapping:
         return self._inputs_mapping
 
     @property
-    def no_label(self):
+    def no_label(self) -> str | int:
         return self._no_label
 
     def evaluate(self, *args):

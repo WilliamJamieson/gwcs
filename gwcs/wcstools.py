@@ -1,6 +1,9 @@
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
+from __future__ import annotations
+
 import functools
 import warnings
+from typing import TYPE_CHECKING
 
 import numpy as np
 from astropy import coordinates as coord
@@ -9,25 +12,36 @@ from astropy.modeling import fitting, models, projections
 from astropy.modeling.bounding_box import CompoundBoundingBox, ModelBoundingBox
 from astropy.modeling.core import Model
 
-from .coordinate_frames import CelestialFrame, CompositeFrame, Frame2D, SpectralFrame
+from gwcs._typing import BoundingBox, BoundingBoxTuple, Mdl, Projection, Real
+
+from .coordinate_frames import (
+    BaseCoordinateFrame,
+    CelestialFrame,
+    CompositeFrame,
+    Frame2D,
+    SpectralFrame,
+)
 from .utils import (
     UnsupportedProjectionError,
     UnsupportedTransformError,
     _compute_lon_pole,
 )
 
+if TYPE_CHECKING:
+    from .wcs import WCS
+
 __all__ = ["grid_from_bounding_box", "wcs_from_fiducial", "wcs_from_points"]
 
 
 def wcs_from_fiducial(
-    fiducial,
-    coordinate_frame=None,
-    projection=None,
-    transform=None,
-    name="",
-    bounding_box=None,
-    input_frame=None,
-):
+    fiducial: coord.SkyCoord | tuple[Real, ...],
+    coordinate_frame: BaseCoordinateFrame | None = None,
+    projection: Projection = None,
+    transform: Mdl = None,
+    name: str = "",
+    bounding_box: BoundingBoxTuple = None,
+    input_frame: BaseCoordinateFrame | None = None,
+) -> WCS:
     """
     Create a WCS object from a fiducial point in a coordinate frame.
 
@@ -35,32 +49,32 @@ def wcs_from_fiducial(
 
     Parameters
     ----------
-    fiducial : `~astropy.coordinates.SkyCoord` or tuple of float
+    fiducial
         One of:
             A location on the sky in some standard coordinate system.
             A Quantity with spectral units.
             A list of the above.
-    coordinate_frame : ~gwcs.coordinate_frames.CoordinateFrame`
+    coordinate_frame
         The output coordinate frame.
         If fiducial is not an instance of `~astropy.coordinates.SkyCoord`,
         ``coordinate_frame`` is required.
-    projection : `~astropy.modeling.projections.Projection`
+    projection
         Projection instance - required if there is a celestial component in
         the fiducial.
-    transform : `~astropy.modeling.Model` (optional)
+    transform
         An optional transform to be prepended to the transform constructed by
         the fiducial point. The number of outputs of this transform must equal
         the number of axes in the coordinate frame.
-    name : str
+    name
         Name of this WCS.
-    bounding_box : tuple
+    bounding_box
         The bounding box over which the WCS is valid.
         It is a tuple of tuples of size 2 where each tuple
         represents a range of (low, high) values. The ``bounding_box`` is in the
         order of the axes, `~gwcs.coordinate_frames.CoordinateFrame.axes_order`.
         For two inputs and axes_order(0, 1) the bounding box is
         ((xlow, xhigh), (ylow, yhigh)).
-    input_frame : ~gwcs.coordinate_frames.CoordinateFrame`
+    input_frame
         The input coordinate frame.
     """
     from .wcs import WCS
@@ -162,29 +176,38 @@ frame2transform = {
 }
 
 
-def grid_from_bounding_box(bounding_box, step=1, center=True, selector=None):
+def grid_from_bounding_box(
+    bounding_box: BoundingBox | BoundingBoxTuple,
+    step: Real | tuple[Real, ...] = 1,
+    center: bool = True,
+    selector: tuple[str, ...] | None = None,
+) -> np.ndarray:
     """
     Create a grid of input points from the WCS bounding_box.
 
-    Note: If ``bbox`` is a tuple describing the range of an axis in ``bounding_box``,
-          ``x.5`` is considered part of the next pixel in ``bbox[0]``
-          and part of the previous pixel in ``bbox[1]``. In this way if
-          ``bbox`` describes the edges of an image the indexing includes
-          only pixels within the image.
+    Notes
+    -----
+    - If ``bbox`` is a tuple describing the range of an axis in ``bounding_box``,
+      ``x.5`` is considered part of the next pixel in ``bbox[0]``
+      and part of the previous pixel in ``bbox[1]``. In this way if
+      ``bbox`` describes the edges of an image the indexing includes
+      only pixels within the image.
+
+    - The bounding_box is in order of X, Y [, Z] and the output will be in the
+      same order.
 
     Parameters
     ----------
-    bounding_box : tuple | ~astropy.modeling.bounding_box.ModelBoundingBox | ~astropy.modeling.bounding_box.CompoundBoundingBox
+    bounding_box
         The bounding_box of a WCS object, `~gwcs.wcs.WCS.bounding_box`.
-    step : scalar or tuple
+    step
         Step size for grid in each dimension.  Scalar applies to all dimensions.
-    center : bool
-    selector : tuple | None
+    center
+        If True the grid points will be centered
+    selector
         If selector is set then it must be a selector tuple and bounding_box must
         be a CompoundBoundingBox.
 
-    The bounding_box is in order of X, Y [, Z] and the output will be in the
-    same order.
 
     Examples
     --------
@@ -208,9 +231,8 @@ def grid_from_bounding_box(bounding_box, step=1, center=True, selector=None):
 
     Returns
     -------
-    x, y [, z]: ndarray
-        Grid of points.
-    """  # noqa: E501
+        Grid of points: x, y [, z]
+    """
 
     def _bbox_to_pixel(bbox):
         return (np.floor(bbox[0] + 0.5), np.ceil(bbox[1] - 0.5))
@@ -262,13 +284,13 @@ def grid_from_bounding_box(bounding_box, step=1, center=True, selector=None):
 
 
 def wcs_from_points(
-    xy,
-    world_coords,
-    proj_point="center",
-    projection=None,
-    poly_degree=4,
-    polynomial_type="polynomial",
-):
+    xy: tuple[np.ndarray, np.ndarray],
+    world_coords: coord.SkyCoord,
+    proj_point: str | coord.SkyCoord = "center",
+    projection: Projection = None,
+    poly_degree: int = 4,
+    polynomial_type: str = "polynomial",
+) -> WCS:
     """
     Given two matching sets of coordinates on detector and sky, compute the WCS.
 
@@ -285,30 +307,29 @@ def wcs_from_points(
 
     Parameters
     ----------
-    xy : tuple of 2 ndarrays
+    xy
         Points in the input coordinate frame - x, y inputs.
-    world_coords : `~astropy.coordinates.SkyCoord`
+    world_coords
         Points in the output coordinate frame.
         The order matches the order of ``xy``.
-    proj_point : `~astropy.coordinates.SkyCoord`
+    proj_point
         A fiducial point in the output coordinate frame. If set to 'center'
         (default), the geometric center of input world
         coordinates will be used as the projection point. To specify an exact
         point for the projection, a Skycoord object with a coordinate pair can
         be passed in.
-    projection : `~astropy.modeling.projections.Projection`
+    projection
         A projection type. One of the projections in
         `~astropy.modeling.projections.projcodes`.
         The direction is from sky to detector.
         Defaults to TAN projection (`astropy.modeling.projections.Sky2Pix_TAN`).
-    poly_degree : int
+    poly_degree
         Degree of polynomial model to be fit to data. Defaults to 4.
-    polynomial_type : str
+    polynomial_type
         one of "polynomial", "chebyshev", "legendre". Defaults to "polynomial".
 
     Returns
     -------
-    wcsobj : `~gwcs.wcs.WCS`
         a WCS object for this observation.
     """
     from .wcs import WCS

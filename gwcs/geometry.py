@@ -3,6 +3,8 @@
 Models for general analytical geometry transformations.
 """
 
+from __future__ import annotations
+
 import numbers
 
 import numpy as np
@@ -27,7 +29,7 @@ class ToDirectionCosines(Model):
     n_inputs = 3
     n_outputs = 4
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.inputs = ("x", "y", "z")
         self.outputs = ("cosa", "cosb", "cosc", "length")
@@ -39,7 +41,7 @@ class ToDirectionCosines(Model):
         cosc = 1.0 / vabs
         return cosa, cosb, cosc, vabs
 
-    def inverse(self):
+    def inverse(self) -> FromDirectionCosines:
         return FromDirectionCosines()
 
 
@@ -53,7 +55,7 @@ class FromDirectionCosines(Model):
     n_inputs = 4
     n_outputs = 3
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.inputs = ("cosa", "cosb", "cosc", "length")
         self.outputs = ("x", "y", "z")
@@ -61,7 +63,7 @@ class FromDirectionCosines(Model):
     def evaluate(self, cosa, cosb, cosc, length):
         return cosa * length, cosb * length, cosc * length
 
-    def inverse(self):
+    def inverse(self) -> ToDirectionCosines:
         return ToDirectionCosines()
 
 
@@ -82,11 +84,11 @@ class SphericalToCartesian(Model):
     n_inputs = 2
     n_outputs = 3
 
-    def __init__(self, wrap_lon_at=360, **kwargs):
+    def __init__(self, wrap_lon_at: int = 360, **kwargs) -> None:
         """
         Parameters
         ----------
-        wrap_lon_at : {360, 180}, optional
+        wrap_lon_at
             An **integer number** that specifies the range of the longitude
             (azimuthal) angle. When ``wrap_lon_at`` is 180, the longitude angle
             will have a range of ``[-180, 180)`` and when ``wrap_lon_at``
@@ -100,7 +102,7 @@ class SphericalToCartesian(Model):
         self.wrap_lon_at = wrap_lon_at
 
     @property
-    def wrap_lon_at(self):
+    def wrap_lon_at(self) -> int:
         """An **integer number** that specifies the range of the longitude
         (azimuthal) angle.
 
@@ -113,7 +115,7 @@ class SphericalToCartesian(Model):
         return self._wrap_lon_at
 
     @wrap_lon_at.setter
-    def wrap_lon_at(self, wrap_angle):
+    def wrap_lon_at(self, wrap_angle: int) -> None:
         if not (isinstance(wrap_angle, numbers.Integral) and wrap_angle in [180, 360]):
             msg = "'wrap_lon_at' must be an integer number: 180 or 360"
             raise ValueError(msg)
@@ -134,11 +136,11 @@ class SphericalToCartesian(Model):
 
         return x, y, z
 
-    def inverse(self):
+    def inverse(self) -> CartesianToSpherical:
         return CartesianToSpherical(wrap_lon_at=self._wrap_lon_at)
 
     @property
-    def input_units(self):
+    def input_units(self) -> dict[str, u.Unit]:
         return {"lon": u.deg, "lat": u.deg}
 
 
@@ -161,11 +163,11 @@ class CartesianToSpherical(Model):
     n_inputs = 3
     n_outputs = 2
 
-    def __init__(self, wrap_lon_at=360, **kwargs):
+    def __init__(self, wrap_lon_at: int = 360, **kwargs) -> None:
         """
         Parameters
         ----------
-        wrap_lon_at : {360, 180}, optional
+        wrap_lon_at
             An **integer number** that specifies the range of the longitude
             (azimuthal) angle. When ``wrap_lon_at`` is 180, the longitude angle
             will have a range of ``[-180, 180)`` and when ``wrap_lon_at``
@@ -179,7 +181,7 @@ class CartesianToSpherical(Model):
         self.wrap_lon_at = wrap_lon_at
 
     @property
-    def wrap_lon_at(self):
+    def wrap_lon_at(self) -> int:
         """An **integer number** that specifies the range of the longitude
         (azimuthal) angle.
 
@@ -192,7 +194,7 @@ class CartesianToSpherical(Model):
         return self._wrap_lon_at
 
     @wrap_lon_at.setter
-    def wrap_lon_at(self, wrap_angle):
+    def wrap_lon_at(self, wrap_angle: int) -> None:
         if not (isinstance(wrap_angle, numbers.Integral) and wrap_angle in [180, 360]):
             msg = "'wrap_lon_at' must be an integer number: 180 or 360"
             raise ValueError(msg)
@@ -216,5 +218,5 @@ class CartesianToSpherical(Model):
 
         return lon, lat
 
-    def inverse(self):
+    def inverse(self) -> SphericalToCartesian:
         return SphericalToCartesian(wrap_lon_at=self._wrap_lon_at)
