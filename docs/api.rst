@@ -16,3 +16,5 @@ Reference/API
 .. automodapi:: gwcs.spectroscopy
 
 .. automodapi:: gwcs.geometry
+
+.. automodapi:: gwcs.region

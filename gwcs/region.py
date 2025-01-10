@@ -7,11 +7,16 @@ Polygon filling algorithm.
 # NOTE: Algorithm description can be found, e.g., here:
 #    http://www.cs.rit.edu/~icss571/filling/how_to.html
 #    http://www.cs.uic.edu/~jbell/CourseNotes/ComputerGraphics/PolygonFilling.html
+from __future__ import annotations
 
 import abc
 from collections import OrderedDict
 
 import numpy as np
+
+from gwcs._typing import Real
+
+from .coordinate_frames import BaseCoordinateFrame
 
 __all__ = ["Edge", "Polygon", "Region"]
 
@@ -24,48 +29,41 @@ class Region:
 
     Parameters
     ----------
-    rid : int or str
+    rid
         region ID
-    coordinate_frame : `~gwcs.coordinate_frames.CoordinateFrame`
+    coordinate_frame
         Coordinate frame in which the region is defined.
     """
 
-    def __init__(self, rid, coordinate_frame):
+    def __init__(self, rid: int | str, coordinate_frame: BaseCoordinateFrame) -> None:
         self._coordinate_system = coordinate_frame
         self._rid = rid
 
     @abc.abstractmethod
-    def __contains__(self, px):
+    def __contains__(self, px: tuple[Real, Real]) -> bool:
         """
         Determines if a pixel is within a region.
 
         Parameters
         ----------
-        px : tuple[float, float]
+        px
             A pixel coordinate (x, y)
-
-        Returns
-        -------
-        True or False
-
-        Subclasses must define this method.
         """
 
     @abc.abstractmethod
-    def scan(self, mask):
+    def scan(self, mask: np.ndarray) -> np.ndarray:
         """
         Sets mask values to region id for all pixels within the region.
         Subclasses must define this method.
 
         Parameters
         ----------
-        mask : ndarray
+        mask
             An array with the shape of the mask to be uised in
             `~gwcs.selector.RegionsSelector`.
 
         Returns
         -------
-        mask : ndarray
             An array where the value of the elements is the region ID.
             Pixels which are not included in any region are marked with 0 or "".
         """
@@ -77,19 +75,24 @@ class Polygon(Region):
 
     Parameters
     ----------
-    rid : str
+    rid
          polygon id
-    vertices : list of (x,y) tuples or lists
+    vertices
          The list is ordered in such a way that when traversed in a
          counterclockwise direction, the enclosed area is the polygon.
          The last vertex must coincide with the first vertex, minimum
          4 vertices are needed to define a triangle
-    coord_frame : str or `~gwcs.coordinate_frames.CoordinateFrame`
+    coord_frame
         Coordinate frame in which the polygon is defined.
 
     """
 
-    def __init__(self, rid, vertices, coord_system="Cartesian"):
+    def __init__(
+        self,
+        rid: str,
+        vertices: list[tuple[Real, Real]],
+        coord_system: str | BaseCoordinateFrame = "Cartesian",
+    ) -> None:
         if len(vertices) < 4:
             msg = "Expected vertices to be a list of minimum 4 tuples (x,y)"
             raise ValueError(msg)
@@ -159,7 +162,7 @@ class Polygon(Region):
                     GET[i].append(edges[j])
         return GET
 
-    def get_edges(self):
+    def get_edges(self) -> list[Edge]:
         """
         Create a list of Edge objects from vertices
         """
@@ -168,18 +171,12 @@ class Polygon(Region):
             for i in range(1, len(self._vertices))
         ]
 
-    def scan(self, data):
+    def scan(self, data: np.ndarray) -> np.ndarray:
         """
         This is the main function which scans the polygon and creates the mask
 
-        Parameters
-        ----------
-        data : array
-            the mask array
-            it has all zeros initially, elements within a region are set to
-            the region's ID
-
         Algorithm:
+
         - Set the Global Edge Table (GET)
         - Set y to be the smallest y coordinate that has an entry in GET
         - Initialize the Active Edge Table (AET) to be empty
@@ -189,6 +186,13 @@ class Polygon(Region):
           3. Compute the intersection of the current scan line with all edges in the AET
           4. Sort on X of intersection point
           5. Set elements between pairs of X in the AET to the Edge's ID
+
+        Parameters
+        ----------
+        data
+            the mask array
+            it has all zeros initially, elements within a region are set to
+            the region's ID
 
         """
         # TODO:
