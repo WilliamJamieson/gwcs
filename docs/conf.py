@@ -142,8 +142,15 @@ htmlhelp_basename = project + "doc"
 # (source start file, name, description, authors, manual section).
 man_pages = [("index", project.lower(), project + " Documentation", [author], 1)]
 
+
 sys.path.insert(0, str(Path(__file__).parent / "sphinxext"))
-extensions += ["sphinx_asdf"]  # noqa: F405
+extensions.remove("numpydoc")  # noqa: F405
+extensions += [  # noqa: F405
+    "sphinx.ext.autodoc",
+    "sphinx.ext.napoleon",
+    "sphinx_autodoc_typehints",
+    "sphinx_asdf",
+]
 
 # Enable nitpicky mode - which ensures that all references in the docs resolve.
 nitpicky = True
@@ -157,3 +164,11 @@ nitpick_ignore = [
     ("py:attr", "gwcs.WCS.bounding_box"),
     ("py:meth", "gwcs.WCS.footprint"),
 ]
+
+typehints_defaults = "braces"
+always_document_param_types = True
+typehints_document_rtype = True
+typehints_use_rtype = False
+napoleon_us_rtype = False
+
+automodsumm_properties_are_attributes = False
