@@ -14,14 +14,18 @@ class Frame2D(CoordinateFrame):
 
     Parameters
     ----------
-    axes_order : tuple of int
+    axes_order
         A dimension in the input data that corresponds to this axis.
-    unit : list of astropy.units.Unit
+    unit
         Unit for each axis.
-    axes_names : list
+    axes_names
         Names of the axes in this frame.
-    name : str
+    name
         Name of this frame.
+    axes_type
+        One of ["SPATIAL", "SPECTRAL", "TIME"]
+    axis_physical_types
+        The physical types of the axes in this frame.
     """
 
     def __init__(

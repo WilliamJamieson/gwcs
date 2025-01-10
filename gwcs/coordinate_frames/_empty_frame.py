@@ -5,6 +5,11 @@ class EmptyFrame(BaseCoordinateFrame):
     """
     Represents a "default" detector frame. This is for use as the default value
     for input frame by the WCS object.
+
+    Parameters
+    ----------
+    name
+        Name for this frame.
     """
 
     def __init__(self, name: str | None = None) -> None:

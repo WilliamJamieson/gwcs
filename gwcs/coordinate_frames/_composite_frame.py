@@ -21,13 +21,15 @@ class CompositeFrame(CoordinateFrame):
 
     Parameters
     ----------
-    frames : list
+    frames
         List of constituient frames.
-    name : str
+    name
         Name for this frame.
     """
 
-    def __init__(self, frames: list[BaseCoordinateFrame], name: str | None = None):
+    def __init__(
+        self, frames: list[BaseCoordinateFrame], name: str | None = None
+    ) -> None:
         self._frames = frames[:]
         naxes = sum([frame._naxes for frame in self._frames])
 
@@ -113,6 +115,9 @@ class CompositeFrame(CoordinateFrame):
 
     @property
     def world_axis_object_components(self) -> WorldAxisComponents:
+        """
+        Object components for this frame.
+        """
         out = [None] * self.naxes
 
         for frame, components in self._wao_renamed_components_iter:
@@ -127,4 +132,7 @@ class CompositeFrame(CoordinateFrame):
 
     @property
     def world_axis_object_classes(self) -> WorldAxisClasses:
+        """
+        Object classes for this frame.
+        """
         return dict(self._wao_renamed_classes_iter)

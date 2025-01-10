@@ -18,19 +18,21 @@ class TemporalFrame(CoordinateFrame):
 
     Parameters
     ----------
-    reference_frame : `~astropy.time.Time`
+    reference_frame
         A Time object which holds the time scale and format.
         If data is provided, it is the time zero point.
         To not set a zero point for the frame initialize ``reference_frame``
         with an empty list.
-    unit : str or `~astropy.units.Unit`
+    unit
         Time unit.
-    axes_names : str
-        Time axis name.
-    axes_order : tuple or int
+    axes_order
         A dimension in the data that corresponds to this axis.
-    name : str
+    axes_names
+        Time axis name.
+    name
         Name for this frame.
+    axis_physical_types
+        The physical types of the axes in this frame.
     """
 
     def __init__(
@@ -87,6 +89,9 @@ class TemporalFrame(CoordinateFrame):
 
     @property
     def world_axis_object_classes(self) -> WorldAxisClasses:
+        """
+        Object classes for this frame.
+        """
         comp = (
             time.Time,
             (),

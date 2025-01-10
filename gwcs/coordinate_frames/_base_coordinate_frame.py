@@ -71,8 +71,6 @@ class BaseCoordinateFrame(abc.ABC):
     def axes_type(self) -> AxesType:
         """
         An upcase string describing the type of the axis.
-
-        Known values are ``"SPATIAL", "TEMPORAL", "STOKES", "SPECTRAL", "PIXEL"``.
         """
 
     @property

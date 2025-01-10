@@ -18,18 +18,19 @@ class SpectralFrame(CoordinateFrame):
 
     Parameters
     ----------
-    axes_order : tuple or int
+    axes_order
         A dimension in the input data that corresponds to this axis.
-    reference_frame : astropy.coordinates.builtin_frames
+    reference_frame
         Reference frame (usually used with output_frame to convert to world
         coordinate objects).
-    unit : str or units.Unit instance
+    unit
         Spectral unit.
-    axes_names : str
+    axes_names
         Spectral axis name.
-    name : str
+    name
         Name for this frame.
-
+    axis_physical_types
+        The physical types of the axes in this frame.
     """
 
     def __init__(
@@ -40,7 +41,7 @@ class SpectralFrame(CoordinateFrame):
         axes_names: list[str] | None = None,
         name: str | None = None,
         axis_physical_types: AxisPhysicalTypes | None = None,
-    ):
+    ) -> None:
         if not isiterable(unit):
             unit = (unit,)
         unit = [u.Unit(un) for un in unit]
@@ -76,6 +77,9 @@ class SpectralFrame(CoordinateFrame):
 
     @property
     def world_axis_object_classes(self) -> WorldAxisClasses:
+        """
+        Object classes for this frame.
+        """
         return {"spectral": (coord.SpectralCoord, (), {"unit": self.unit[0]})}
 
     @property

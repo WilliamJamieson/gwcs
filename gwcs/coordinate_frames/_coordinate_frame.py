@@ -34,21 +34,23 @@ class CoordinateFrame(_BaseCoordinateFrame):
 
     Parameters
     ----------
-    naxes : int
+    naxes
         Number of axes.
-    axes_type : AxesType
+    axes_type
         One of ["SPATIAL", "SPECTRAL", "TIME"]
-    axes_order : tuple of int
+    axes_order
         A dimension in the input data that corresponds to this axis.
-    reference_frame : astropy.coordinates.builtin_frames
+    reference_frame
         Reference frame (usually used with output_frame to convert to world
         coordinate objects).
-    unit : list of astropy.units.Unit
+    unit
         Unit for each axis.
-    axes_names : list
+    axes_names
         Names of the axes in this frame.
-    name : str
+    name
         Name of this frame.
+    axis_physical_types
+        The physical types of the axes in this frame.
     """
 
     def __init__(
@@ -153,7 +155,7 @@ class CoordinateFrame(_BaseCoordinateFrame):
 
     @property
     def axes_type(self) -> AxesType:
-        """Type of this frame : 'SPATIAL', 'SPECTRAL', 'TIME'."""
+        """Type of this frame."""
         return self._sort_property(self._prop.axes_type)
 
     @property
@@ -167,6 +169,9 @@ class CoordinateFrame(_BaseCoordinateFrame):
 
     @property
     def world_axis_object_classes(self) -> WorldAxisClasses:
+        """
+        Object classes for this frame.
+        """
         return {
             f"{at}{i}" if i != 0 else at: (u.Quantity, (), {"unit": unit})
             for i, (at, unit) in enumerate(zip(self.axes_type, self.unit, strict=False))
@@ -198,12 +203,11 @@ class CoordinateFrame(_BaseCoordinateFrame):
 
         Parameters
         ----------
-        values : `numbers.Number`, `numpy.ndarray`, or `~astropy.units.Quantity`
+        values
            ``naxis`` number of coordinates as scalars or arrays.
 
         Returns
         -------
-        high_level_coordinates
             One (or more) high level object describing the coordinate.
         """
         # We allow Quantity-like objects here which values_to_high_level_objects
@@ -236,12 +240,11 @@ class CoordinateFrame(_BaseCoordinateFrame):
 
         Parameters
         ----------
-        high_level_coordinates
+        high_level_coords
             One (or more) high level object describing the coordinate.
 
         Returns
         -------
-        values : `numbers.Number` or `numpy.ndarray`
            ``naxis`` number of coordinates as scalars or arrays.
         """
         values = high_level_objects_to_values(*high_level_coords, low_level_wcs=self)

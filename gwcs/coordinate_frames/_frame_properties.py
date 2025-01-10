@@ -5,6 +5,8 @@ from astropy import utils as astutil
 from astropy.utils.misc import isiterable
 from astropy.wcs.wcsapi.low_level_api import VALID_UCDS, validate_physical_types
 
+from gwcs._typing import AxisPhysicalTypes
+
 from ._axis import AxesType
 
 __all__ = ["FrameProperties"]
@@ -18,7 +20,7 @@ class FrameProperties:
     axes_names: tuple[str, ...] = None
     axis_physical_types: list[str] = None
 
-    def __post_init__(self, naxes: int):
+    def __post_init__(self, naxes: int) -> None:
         if isinstance(self.axes_type, str):
             self.axes_type = (self.axes_type,)
         else:
@@ -70,7 +72,7 @@ class FrameProperties:
             self.axis_physical_types = tuple(ph_type)
 
     @property
-    def _default_axis_physical_types(self):
+    def _default_axis_physical_types(self) -> AxisPhysicalTypes:
         """
         The default physical types to use for this frame if none are specified
         by the user.
