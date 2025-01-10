@@ -56,19 +56,19 @@ class InverseMixin(BaseGwcs):
 
         Parameters
         ----------
-        args : float, array like, `~astropy.coordinates.SkyCoord` or `~astropy.units.Unit`
+        args
             Coordinates to be inverted. The number of arguments must be equal
             to the number of world coordinates given by ``world_n_dim``.
 
-        with_bounding_box : bool, optional
+        with_bounding_box
              If `True` (default) values in the result which correspond to any
              of the inputs being outside the bounding_box are set to
              ``fill_value``.
 
-        fill_value : float, optional
+        fill_value
             Output value for inputs outside the bounding_box (default is ``np.nan``).
 
-        tolerance : float, optional
+        tolerance
             *Absolute tolerance* of solution. Iteration terminates when the
             iterative solver estimates that the "true solution" is
             within this many pixels current estimate, more
@@ -77,18 +77,18 @@ class InverseMixin(BaseGwcs):
             (in the sense of the L2 norm) than ``tolerance``.
             Default ``tolerance`` is 1.0e-5.
 
-        maxiter : int, optional
+        maxiter
             Maximum number of iterations allowed to reach a solution.
             Default is 50.
 
-        quiet : bool, optional
+        quiet
             Do not throw :py:class:`NoConvergence` exceptions when
             the method does not converge to a solution with the
             required accuracy within a specified number of maximum
             iterations set by ``maxiter`` parameter. Instead,
             simply return the found solution. Default is `True`.
 
-        adaptive : bool, optional
+        adaptive
             Specifies whether to adaptively select only points that
             did not converge to a solution within the required
             accuracy for the next iteration. Default (`True`) is recommended.
@@ -116,7 +116,7 @@ class InverseMixin(BaseGwcs):
                to the adaptive algorithm once divergence has been
                detected.
 
-        detect_divergence : bool, optional
+        detect_divergence
             Specifies whether to perform a more detailed analysis
             of the convergence to a solution. Normally
             :py:meth:`numerical_inverse` may not achieve the required
@@ -184,7 +184,6 @@ class InverseMixin(BaseGwcs):
 
         Returns
         -------
-        result : tuple
             Returns a tuple of scalar or array values for each axis.
 
         Raises

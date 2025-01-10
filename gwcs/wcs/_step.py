@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import warnings
 from typing import NamedTuple, TypeAlias, Union
 
 from astropy.modeling.core import Model
 
+from gwcs._typing import Mdl
 from gwcs.coordinate_frames import BaseCoordinateFrame, EmptyFrame
 
 __all__ = [
@@ -21,14 +24,14 @@ class Step:
 
     Parameters
     ----------
-    frame : `~gwcs.coordinate_frames.CoordinateFrame`
+    frame
         A gwcs coordinate frame object.
-    transform : `~astropy.modeling.Model` or None
+    transform
         A transform from this step's frame to next step's frame.
         The transform of the last step should be `None`.
     """
 
-    def __init__(self, frame: str | BaseCoordinateFrame | None, transform=None):
+    def __init__(self, frame: str | BaseCoordinateFrame | None, transform=None) -> None:
         # Allow for a string to be passed in for the frame but be turned into a
         # frame object
         self.frame = (
@@ -37,11 +40,11 @@ class Step:
         self.transform = transform
 
     @property
-    def frame(self):
+    def frame(self) -> BaseCoordinateFrame:
         return self._frame
 
     @frame.setter
-    def frame(self, val):
+    def frame(self, val: str | BaseCoordinateFrame) -> None:
         if not isinstance(val, BaseCoordinateFrame | str):
             msg = '"frame" should be an instance of CoordinateFrame or a string.'
             raise TypeError(msg)
@@ -49,23 +52,23 @@ class Step:
         self._frame = val
 
     @property
-    def transform(self):
+    def transform(self) -> Mdl:
         return self._transform
 
     @transform.setter
-    def transform(self, val):
+    def transform(self, val: Mdl) -> None:
         if val is not None and not isinstance(val, (Model)):
             msg = '"transform" should be an instance of astropy.modeling.Model.'
             raise TypeError(msg)
         self._transform = val
 
     @property
-    def frame_name(self):
+    def frame_name(self) -> str:
         if isinstance(self.frame, str):
             return self.frame
         return self.frame.name
 
-    def __getitem__(self, ind):
+    def __getitem__(self, ind: int) -> BaseCoordinateFrame | Mdl:
         warnings.warn(
             "Indexing a WCS.pipeline step is deprecated. "
             "Use the `frame` and `transform` attributes instead.",
@@ -79,19 +82,19 @@ class Step:
             return self.frame
         return self.transform
 
-    def __str__(self):
+    def __str__(self) -> str:
         return (
             f"{self.frame_name}\t "
             f"{getattr(self.transform, 'name', 'None') or type(self.transform).__name__}"  # noqa: E501
         )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"Step(frame={self.frame_name}, "
             f"transform={getattr(self.transform, 'name', 'None') or type(self.transform).__name__})"  # noqa: E501
         )
 
-    def copy(self):
+    def copy(self) -> Step:
         return Step(self.frame, self.transform)
 
 

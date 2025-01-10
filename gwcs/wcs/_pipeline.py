@@ -26,6 +26,20 @@ class Pipeline:
     This is intended to act line a list of steps, but with built in protections
     for things like duplicate frames. In addition, this handles all the logic
     for handling steps and their frames/transforms.
+
+    Parameters
+    ----------
+    forward_transform
+        The forward transform to initialize the pipeline with.
+        - Can be a single model which acts as the entire transform.
+        - List of steps for the pipeline
+        - List of tuples[BaseCoordinateFrame, Model] for the pipeline
+        - None for an empty pipeline
+    input_frame
+        The input frame of the pipeline.
+    output_frame
+        The output frame of the pipeline. This must be specified if
+        forward_transform is not a list of steps.
     """
 
     def __init__(
@@ -48,15 +62,15 @@ class Pipeline:
 
         Parameters
         ----------
-        forward_transform " `~astropy.modeling.Model`, list of `~gwcs.wcs.Step`, or None
+        forward_transform
             The forward transform to initialize the pipeline with.
             - Can be a single model which acts as the entire transform.
             - List of steps for the pipeline
             - List of tuples[BaseCoordinateFrame, Model] for the pipeline
             - None for an empty pipeline
-        input_frame : `~gwcs.coordinate_frames.BaseCoordinateFrame` or None
+        input_frame
             The input frame of the pipeline.
-        output_frame : `~gwcs.coordinate_frames.BaseCoordinateFrame` or None
+        output_frame
             The output frame of the pipeline. This must be specified if
             forward_transform is not a list of steps.
 
@@ -125,9 +139,9 @@ class Pipeline:
 
         Parameters
         ----------
-        step : `~gwcs.wcs.Step` or tuple
+        step
             The step to wrap in a Step object and check.
-        replace_index : int or None
+        replace_index
             The index of the step to replace in the pipeline, this ensures that
             we can inplace replace a step using the same frame as the one being
             replaced. This frame will be removed from the frames to check against
@@ -222,12 +236,12 @@ class Pipeline:
 
         Parameters
         ----------
-        frame : str or `~gwcs.coordinate_frames.BaseCoordinateFrame`
+        frame
             Name of the frame or the frame object.
 
         Returns
         -------
-        Name of the frame.
+            Name of the frame.
         """
         return frame.name if isinstance(frame, BaseCoordinateFrame) else frame
 
@@ -237,12 +251,12 @@ class Pipeline:
 
         Parameters
         ----------
-        frame : str or `~gwcs.coordinate_frames.BaseCoordinateFrame`
+        frame
             Name of the frame or the frame object.
 
         Returns
         -------
-        Index of the frame in the pipeline.
+            Index of the frame in the pipeline.
         """
         try:
             return self.available_frames.index(self._frame_name(frame))
@@ -266,14 +280,13 @@ class Pipeline:
 
         Parameters
         ----------
-        from_frame : str or `~gwcs.coordinate_frames.BaseCoordinateFrame`
+        from_frame
             Initial coordinate frame name of object.
-        to_frame : str or `~gwcs.coordinate_frames.BaseCoordinateFrame`
+        to_frame
             End coordinate frame name or object.
 
         Returns
         -------
-        transform : `~astropy.modeling.Model`
             Transform between two frames.
         """
         from_index = self._frame_index(from_frame)
@@ -309,11 +322,11 @@ class Pipeline:
 
         Parameters
         ----------
-        from_frame : str or `~gwcs.coordinate_frames.BaseCoordinateFrame`
+        from_frame
             Initial coordinate frame.
-        to_frame : str, or instance of `~gwcs.coordinate_frames.BaseCoordinateFrame`
+        to_frame
             End coordinate frame.
-        transform : `~astropy.modeling.Model`
+        transform
             Transform between ``from_frame`` and ``to_frame``.
         """
         from_index = self._frame_index(from_frame)
@@ -339,11 +352,11 @@ class Pipeline:
 
         Parameters
         ----------
-        frame : str or `~gwcs.coordinate_frames.BaseCoordinateFrame`
+        frame
             Coordinate frame which sets the point of insertion.
-        transform : `~astropy.modeling.Model`
+        transform
             New transform to be inserted in the pipeline
-        after : bool
+        after
             If True, the new transform is inserted in the pipeline
             immediately after ``frame``.
         """
@@ -377,11 +390,11 @@ class Pipeline:
 
         Parameters
         ----------
-        input_frame : str or `~gwcs.coordinate_frames.BaseCoordinateFrame`
+        input_frame
             Coordinate frame at start of new transform
-        transform : `~astropy.modeling.Model`
+        transform
             New transform to be inserted in the pipeline
-        output_frame: str or `~gwcs.coordinate_frames.BaseCoordinateFrame`
+        output_frame
             Coordinate frame at end of new transform
         """
 
@@ -503,7 +516,7 @@ class Pipeline:
 
     def attach_compound_bounding_box(
         self, cbbox: dict[tuple[str], tuple], selector_args: tuple[str]
-    ):
+    ) -> None:
         """
         Attach a compound bounding box dictionary to the pipeline.
 
@@ -541,7 +554,7 @@ class Pipeline:
         return transform
 
     @property
-    def backward_transform(self):
+    def backward_transform(self) -> Model:
         """
         Return the total backward transform if available - from output to input
         coordinate system.

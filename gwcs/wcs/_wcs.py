@@ -33,17 +33,17 @@ class WCS(Pipeline, GWCSAPIMixin, InverseMixin, FitsMixin):
 
     Parameters
     ----------
-    forward_transform : `~astropy.modeling.Model` or a list
+    forward_transform
         The transform between ``input_frame`` and ``output_frame``.
         A list of (frame, transform) tuples where ``frame`` is the starting frame and
         ``transform`` is the transform from this frame to the next one or
         ``output_frame``.  The last tuple is (transform, None), where None indicates
         the end of the pipeline.
-    input_frame : str, `~gwcs.coordinate_frames.BaseCoordinateFrame`
+    input_frame
         A coordinates object or a string name.
-    output_frame : str, `~gwcs.coordinate_frames.BaseCoordinateFrame`
+    output_frame
         A coordinates object or a string name.
-    name : str
+    name
         a name for this WCS
 
     """
@@ -107,6 +107,10 @@ class WCS(Pipeline, GWCSAPIMixin, InverseMixin, FitsMixin):
         with_units : bool, optional
             If ``True`` then high level Astropy objects will be returned.
             Optional, default=False.
+
+        Returns
+        -------
+            The results from exicuting the forward transform.
         """
         results = self._call_forward(
             *args, with_bounding_box=with_bounding_box, fill_value=fill_value, **kwargs
@@ -171,16 +175,15 @@ class WCS(Pipeline, GWCSAPIMixin, InverseMixin, FitsMixin):
 
         Parameters
         ----------
-        args : float, array like, `~astropy.coordinates.SkyCoord` or
-            `~astropy.units.Unit` coordinates to be inverted
+        args
+            Coordinates to be inverted
 
-        kwargs : dict
+        kwargs
             keyword arguments to be passed either to ``backward_transform``
             (when defined) or to the iterative invert method.
 
         Returns
         -------
-        result : bool, numpy.ndarray
            A single boolean value or an array of boolean values with `True`
            indicating that the WCS footprint contains the coordinate
            and `False` if input is outside the footprint.
@@ -213,37 +216,34 @@ class WCS(Pipeline, GWCSAPIMixin, InverseMixin, FitsMixin):
 
         Parameters
         ----------
-        args : float, array like, `~astropy.coordinates.SkyCoord` or `~astropy.units.Unit`
+        args
             Coordinates to be inverted. The number of arguments must be equal
             to the number of world coordinates given by ``world_n_dim``.
 
-        with_bounding_box : bool, optional
+        with_bounding_box
              If `True` (default) values in the result which correspond to any
              of the inputs being outside the bounding_box are set to
              ``fill_value``.
 
-        fill_value : float, optional
+        fill_value
             Output value for inputs outside the bounding_box (default is ``np.nan``).
 
-        with_units : bool, optional
+        with_units
             If ``True`` then high level astropy object (i.e. ``Quantity``) will
             be returned.  Optional, default=False.
 
-        Other Parameters
-        ----------------
-        kwargs : dict
+        kwargs
             Keyword arguments to be passed to :py:meth:`numerical_inverse`
             (when defined) or to the iterative invert method.
 
         Returns
         -------
-        result : tuple or value
             Returns a tuple of scalar or array values for each axis. Unless
             ``input_frame.naxes == 1`` when it shall return the value.
             The return type will be `~astropy.units.Quantity` objects if the
             transform returns ``Quantity`` objects, else values.
 
-        """  # noqa: E501
+        """
         if is_high_level(*args, low_level_wcs=self):
             args = high_level_objects_to_values(*args, low_level_wcs=self)
 
@@ -395,13 +395,13 @@ class WCS(Pipeline, GWCSAPIMixin, InverseMixin, FitsMixin):
 
         Parameters
         ----------
-        from_frame : str or `~gwcs.coordinate_frames.BaseCoordinateFrame`
+        from_frame
             Initial coordinate frame.
-        to_frame : str, or instance of `~gwcs.coordinate_frames.BaseCoordinateFrame`
+        to_frame
             Coordinate frame into which to transform.
-        args : float or array-like
+        args
             Inputs in ``from_frame``, separate inputs for each dimension.
-        with_bounding_box : bool, optional
+        with_bounding_box
              If True(default) values in the result which correspond to any of
              the inputs being outside the bounding_box are set to ``fill_value``.
         """
@@ -482,17 +482,16 @@ class WCS(Pipeline, GWCSAPIMixin, InverseMixin, FitsMixin):
 
         Parameters
         ----------
-        bounding_box : tuple of floats: (start, stop)
-            ``prop: bounding_box``
-        center : bool
+        bounding_box
+            A bounding box tuple to use for the footprint
+        center
             If `True` use the center of the pixel, otherwise use the corner.
-        axis_type : str
+        axis_type
             A supported ``output_frame.axes_type`` or ``"all"`` (default).
             One of [``'spatial'``, ``'spectral'``, ``'temporal'``] or a custom type.
 
         Returns
         -------
-        coord : ndarray
             Array of coordinates in the output_frame mapping
             corners to the output frame. For spatial coordinates the order
             is clockwise, starting from the bottom left corner.
@@ -563,12 +562,11 @@ class WCS(Pipeline, GWCSAPIMixin, InverseMixin, FitsMixin):
 
         Parameters
         ----------
-        fixed : dict
+        fixed
             Keyword arguments with fixed values corresponding to ``self.selector``.
 
         Returns
         -------
-        new_wcs : `WCS`
             A new unique WCS corresponding to the values in ``fixed``.
 
         Examples

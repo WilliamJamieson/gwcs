@@ -41,21 +41,16 @@ class _WorldAxisInfo:
 
     Parameters
     ----------
-    axis : int
+    axis
         Output axis number [in the forward transformation].
-
-    frame : BaseCoordinateFrame
+    frame
         Coordinate frame to which this axis belongs.
-
-    world_axis_order : int
+    world_axis_order
         Index of this axis in `gwcs.WCS.output_frame.axes_order`
-
-    cunit : str
+    cunit
         Axis unit using FITS conversion (``CUNIT``).
-
-    ctype : str
+    ctype
         Axis FITS type (``CTYPE``).
-
     input_axes : tuple of int
         Tuple of input axis indices contributing to this world axis.
 
@@ -96,19 +91,19 @@ class FitsMixin(BaseGwcs):
 
         Parameters
         ----------
-        bounding_box : tuple, optional
+        bounding_box
             A pair of tuples, each consisting of two numbers
             Represents the range of pixel values in both dimensions
             ((xmin, xmax), (ymin, ymax))
 
-        max_pix_error : float, optional
+        max_pix_error
             Maximum allowed error over the domain of the pixel array. This
             error is the equivalent pixel error that corresponds to the maximum
             error in the output coordinate resulting from the fit based on
             a nominal plate scale. Ignored when ``degree`` is an integer or
             a list with a single degree.
 
-        degree : int, iterable, None, optional
+        degree
             Degree of the SIP polynomial. Default value `None` indicates that
             all allowed degree values (``[1...9]``) will be considered and
             the lowest degree that meets accuracy requerements set by
@@ -120,12 +115,12 @@ class FitsMixin(BaseGwcs):
             to be fit to the WCS transformation. In this case
             ``max_pixel_error`` is ignored.
 
-        max_inv_pix_error : float, optional
+        max_inv_pix_error
             Maximum allowed inverse error over the domain of the pixel array
             in pixel units. If None, no inverse is generated. Ignored when
             ``degree`` is an integer or a list with a single degree.
 
-        inv_degree : int, iterable, None, optional
+        inv_degree
             Degree of the SIP polynomial. Default value `None` indicates that
             all allowed degree values (``[1...9]``) will be considered and
             the lowest degree that meets accuracy requerements set by
@@ -137,17 +132,17 @@ class FitsMixin(BaseGwcs):
             to be fit to the WCS transformation. In this case
             ``max_inv_pixel_error`` is ignored.
 
-        npoints : int, optional
+        npoints
             The number of points in each dimension to sample the bounding box
             for use in the SIP fit. Minimum number of points is 3.
 
-        crpix : list of float, None, optional
+        crpix
             Coordinates (1-based) of the reference point for the new FITS WCS.
             When not provided, i.e., when set to `None` (default) the reference
             pixel will be chosen near the center of the bounding box for axes
             corresponding to the celestial frame.
 
-        projection : str, `~astropy.modeling.projections.Pix2SkyProjection`, optional
+        projection
             Projection to be used for the created FITS WCS. It can be specified
             as a string of three characters specifying a FITS projection code
             from Table 13 in
@@ -160,12 +155,12 @@ class FitsMixin(BaseGwcs):
             projection models inherited from
             :py:class:`~astropy.modeling.projections.Pix2SkyProjection`.
 
-        verbose : bool, optional
+        verbose
             Print progress of fits.
 
         Returns
         -------
-        FITS header with all SIP WCS keywords
+          FITS header with all SIP WCS keywords
 
         Raises
         ------
@@ -227,11 +222,11 @@ class FitsMixin(BaseGwcs):
 
         Parameters
         ----------
-        celestial_group : list of ``_WorldAxisInfo``
+        celestial_group
             A group of two celestial axes to be represented using standard
             image FITS WCS and maybe ``-SIP`` polynomials.
 
-        keep_axis_position : bool
+        keep_axis_position
             This parameter controls whether to keep/preserve output axes
             indices in this WCS object when creating FITS WCS and create a FITS
             header with ``CTYPE`` axes indices preserved from the ``frame``
@@ -248,19 +243,19 @@ class FitsMixin(BaseGwcs):
                 The ``lon``/``lat`` order is still preserved regardless of this
                 setting.
 
-        bounding_box : tuple, optional
+        bounding_box
             A pair of tuples, each consisting of two numbers
             Represents the range of pixel values in both dimensions
             ((xmin, xmax), (ymin, ymax))
 
-        max_pix_error : float, optional
+        max_pix_error
             Maximum allowed error over the domain of the pixel array. This
             error is the equivalent pixel error that corresponds to the maximum
             error in the output coordinate resulting from the fit based on
             a nominal plate scale. Ignored when ``degree`` is an integer or
             a list with a single degree.
 
-        degree : int, iterable, None, optional
+        degree
             Degree of the SIP polynomial. Default value `None` indicates that
             all allowed degree values (``[1...9]``) will be considered and
             the lowest degree that meets accuracy requerements set by
@@ -272,12 +267,12 @@ class FitsMixin(BaseGwcs):
             to be fit to the WCS transformation. In this case
             ``max_pixel_error`` is ignored.
 
-        max_inv_pix_error : float, optional
+        max_inv_pix_error
             Maximum allowed inverse error over the domain of the pixel array
             in pixel units. If None, no inverse is generated. Ignored when
             ``degree`` is an integer or a list with a single degree.
 
-        inv_degree : int, iterable, None, optional
+        inv_degree
             Degree of the SIP polynomial. Default value `None` indicates that
             all allowed degree values (``[1...9]``) will be considered and
             the lowest degree that meets accuracy requerements set by
@@ -289,17 +284,17 @@ class FitsMixin(BaseGwcs):
             to be fit to the WCS transformation. In this case
             ``max_inv_pixel_error`` is ignored.
 
-        npoints : int, optional
+        npoints
             The number of points in each dimension to sample the bounding box
             for use in the SIP fit. Minimum number of points is 3.
 
-        crpix : list of float, None, optional
+        crpix
             Coordinates (1-based) of the reference point for the new FITS WCS.
             When not provided, i.e., when set to `None` (default) the reference
             pixel will be chosen near the center of the bounding box for axes
             corresponding to the celestial frame.
 
-        projection : str, `~astropy.modeling.projections.Pix2SkyProjection`, optional
+        projection
             Projection to be used for the created FITS WCS. It can be specified
             as a string of three characters specifying a FITS projection code
             from Table 13 in
@@ -312,7 +307,7 @@ class FitsMixin(BaseGwcs):
             projection models inherited from
             :py:class:`~astropy.modeling.projections.Pix2SkyProjection`.
 
-        matrix_type : {'CD', 'PC-CDELT1', 'PC-SUM1', 'PC-DET1', 'PC-SCALE'}
+        matrix_type
             Specifies formalism (``PC`` or ``CD``) to be used for the linear
             transformation matrix and normalization for the ``PC`` matrix
             *when non-linear polynomial terms are not required to achieve
@@ -336,7 +331,7 @@ class FitsMixin(BaseGwcs):
             - ``'PC-SCALE'``: normalize ``PC`` matrix such that ``CDELTi``
               are estimates of the linear pixel scales.
 
-        verbose : bool, optional
+        verbose
             Print progress of fits.
 
         Returns
@@ -696,7 +691,7 @@ class FitsMixin(BaseGwcs):
 
         Parameters
         ----------
-        detect_celestial : bool
+        detect_celestial
             If `True`, will return, as the third return value, the group of
             celestial axes separately from all other (groups of) axes. If
             no celestial frame is detected, then return value for the
@@ -704,25 +699,22 @@ class FitsMixin(BaseGwcs):
 
         Returns
         -------
-        axes_groups : list of lists of ``_WorldAxisInfo``
-            Each inner list represents a group of non-separable (among
-            themselves) axes and each axis in a group is independent of axes
-            in *other* groups. Each axis in a group is represented through
-            the `_WorldAxisInfo` class used to store relevant information about
-            an axis. When ``detect_celestial`` is set to `True`, celestial axes
-            group is not included in this list.
+            List of one of the following:
+            - Each inner list represents a group of non-separable (among
+              themselves) axes and each axis in a group is independent of axes
+              in *other* groups. Each axis in a group is represented through
+              the `_WorldAxisInfo` class used to store relevant information about
+              an axis. When ``detect_celestial`` is set to `True`, celestial axes
+              group is not included in this list.
 
-        world_axes : list of ``_WorldAxisInfo``
-            A flattened version of ``axes_groups``. Even though it is not
-            difficult to flatten ``axes_groups``, this list is a by-product
-            of other checks and returned here for efficiency. When
-            ``detect_celestial`` is set to `True`, celestial axes
-            group is not included in this list.
+            - A flattened version of ``axes_groups``. Even though it is not
+              difficult to flatten ``axes_groups``, this list is a by-product
+              of other checks and returned here for efficiency. When
+              ``detect_celestial`` is set to `True`, celestial axes
+              group is not included in this list.
 
-        celestial_group : list of ``_WorldAxisInfo``
-            A group of two celestial axes. This group is returned *only when*
-            ``detect_celestial`` is set to `True`.
-
+            - A group of two celestial axes. This group is returned *only when*
+              ``detect_celestial`` is set to `True`.
         """
 
         def find_frame(axis_number):
@@ -845,25 +837,25 @@ class FitsMixin(BaseGwcs):
 
         Parameters
         ----------
-        bounding_box : tuple, optional
+        bounding_box
             Specifies the range of acceptable values for each input axis.
             The order of the axes is
             `~gwcs.coordinate_frames.BaseCoordinateFrame.axes_order`.
             For two image axes ``bounding_box`` is of the form
             ``((xmin, xmax), (ymin, ymax))``.
 
-        bin_ext_name : str, optional
+        bin_ext_name
             Extension name for the `~astropy.io.fits.BinTableHDU` HDU for those
             axes groups that will be converted using FITW WCS' ``-TAB``
             algorithm. Extension version will be determined automatically
             based on the number of separable group of axes.
 
-        coord_col_name : str, optional
+        coord_col_name
             Field name of the coordinate array in the structured array
             stored in `~astropy.io.fits.BinTableHDU` data. This corresponds to
             ``TTYPEi`` field in the FITS header of the binary table extension.
 
-        sampling : float, tuple, optional
+        sampling
             The target "density" of grid nodes per pixel to be used when
             creating the coordinate array for the ``-TAB`` FITS WCS convention.
             It is equal to ``1/step`` where ``step`` is the distance between
@@ -873,11 +865,9 @@ class FitsMixin(BaseGwcs):
 
         Returns
         -------
-        hdr : `~astropy.io.fits.Header`
             Header with WCS-TAB information associated (to be used) with image
             data.
 
-        bin_table_hdu : `~astropy.io.fits.BinTableHDU`
             Binary table extension containing the coordinate array.
 
         Raises
@@ -969,28 +959,28 @@ class FitsMixin(BaseGwcs):
 
         Parameters
         ----------
-        hdr : astropy.io.fits.Header, None
+        hdr
             The first time this function is called, ``hdr`` should be set to
             `None` or be an empty :py:class:`~astropy.io.fits.Header` object.
             On subsequent calls, updated header from the previous iteration
             should be provided.
 
-        world_axes_group : tuple of dict
+        world_axes_group
             A list of world axes to represent through FITS' -TAB convention.
             This is a list of dictionaries with each dicti
 
-        use_cd : bool
+        use_cd
             When `True` - CD-matrix formalism will be used instead of the
             PC-matrix formalism.
 
-        bounding_box : tuple, optional
+        bounding_box
             Specifies the range of acceptable values for each input axis.
             The order of the axes is
             `~gwcs.coordinate_frames.BaseCoordinateFrame.axes_order`.
             For two image axes ``bounding_box`` is of the form
             ``((xmin, xmax), (ymin, ymax))``.
 
-        bin_ext : str, tuple of str and int
+        bin_ext
             Extension name  and optionally version for the
             `~astropy.io.fits.BinTableHDU` HDU. When only a string extension
             name is provided, extension version will be set to 1.
@@ -998,12 +988,12 @@ class FitsMixin(BaseGwcs):
             name and the second element is a positive integer extension version
             number.
 
-        coord_col_name : str, optional
+        coord_col_name
             Field name of the coordinate array in the structured array
             stored in `~astropy.io.fits.BinTableHDU` data. This corresponds to
             ``TTYPEi`` field in the FITS header of the binary table extension.
 
-        sampling : float, tuple, optional
+        sampling
             The target "density" of grid nodes per pixel to be used when
             creating the coordinate array for the ``-TAB`` FITS WCS convention.
             It is equal to ``1/step`` where ``step`` is the distance between
@@ -1013,11 +1003,9 @@ class FitsMixin(BaseGwcs):
 
         Returns
         -------
-        hdr : `~astropy.io.fits.Header`
             Header with WCS-TAB information associated (to be used) with image
             data.
 
-        bin_table_hdu : `~astropy.io.fits.BinTableHDU`
             Binary table extension containing the coordinate array.
 
         Raises
@@ -1226,20 +1214,20 @@ class FitsMixin(BaseGwcs):
 
         Parameters
         ----------
-        bounding_box : tuple, optional
+        bounding_box
             Specifies the range of acceptable values for each input axis.
             The order of the axes is
             `~gwcs.coordinate_frames.BaseCoordinateFrame.axes_order`.
             For two image axes ``bounding_box`` is of the form
             ``((xmin, xmax), (ymin, ymax))``.
 
-        max_pix_error : float, optional
+        max_pix_error
             Maximum allowed error over the domain of the pixel array. This
             error is the equivalent pixel error that corresponds to the maximum
             error in the output coordinate resulting from the fit based on
             a nominal plate scale.
 
-        degree : int, iterable, None, optional
+        degree
             Degree of the SIP polynomial. Default value `None` indicates that
             all allowed degree values (``[1...9]``) will be considered and
             the lowest degree that meets accuracy requerements set by
@@ -1254,11 +1242,11 @@ class FitsMixin(BaseGwcs):
             .. note::
                 When WCS object has When ``degree`` is `None` and the WCS object has
 
-        max_inv_pix_error : float, optional
+        max_inv_pix_error
             Maximum allowed inverse error over the domain of the pixel array
             in pixel units. If None, no inverse is generated.
 
-        inv_degree : int, iterable, None, optional
+        inv_degree
             Degree of the SIP polynomial. Default value `None` indicates that
             all allowed degree values (``[1...9]``) will be considered and
             the lowest degree that meets accuracy requerements set by
@@ -1270,17 +1258,17 @@ class FitsMixin(BaseGwcs):
             to be fit to the WCS transformation. In this case
             ``max_inv_pixel_error`` is ignored.
 
-        npoints : int, optional
+        npoints
             The number of points in each dimension to sample the bounding box
             for use in the SIP fit. Minimum number of points is 3.
 
-        crpix : list of float, None, optional
+        crpix
             Coordinates (1-based) of the reference point for the new FITS WCS.
             When not provided, i.e., when set to `None` (default) the reference
             pixel will be chosen near the center of the bounding box for axes
             corresponding to the celestial frame.
 
-        projection : str, `~astropy.modeling.projections.Pix2SkyProjection`, optional
+        projection
             Projection to be used for the created FITS WCS. It can be specified
             as a string of three characters specifying a FITS projection code
             from Table 13 in
@@ -1293,18 +1281,18 @@ class FitsMixin(BaseGwcs):
             projection models inherited from
             :py:class:`~astropy.modeling.projections.Pix2SkyProjection`.
 
-        bin_ext_name : str, optional
+        bin_ext_name
             Extension name for the `~astropy.io.fits.BinTableHDU` HDU for those
             axes groups that will be converted using FITW WCS' ``-TAB``
             algorithm. Extension version will be determined automatically
             based on the number of separable group of axes.
 
-        coord_col_name : str, optional
+        coord_col_name
             Field name of the coordinate array in the structured array
             stored in `~astropy.io.fits.BinTableHDU` data. This corresponds to
             ``TTYPEi`` field in the FITS header of the binary table extension.
 
-        sampling : float, tuple, optional
+        sampling
             The target "density" of grid nodes per pixel to be used when
             creating the coordinate array for the ``-TAB`` FITS WCS convention.
             It is equal to ``1/step`` where ``step`` is the distance between
@@ -1312,16 +1300,14 @@ class FitsMixin(BaseGwcs):
             number to be used for all axes or as a `tuple` of numbers
             that specify the sampling for each image axis.
 
-        verbose : bool, optional
+        verbose
             Print progress of fits.
 
         Returns
         -------
-        hdr : `~astropy.io.fits.Header`
             Header with WCS-TAB information associated (to be used) with image
             data.
 
-        hdulist : a list of `~astropy.io.fits.BinTableHDU`
             A Python list of binary table extensions containing the coordinate
             array for TAB extensions; one extension per separable axes group.
 

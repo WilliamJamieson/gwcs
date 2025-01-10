@@ -78,14 +78,13 @@ class BaseGwcs(BaseLowLevelWCS, abc.ABC):
 
         Parameters
         ----------
-        from_frame : str or `~gwcs.coordinate_frames.CoordinateFrame`
+        from_frame
             Initial coordinate frame name of object.
-        to_frame : str or `~gwcs.coordinate_frames.CoordinateFrame`
+        to_frame
             End coordinate frame name or object.
 
         Returns
         -------
-        transform : `~astropy.modeling.Model`
             Transform between two frames.
         """
 
@@ -127,17 +126,17 @@ class BaseGwcs(BaseLowLevelWCS, abc.ABC):
         """
         Executes the forward transform.
 
-        args : float or array-like
+        args
             Inputs in the input coordinate system, separate inputs
             for each dimension.
-        with_bounding_box : bool, optional
-             If True(default) values in the result which correspond to
-             any of the inputs being outside the bounding_box are set
-             to ``fill_value``.
-        fill_value : float, optional
+        with_bounding_box
+            If True(default) values in the result which correspond to
+            any of the inputs being outside the bounding_box are set
+            to ``fill_value``.
+        fill_value
             Output value for inputs outside the bounding_box
             (default is np.nan).
-        with_units : bool, optional
+        with_units
             If ``True`` then high level Astropy objects will be returned.
             Optional, default=False.
         """

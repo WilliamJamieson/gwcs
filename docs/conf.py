@@ -165,7 +165,7 @@ nitpick_ignore = [
     ("py:meth", "gwcs.WCS.footprint"),
 ]
 
-typehints_defaults = "braces"
+typehints_defaults = "comma"
 always_document_param_types = True
 typehints_document_rtype = True
 typehints_use_rtype = False
