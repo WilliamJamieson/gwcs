@@ -1177,7 +1177,7 @@ class WCS(Pipeline, GWCSAPIMixin):
         to_step = self._get_step(to_frame)
 
         # Determine if the transform is actually an inverse
-        backward = to_step.index < from_step.index
+        backward = to_step.idx < from_step.idx
 
         if backward and is_high_level(*args, low_level_wcs=from_step.step.frame):
             args = high_level_objects_to_values(

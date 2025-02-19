@@ -1,11 +1,12 @@
 import warnings
 from functools import reduce
-from typing import TypeAlias, Union
+from typing import TypeAlias, Union, cast
 
+from astropy import units as u
 from astropy.modeling import Model
 from astropy.modeling.bounding_box import CompoundBoundingBox, ModelBoundingBox
-from astropy.units import Unit
 
+from gwcs._typing import Bbox, BoundingBox, Cbbox, Mdl
 from gwcs.coordinate_frames import CoordinateFrame, EmptyFrame
 from gwcs.utils import CoordinateFrameError
 
@@ -16,7 +17,6 @@ __all__ = ["ForwardTransform", "Pipeline"]
 
 # Type aliases due to the use of the `|` for type hints not working with Model
 ForwardTransform: TypeAlias = Union[Model, list[Step | StepTuple], None]  # noqa: UP007
-Mdl: TypeAlias = Union[Model, None]  # noqa: UP007
 
 
 class Pipeline:
@@ -69,33 +69,43 @@ class Pipeline:
             # WCS programmatically.
             if output_frame is None:
                 msg = "An output_frame must be specified if forward_transform is None."
-                raise CoordinateFrameError(msg)
+                raise CoordinateFrameError(msg)  # type: ignore[no-untyped-call]
 
-            forward_transform = [
-                Step(input_frame, None),
-                Step(output_frame, None),
-            ]
+            self._extend(
+                [
+                    Step(input_frame, None),
+                    Step(output_frame, None),
+                ]
+            )
+            return
 
         if isinstance(forward_transform, Model):
             if output_frame is None:
                 msg = (
                     "An output_frame must be specified if forward_transform is a model."
                 )
-                raise CoordinateFrameError(msg)
+                raise CoordinateFrameError(msg)  # type: ignore[no-untyped-call]
 
-            forward_transform = [
-                Step(input_frame, forward_transform.copy()),
-                Step(output_frame, None),
-            ]
-
-        if not isinstance(forward_transform, list):
-            msg = (
-                "Expected forward_transform to be a None, model, or a "
-                f"(frame, transform) list, got {type(forward_transform)}"
+            self._extend(
+                [
+                    # Astropy models are not typed yet, so MyPy needs to ignore
+                    Step(input_frame, forward_transform.copy()),  # type: ignore[no-untyped-call]
+                    Step(output_frame, None),
+                ]
             )
-            raise TypeError(msg)
+            return
 
-        self._extend(forward_transform)
+        if isinstance(forward_transform, list):
+            self._extend(forward_transform)
+            return
+
+        # This is a safety check, but if the hint is followed it will never
+        # be reached
+        msg = (  # type: ignore[unreachable]
+            "Expected forward_transform to be a None, model, or a "
+            f"(frame, transform) list, got {type(forward_transform)}"
+        )
+        raise TypeError(msg)
 
     @property
     def pipeline(self) -> list[Step]:
@@ -169,7 +179,7 @@ class Pipeline:
         self._pipeline.insert(index, self._wrap_step(value))
         self._check_last_step()
 
-    def _extend(self, values: list[Step]) -> None:
+    def _extend(self, values: list[Step | StepTuple]) -> None:
         """
         Handle extending the pipeline with a list of steps
         """
@@ -179,7 +189,7 @@ class Pipeline:
         self._check_last_step()
 
     @staticmethod
-    def _handle_empty_frame(frame: CoordinateFrame) -> CoordinateFrame | None:
+    def _handle_empty_frame(frame: CoordinateFrame | None) -> CoordinateFrame | None:
         """
         Handle the case where the frame is an EmptyFrame.
         """
@@ -204,16 +214,25 @@ class Pipeline:
         )
 
     @property
-    def unit(self) -> Unit | None:
+    def unit(self) -> tuple[u.Unit, ...] | None:
         """The unit of the coordinates in the output coordinate system."""
         return self._pipeline[-1].frame.unit if self._pipeline else None
 
     @staticmethod
-    def _combine_transforms(transforms: list[Model]) -> Model:
+    def _combine_transforms(transforms: list[Mdl]) -> Model:
         """
         Combine a list of transforms into a single transform.
         """
-        return reduce(lambda x, y: x | y, transforms)
+
+        def _combine(x: Mdl, y: Mdl) -> Model:
+            if x is None or y is None:
+                msg = "Cannot combine None 'transforms' in the pipeline."
+                raise RuntimeError(msg)
+            # astropy.modeling is not MyPy compatible yet, so MyPy does not understand
+            # that the `|` operator is overloaded for Model
+            return cast(Model, x | y)  # type: ignore[operator]
+
+        return cast(Model, reduce(_combine, transforms))
 
     @staticmethod
     def _frame_name(frame: str | CoordinateFrame) -> str:
@@ -248,7 +267,7 @@ class Pipeline:
             return self.available_frames.index(self._frame_name(frame))
         except ValueError as err:
             msg = f"Frame {self._frame_name(frame)} is not in the available frames"
-            raise CoordinateFrameError(msg) from err
+            raise CoordinateFrameError(msg) from err  # type: ignore[no-untyped-call]
 
     def _get_step(self, frame: str | CoordinateFrame) -> IndexedStep:
         """
@@ -282,8 +301,7 @@ class Pipeline:
         # Moving backwards over the pipeline
         if to_index < from_index:
             transforms = [
-                step.transform.inverse
-                for step in self._pipeline[to_index:from_index][::-1]
+                step.inverse for step in self._pipeline[to_index:from_index][::-1]
             ]
 
         # from and to are the same
@@ -354,7 +372,9 @@ class Pipeline:
 
         current_transform = self._pipeline[index].transform
         transform = (
-            transform | current_transform if after else current_transform | transform
+            # astropy.modeling is not MyPy compatible yet, so MyPy does not understand
+            # that the `|` operator is overloaded for Model
+            transform | current_transform if after else current_transform | transform  # type: ignore[operator]
         )
 
         self._pipeline[index].transform = transform
@@ -422,14 +442,14 @@ class Pipeline:
 
         # so input_index is None or output_index is None
         if input_index is None:
-            self._insert(output_index, Step(input_frame, transform))
+            self._insert(cast(int, output_index), Step(input_frame, transform))
         else:
             current = self._pipeline[input_index].transform
             self._pipeline[input_index].transform = transform
             self._insert(input_index + 1, Step(output_frame, current))
 
     @property
-    def bounding_box(self) -> ModelBoundingBox | CompoundBoundingBox | None:
+    def bounding_box(self) -> BoundingBox:
         """
         Return the bounding box of the pipeline.
         """
@@ -442,17 +462,21 @@ class Pipeline:
             return None
 
         try:
-            bounding_box = transform.bounding_box
+            bounding_box: ModelBoundingBox | CompoundBoundingBox = (
+                transform.bounding_box
+            )
         except NotImplementedError:
             return None
 
         if (
             # Check that the bounding_box was set on the instance (not a default)
             transform._user_bounding_box is not None
+            # Check that this is a ModelBounding Box
+            and isinstance(bounding_box, ModelBoundingBox)
             # Check the order of that bounding_box is C
             and bounding_box.order == "C"
             # Check that the bounding_box is not a single value
-            and (isinstance(bounding_box, CompoundBoundingBox) or len(bounding_box) > 1)
+            and len(bounding_box) > 1
         ):
             warnings.warn(
                 "The bounding_box was set in C order on the transform prior to "
@@ -464,14 +488,15 @@ class Pipeline:
                 GwcsBoundingBoxWarning,
                 stacklevel=2,
             )
-            self.bounding_box = bounding_box.bounding_box(order="F")
-            bounding_box = self.bounding_box
+            # MyPy does not recognize the use of the setter defined below
+            self.bounding_box = bounding_box.bounding_box(order="F")  # type: ignore[assignment]
+            bounding_box = cast(ModelBoundingBox, self.bounding_box)
 
         return bounding_box
 
     @bounding_box.setter
     def bounding_box(
-        self, value: tuple | ModelBoundingBox | CompoundBoundingBox | None
+        self, value: ModelBoundingBox | CompoundBoundingBox | Bbox | Cbbox | None
     ) -> None:
         """
         Set the range of acceptable values for each input axis.
@@ -486,23 +511,31 @@ class Pipeline:
             Tuple of tuples with ("low", high") values for the range.
         """
         frames = self.available_frames
-        transform_0 = self.get_transform(frames[0], frames[1])
+        transform = self.get_transform(frames[0], frames[1])
+
+        if transform is None:
+            msg = "Cannot set bounding_box on a None transform."
+            raise RuntimeError(msg)
+
         if value is None:
-            transform_0.bounding_box = value
+            transform.bounding_box = value
         else:
+            bbox: ModelBoundingBox | CompoundBoundingBox
+
             # Make sure the dimensions of the new bbox are correct.
             if isinstance(value, CompoundBoundingBox):
-                bbox = CompoundBoundingBox.validate(transform_0, value, order="F")
+                # Type hint in astropy.modeling is not correct
+                bbox = CompoundBoundingBox.validate(transform, value, order="F")  # type: ignore[arg-type]
             else:
-                bbox = ModelBoundingBox.validate(transform_0, value, order="F")
+                bbox = ModelBoundingBox.validate(transform, value, order="F")
 
-            transform_0.bounding_box = bbox
+            transform.bounding_box = bbox
 
-        self.set_transform(frames[0], frames[1], transform_0)
+        self.set_transform(frames[0], frames[1], transform)
 
     def attach_compound_bounding_box(
-        self, cbbox: dict[tuple[str], tuple], selector_args: tuple[str]
-    ):
+        self, cbbox: Cbbox, selector_args: tuple[str, ...]
+    ) -> None:
         """
         Attach a compound bounding box dictionary to the pipeline.
 
@@ -540,7 +573,7 @@ class Pipeline:
         return transform
 
     @property
-    def backward_transform(self):
+    def backward_transform(self) -> Model:
         """
         Return the total backward transform if available - from output to input
         coordinate system.
@@ -552,10 +585,11 @@ class Pipeline:
 
         """
         try:
-            backward = self.forward_transform.inverse
+            backward: Model = self.forward_transform.inverse
         except NotImplementedError as err:
             msg = f"Could not construct backward transform. \n{err}"
             raise NotImplementedError(msg) from err
+
         try:
             _ = backward.inverse
         except NotImplementedError:  # means "hasattr" won't work

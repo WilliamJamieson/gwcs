@@ -19,8 +19,10 @@ from astropy.units import Quantity
 __all__ = [
     "AxisPhysicalType",
     "AxisPhysicalTypes",
+    "Bbox",
     "BoundingBox",
     "Bounds",
+    "Cbbox",
     "HighLevelObject",
     "HighLevelObjects",
     "Interval",
@@ -37,6 +39,8 @@ Real: TypeAlias = int | float | Fraction | np.integer | np.floating
 
 Interval: TypeAlias = tuple[Real, Real]
 Bounds: TypeAlias = tuple[Interval, ...] | None
+Bbox: TypeAlias = tuple[Interval, ...] | Interval
+Cbbox: TypeAlias = dict[tuple[str, ...], Bbox]
 
 BoundingBox: TypeAlias = ModelBoundingBox | CompoundBoundingBox | None
 
