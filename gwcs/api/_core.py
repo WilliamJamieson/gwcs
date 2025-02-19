@@ -7,192 +7,34 @@ in astropy APE 14 (https://doi.org/10.5281/zenodo.1188875).
 from __future__ import annotations
 
 import abc
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, cast
+from typing import TYPE_CHECKING, cast
 
 import astropy.units as u
 import numpy as np
 import numpy.typing as npt
-from astropy.modeling import Model, separable
+from astropy.modeling import separable
 from astropy.wcs.wcsapi import BaseLowLevelWCS, HighLevelWCSMixin
 
 from gwcs._typing import (
     AxisPhysicalTypes,
-    BoundingBox,
     Bounds,
     LowLevelArray,
     LowLevelArrays,
     LowLevelValue,
-    Mdl,
-    Real,
 )
 from gwcs.utils import _toindex
+
+from ._base import BaseGwcs
+from ._exception import GwcsAxesMismatchError, GwcsFrameMissingError
+from ._world_axis import WorldAxisClasses, WorldAxisComponents
 
 if TYPE_CHECKING:
     from gwcs.coordinate_frames import BaseCoordinateFrame
 
-__all__ = [
-    "BaseGwcs",
-    "GWCSAPIMixin",
-    "WorldAxisClass",
-    "WorldAxisClasses",
-    "WorldAxisComponent",
-    "WorldAxisComponents",
-    "WorldAxisConverterClass",
-]
+__all__ = ["GWCSAPIMixin"]
 
 
-class WorldAxisClass(NamedTuple):
-    """
-    Named tuple for the world_axis_object_classes WCS property
-    """
-
-    object_type: type | str
-    args: tuple[int | None, ...]
-    kwargs: dict[str, Any]
-
-
-class WorldAxisConverterClass(NamedTuple):
-    """
-    Named tuple for the world_axis_object_classes WCS property, which have a converter
-    """
-
-    object_type: type | str
-    args: tuple[int | None, ...]
-    kwargs: dict[str, Any]
-    converter: Callable[..., Any] | None = None
-
-
-WorldAxisClasses: TypeAlias = dict[str | int, WorldAxisClass | WorldAxisConverterClass]
-
-
-class WorldAxisComponent(NamedTuple):
-    """
-    Named tuple for the world_axis_object_components WCS property
-    """
-
-    name: str
-    key: str | int
-    property_name: str | Callable[[Any], Any]
-
-
-WorldAxisComponents: TypeAlias = list[WorldAxisComponent]
-
-
-class BaseGwcs(BaseLowLevelWCS, abc.ABC):
-    """
-    Base class for a GWCS object.
-    """
-
-    @property
-    @abc.abstractmethod
-    def forward_transform(self) -> Model:
-        """
-        The forward transform of the WCS.
-        """
-
-    @property
-    @abc.abstractmethod
-    def input_frame(self) -> BaseCoordinateFrame | None:
-        """
-        The input coordinate frame of the WCS.
-        """
-
-    @property
-    @abc.abstractmethod
-    def output_frame(self) -> BaseCoordinateFrame | None:
-        """
-        The output coordinate frame of the WCS.
-        """
-
-    @property
-    @abc.abstractmethod
-    def available_frames(self) -> list[str]:
-        """
-        List of all the frame names in this WCS in their order in the pipeline
-        """
-
-    @property
-    @abc.abstractmethod
-    def bounding_box(self) -> BoundingBox | None:
-        """
-        The bounding box of the WCS.
-        """
-
-    @abc.abstractmethod
-    def get_transform(
-        self, from_frame: str | BaseCoordinateFrame, to_frame: str | BaseCoordinateFrame
-    ) -> Mdl:
-        """
-        Return a transform between two coordinate frames.
-
-        Parameters
-        ----------
-        from_frame
-            Initial coordinate frame name of object.
-        to_frame
-            End coordinate frame name or object.
-
-        Returns
-        -------
-            Transform between two frames.
-        """
-
-    @abc.abstractmethod
-    def _call_forward(
-        self,
-        *args: LowLevelValue,
-        from_frame: BaseCoordinateFrame | None = None,
-        to_frame: BaseCoordinateFrame | None = None,
-        with_bounding_box: bool = True,
-        fill_value: Real = np.nan,
-        **kwargs: Any,
-    ) -> LowLevelArrays:
-        """
-        Executes the forward transform, but values only.
-        """
-
-    @abc.abstractmethod
-    def _call_backward(
-        self,
-        *args: LowLevelArrays,
-        with_bounding_box: bool = True,
-        fill_value: Real = np.nan,
-        **kwargs: Any,
-    ) -> LowLevelArrays:
-        """
-        Executes the backward transform, but values only.
-        """
-
-    @abc.abstractmethod
-    def __call__(
-        self,
-        *args: LowLevelArrays,
-        with_bounding_box: bool = True,
-        fill_value: Real = np.nan,
-        with_units: bool = False,
-        **kwargs: Any,
-    ) -> LowLevelArrays:
-        """
-        Executes the forward transform.
-
-        args
-            Inputs in the input coordinate system, separate inputs
-            for each dimension.
-        with_bounding_box
-            If True(default) values in the result which correspond to
-            any of the inputs being outside the bounding_box are set
-            to ``fill_value``.
-        fill_value
-            Output value for inputs outside the bounding_box
-            (default is np.nan).
-        with_units
-            If ``True`` then high level Astropy objects will be returned.
-            Optional, default=False.
-        """
-
-
-class GWCSAPIMixin(BaseGwcs, HighLevelWCSMixin):
+class GWCSAPIMixin(BaseGwcs, BaseLowLevelWCS, HighLevelWCSMixin, abc.ABC):
     """
     A mix-in class that is intended to be inherited by the
     :class:`~gwcs.wcs.WCS` class and provides the low- and high-level
@@ -287,8 +129,7 @@ class GWCSAPIMixin(BaseGwcs, HighLevelWCSMixin):
         result = self._call_forward(*pixel_arrays)
 
         if self.output_frame is None:
-            msg = "Output frame is not defined."
-            raise RuntimeError(msg)
+            raise GwcsFrameMissingError.output_frame()
 
         return self._remove_quantity_output(result, self.output_frame)
 
@@ -320,8 +161,7 @@ class GWCSAPIMixin(BaseGwcs, HighLevelWCSMixin):
         result = self._call_backward(*world_arrays)
 
         if self.input_frame is None:
-            msg = "Input frame is not defined."
-            raise RuntimeError(msg)
+            raise GwcsFrameMissingError.input_frame()
 
         return self._remove_quantity_output(result, self.input_frame)
 
@@ -420,17 +260,10 @@ class GWCSAPIMixin(BaseGwcs, HighLevelWCSMixin):
             return
 
         if self.input_frame is None:
-            msg = "Input frame is not defined."
-            raise RuntimeError(msg)
+            raise GwcsFrameMissingError.input_frame()
 
-        wcs_naxes = self.input_frame.naxes
-        if len(value) != wcs_naxes:
-            msg = (
-                "The number of data axes, "
-                f"{wcs_naxes}, does not equal the "
-                f"shape {len(value)}."
-            )
-            raise ValueError(msg)
+        if len(value) != self.input_frame.naxes:
+            raise GwcsAxesMismatchError.mismatch(self.input_frame.naxes, value)
         self._pixel_shape = tuple(value)
 
     @property
