@@ -2,7 +2,6 @@
 """
 This module contains a mixin class which exposes the WCS API defined
 in astropy APE 14 (https://doi.org/10.5281/zenodo.1188875).
-
 """
 
 from __future__ import annotations
@@ -17,7 +16,7 @@ import numpy.typing as npt
 from astropy.modeling import Model, separable
 from astropy.wcs.wcsapi import BaseLowLevelWCS, HighLevelWCSMixin
 
-from ._typing import (
+from gwcs._typing import (
     AxisPhysicalTypes,
     BoundingBox,
     Bounds,
@@ -27,12 +26,13 @@ from ._typing import (
     Mdl,
     Real,
 )
-from .utils import _toindex
+from gwcs.utils import _toindex
 
 if TYPE_CHECKING:
-    from .coordinate_frames import BaseCoordinateFrame
+    from gwcs.coordinate_frames import BaseCoordinateFrame
 
 __all__ = [
+    "BaseGwcs",
     "GWCSAPIMixin",
     "WorldAxisClass",
     "WorldAxisClasses",
