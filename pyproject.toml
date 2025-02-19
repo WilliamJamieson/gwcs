@@ -185,21 +185,6 @@ enable_error_code = [
     "redundant-expr",
     "truthy-bool",
 ]
-exclude = [
-    'gwcs/tests/$',
-    'gwcs/converters/tests/$',
-    'gwcs/wcs/$',
-    'gwcs/api.py',
-    'gwcs/coordinate_frames.py',
-    'gwcs/examples.py',
-    'gwcs/extension.py',
-    'gwcs/geometry.py',
-    'gwcs/region.py',
-    'gwcs/selector.py',
-    'gwcs/spectroscopy.py',
-    'gwcs/utils.py',
-    'gwcs/wcstools.py',
-]
 warn_unreachable = true
 
 [[tool.mypy.overrides]]
@@ -207,6 +192,7 @@ module = [
     "astropy.coordinates.*",
     "astropy.modeling.*",
     # "astropy.table.*",
+    "astropy.io.*",
     "astropy.time.*",
     "astropy.units.*",
     "astropy.utils.*",
@@ -221,6 +207,7 @@ module = [
     "gwcs.converters.*",
     "gwcs.wcs._utils.*",
     "gwcs.wcs._wcs.*",
+    "gwcs.wcs._fits.*",
     "gwcs.examples.*",
     "gwcs.extension.*",
     "gwcs.geometry.*",
