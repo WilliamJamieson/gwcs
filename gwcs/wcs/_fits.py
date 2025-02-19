@@ -5,11 +5,14 @@ from dataclasses import dataclass
 # Note: astropy.io.fits does not define __all__ in a way that MyPy likes, so
 # it cannot find the Header import
 import numpy as np
+import numpy.linalg as npla
 from astropy import units as u
 from astropy.io.fits import BinTableHDU, Card, Header  # type: ignore[attr-defined]
 from astropy.modeling import projections
 from astropy.modeling.bounding_box import ModelBoundingBox
 from astropy.modeling.models import (
+    Const1D,
+    Identity,
     Mapping,
     Pix2SkyProjection,
     RotateCelestial2Native,
@@ -26,13 +29,7 @@ from gwcs.coordinate_frames import (
     get_ctype_from_ucd,
 )
 
-from ._utils import (
-    fit_2D_poly,
-    fix_transform_inputs,
-    make_sampling_grid,
-    reform_poly_coefficients,
-    store_2D_coefficients,
-)
+from ._utils import fit_2D_poly, make_sampling_grid
 
 __all__ = ["FitsMixin"]
 
@@ -1407,3 +1404,77 @@ class FitsMixin(BaseGwcs):
         hdr.add_comment("FITS WCS created by approximating a gWCS")
 
         return hdr, hdulist
+
+
+def fix_transform_inputs(transform, inputs):
+    # This is a workaround to the bug in https://github.com/astropy/astropy/issues/11360
+    # Once that bug is fixed, the code below can be replaced with fix_inputs
+    if not inputs:
+        return transform
+
+    c = None
+    mapping = []
+    for k in range(transform.n_inputs):
+        if k in inputs:
+            mapping.append(0)
+        else:
+            # this assumes that n_inputs > 0 and that axis 0 always exist
+            c = 0 if c is None else (c + 1)
+            mapping.append(c)
+
+    in_selector = Mapping(mapping, n_inputs=transform.n_inputs - len(inputs))
+
+    input_fixer = Const1D(inputs[0]) if 0 in inputs else Identity(1)
+    for k in range(1, transform.n_inputs):
+        input_fixer &= Const1D(inputs[k]) if k in inputs else Identity(1)
+
+    return in_selector | input_fixer | transform
+
+
+def reform_poly_coefficients(fit_poly_x, fit_poly_y):
+    """
+    The fit polynomials must be recombined to align with the SIP decomposition
+
+    The result is the f(u,v) and g(u,v) polynomials, and the CD matrix.
+    """
+    # Extract values for CD matrix and recombining
+    c11 = fit_poly_x.c1_0.value
+    c12 = fit_poly_x.c0_1.value
+    c21 = fit_poly_y.c1_0.value
+    c22 = fit_poly_y.c0_1.value
+    sip_poly_x = fit_poly_x.copy()
+    sip_poly_y = fit_poly_y.copy()
+    # Force low order coefficients to be 0 as defined in SIP
+    sip_poly_x.c0_0 = 0
+    sip_poly_y.c0_0 = 0
+    sip_poly_x.c1_0 = 0
+    sip_poly_x.c0_1 = 0
+    sip_poly_y.c1_0 = 0
+    sip_poly_y.c0_1 = 0
+
+    cdmat = ((c11, c12), (c21, c22))
+    invcdmat = npla.inv(np.array(cdmat))
+    degree = fit_poly_x.degree
+    # Now loop through all remaining coefficients
+    for i in range(degree + 1):
+        for j in range(degree + 1):
+            if (i + j > 1) and (i + j < degree + 1):
+                old_x = getattr(fit_poly_x, f"c{i}_{j}").value
+                old_y = getattr(fit_poly_y, f"c{i}_{j}").value
+                newcoeff = np.dot(invcdmat, np.array([[old_x], [old_y]]))
+                setattr(sip_poly_x, f"c{i}_{j}", newcoeff[0, 0])
+                setattr(sip_poly_y, f"c{i}_{j}", newcoeff[1, 0])
+
+    return cdmat, sip_poly_x, sip_poly_y
+
+
+def store_2D_coefficients(hdr, poly_model, coeff_prefix, keeplinear=False):
+    """
+    Write the polynomial model coefficients to the header.
+    """
+    mindeg = int(not keeplinear)
+    degree = poly_model.degree
+    for i in range(degree + 1):
+        for j in range(degree + 1):
+            if (i + j) > mindeg and (i + j < degree + 1):
+                hdr[f"{coeff_prefix}_{i}_{j}"] = getattr(poly_model, f"c{i}_{j}").value

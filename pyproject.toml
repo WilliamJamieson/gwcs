@@ -208,6 +208,7 @@ module = [
     "gwcs.wcs._utils.*",
     "gwcs.wcs._wcs.*",
     "gwcs.wcs._fits.*",
+    "gwcs.wcs._numerical.*",
     "gwcs.examples.*",
     "gwcs.extension.*",
     "gwcs.geometry.*",
