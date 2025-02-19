@@ -67,5 +67,6 @@ repos:
         files: gwcs
         args: []
         additional_dependencies:  # add dependencies for mypy to pull information from
-          - numpy>=2
           - astropy>=7
+          - numpy>=2
+          - scipy-stubs>=1.15

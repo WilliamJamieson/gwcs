@@ -7,10 +7,7 @@ from scipy import linalg
 
 from gwcs.wcstools import grid_from_bounding_box
 
-__all__ = [
-    "fit_2D_poly",
-    "make_sampling_grid",
-]
+__all__ = ["fit_2D_poly", "make_sampling_grid"]
 
 
 def _poly_fit_lu(xin, yin, xout, yout, degree, coord_pow=None):
