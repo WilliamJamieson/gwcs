@@ -10,14 +10,12 @@ from astropy.wcs.wcsapi.high_level_api import (
     values_to_high_level_objects,
 )
 
-from gwcs._typing import (
+from gwcs.api import (
     AxisPhysicalTypes,
     HighLevelObject,
     HighLevelObjects,
     LowLevelArrays,
     LowLevelValue,
-)
-from gwcs.api import (
     WorldAxisClass,
     WorldAxisClasses,
     WorldAxisComponent,

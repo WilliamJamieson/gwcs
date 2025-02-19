@@ -10,10 +10,8 @@ from astropy.wcs.wcsapi.high_level_api import (
     values_to_high_level_objects,
 )
 
-from gwcs.api import GWCSAPIMixin
-from gwcs.coordinate_frames import (
-    CoordinateFrame,
-)
+from gwcs.api import GWCSAPIMixin, LowLevelArrays
+from gwcs.coordinate_frames import BaseCoordinateFrame
 from gwcs.utils import _toindex, is_high_level
 
 from ._fits import FitsMixin
@@ -49,8 +47,8 @@ class WCS(Pipeline, GWCSAPIMixin, NumericalMixin, FitsMixin):
     def __init__(
         self,
         forward_transform: ForwardTransform = None,
-        input_frame: CoordinateFrame | None = None,
-        output_frame: CoordinateFrame | None = None,
+        input_frame: BaseCoordinateFrame | None = None,
+        output_frame: BaseCoordinateFrame | None = None,
         name: str | None = None,
     ) -> None:
         super().__init__(forward_transform, input_frame, output_frame)
@@ -61,7 +59,7 @@ class WCS(Pipeline, GWCSAPIMixin, NumericalMixin, FitsMixin):
         self._pixel_shape = None
 
     def _add_units_input(
-        self, arrays: np.ndarray | float, frame: CoordinateFrame | None
+        self, arrays: LowLevelArrays, frame: BaseCoordinateFrame | None
     ) -> tuple[u.Quantity, ...]:
         if frame is not None:
             return frame.add_units(arrays)
@@ -69,7 +67,7 @@ class WCS(Pipeline, GWCSAPIMixin, NumericalMixin, FitsMixin):
         return arrays
 
     def _remove_units_input(
-        self, arrays: list[u.Quantity], frame: CoordinateFrame | None
+        self, arrays: list[u.Quantity], frame: BaseCoordinateFrame | None
     ) -> tuple[np.ndarray, ...]:
         if frame is not None:
             return frame.remove_units(arrays)
@@ -195,8 +193,8 @@ class WCS(Pipeline, GWCSAPIMixin, NumericalMixin, FitsMixin):
     def _call_forward(
         self,
         *args,
-        from_frame: CoordinateFrame | None = None,
-        to_frame: CoordinateFrame | None = None,
+        from_frame: BaseCoordinateFrame | None = None,
+        to_frame: BaseCoordinateFrame | None = None,
         with_bounding_box: bool = True,
         fill_value: float | np.number = np.nan,
         **kwargs,
@@ -449,8 +447,8 @@ class WCS(Pipeline, GWCSAPIMixin, NumericalMixin, FitsMixin):
 
     def transform(
         self,
-        from_frame: str | CoordinateFrame,
-        to_frame: str | CoordinateFrame,
+        from_frame: str | BaseCoordinateFrame,
+        to_frame: str | BaseCoordinateFrame,
         *args,
         with_units: bool = False,
         **kwargs,

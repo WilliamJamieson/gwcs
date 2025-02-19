@@ -191,8 +191,8 @@ warn_unreachable = true
 module = [
     "astropy.coordinates.*",
     "astropy.modeling.*",
-    # "astropy.table.*",
     "astropy.io.*",
+    "astropy.table.*",
     "astropy.time.*",
     "astropy.units.*",
     "astropy.utils.*",

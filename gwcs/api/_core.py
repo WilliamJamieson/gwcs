@@ -15,17 +15,19 @@ import numpy.typing as npt
 from astropy.modeling import separable
 from astropy.wcs.wcsapi import BaseLowLevelWCS, HighLevelWCSMixin
 
-from gwcs._typing import (
-    AxisPhysicalTypes,
-    Bounds,
-    LowLevelArray,
-    LowLevelArrays,
-    LowLevelValue,
-)
+from gwcs._typing import Bounds
 from gwcs.utils import _toindex
 
 from ._base import BaseGwcs
 from ._exception import GwcsAxesMismatchError, GwcsFrameMissingError
+from ._typing import (
+    AxisPhysicalTypes,
+    GWCSLowLevelArrays,
+    GWCSLowLevelValue,
+    LowLevelArray,
+    LowLevelArrays,
+    LowLevelValue,
+)
 from ._world_axis import WorldAxisClasses, WorldAxisComponents
 
 if TYPE_CHECKING:
@@ -90,8 +92,11 @@ class GWCSAPIMixin(BaseGwcs, BaseLowLevelWCS, HighLevelWCSMixin, abc.ABC):
         return tuple(unit.to_string(format="vounit") for unit in self.output_frame.unit)
 
     def _remove_quantity_output(
-        self, result: LowLevelArrays, frame: BaseCoordinateFrame
+        self, result: GWCSLowLevelArrays, frame: BaseCoordinateFrame
     ) -> LowLevelArrays:
+        """
+        Strip off the units from some result to return a strict APE 14 output.
+        """
         if self.forward_transform.uses_quantity:
             if frame.naxes == 1:
                 result = (cast(LowLevelValue, result),)
@@ -113,7 +118,7 @@ class GWCSAPIMixin(BaseGwcs, BaseLowLevelWCS, HighLevelWCSMixin, abc.ABC):
 
         return result
 
-    def pixel_to_world_values(self, *pixel_arrays: LowLevelValue) -> LowLevelArrays:
+    def pixel_to_world_values(self, *pixel_arrays: GWCSLowLevelValue) -> LowLevelArrays:
         """
         Convert pixel coordinates to world coordinates.
 
@@ -125,6 +130,12 @@ class GWCSAPIMixin(BaseGwcs, BaseLowLevelWCS, HighLevelWCSMixin, abc.ABC):
         can be returned. The coordinates should be specified in the ``(x, y)``
         order, where for an image, ``x`` is the horizontal coordinate and ``y``
         is the vertical coordinate.
+
+        Notes
+        -----
+        - The pixel_arrays can be quantities or APE 14 low-level values, either
+          case is handled correctly.
+        - No matter the input, the output will be APE 14 low-level values.
         """
         result = self._call_forward(*pixel_arrays)
 
@@ -134,7 +145,7 @@ class GWCSAPIMixin(BaseGwcs, BaseLowLevelWCS, HighLevelWCSMixin, abc.ABC):
         return self._remove_quantity_output(result, self.output_frame)
 
     def array_index_to_world_values(
-        self, *index_arrays: LowLevelValue
+        self, *index_arrays: GWCSLowLevelValue
     ) -> LowLevelArrays:
         """
         Convert array indices to world coordinates.
@@ -142,11 +153,17 @@ class GWCSAPIMixin(BaseGwcs, BaseLowLevelWCS, HighLevelWCSMixin, abc.ABC):
         except that the indices should be given in ``(i, j)`` order, where for an image
         ``i`` is the row and ``j`` is the column (i.e. the opposite order to
         `~astropy.wcs.wcsapi.BaseLowLevelWCS.pixel_to_world_values`).
+
+        Notes
+        -----
+        - The index_arrays can be quantities or APE 14 low-level values, either
+          case is handled correctly.
+        - No matter the input, the output will be APE 14 low-level values.
         """
         pixel_arrays = index_arrays[::-1]
         return self.pixel_to_world_values(*pixel_arrays)
 
-    def world_to_pixel_values(self, *world_arrays: LowLevelValue) -> LowLevelArrays:
+    def world_to_pixel_values(self, *world_arrays: GWCSLowLevelValue) -> LowLevelArrays:
         """
         Convert world coordinates to pixel coordinates.
 
@@ -157,6 +174,12 @@ class GWCSAPIMixin(BaseGwcs, BaseLowLevelWCS, HighLevelWCSMixin, abc.ABC):
         matching pixel coordinate, NaN can be returned.  The coordinates should
         be returned in the ``(x, y)`` order, where for an image, ``x`` is the
         horizontal coordinate and ``y`` is the vertical coordinate.
+
+        Notes
+        -----
+        - The world_arrays can be quantities or APE 14 low-level values, either
+          case is handled correctly.
+        - No matter the input, the output will be APE 14 low-level values.
         """
         result = self._call_backward(*world_arrays)
 
@@ -166,7 +189,7 @@ class GWCSAPIMixin(BaseGwcs, BaseLowLevelWCS, HighLevelWCSMixin, abc.ABC):
         return self._remove_quantity_output(result, self.input_frame)
 
     def world_to_array_index_values(
-        self, *world_arrays: LowLevelValue
+        self, *world_arrays: GWCSLowLevelValue
     ) -> LowLevelArrays:
         """
         Convert world coordinates to array indices.
@@ -175,6 +198,12 @@ class GWCSAPIMixin(BaseGwcs, BaseLowLevelWCS, HighLevelWCSMixin, abc.ABC):
         image ``i`` is the row and ``j`` is the column (i.e. the opposite order to
         `~astropy.wcs.wcsapi.BaseLowLevelWCS.pixel_to_world_values`). The indices should
         be returned as rounded integers.
+
+        Notes
+        -----
+        - The world_arrays can be quantities or APE 14 low-level values, either
+          case is handled correctly.
+        - No matter the input, the output will be APE 14 low-level values.
         """
         results = self.world_to_pixel_values(*world_arrays)
         results = (

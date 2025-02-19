@@ -7,7 +7,8 @@ from astropy.modeling import Model
 from astropy.modeling.bounding_box import CompoundBoundingBox, ModelBoundingBox
 
 from gwcs._typing import Bbox, BoundingBox, Cbbox, Mdl
-from gwcs.coordinate_frames import CoordinateFrame, EmptyFrame
+from gwcs.api import BaseGwcs
+from gwcs.coordinate_frames import BaseCoordinateFrame, EmptyFrame
 from gwcs.utils import CoordinateFrameError
 
 from ._exception import GwcsBoundingBoxWarning, GwcsFrameExistsError
@@ -19,7 +20,7 @@ __all__ = ["ForwardTransform", "Pipeline"]
 ForwardTransform: TypeAlias = Union[Model, list[Step | StepTuple], None]  # noqa: UP007
 
 
-class Pipeline:
+class Pipeline(BaseGwcs):
     """
     Class to handle a sequence of WCS transformations.
 
@@ -31,8 +32,8 @@ class Pipeline:
     def __init__(
         self,
         forward_transform: ForwardTransform = None,
-        input_frame: str | CoordinateFrame | None = None,
-        output_frame: str | CoordinateFrame | None = None,
+        input_frame: str | BaseCoordinateFrame | None = None,
+        output_frame: str | BaseCoordinateFrame | None = None,
     ) -> None:
         self._pipeline: list[Step] = []
         self._initialize_pipeline(forward_transform, input_frame, output_frame)
@@ -40,8 +41,8 @@ class Pipeline:
     def _initialize_pipeline(
         self,
         forward_transform: ForwardTransform,
-        input_frame: str | CoordinateFrame | None,
-        output_frame: str | CoordinateFrame | None,
+        input_frame: str | BaseCoordinateFrame | None,
+        output_frame: str | BaseCoordinateFrame | None,
     ) -> None:
         """
         Initialize a pipeline from a forward transform specification.
@@ -189,14 +190,16 @@ class Pipeline:
         self._check_last_step()
 
     @staticmethod
-    def _handle_empty_frame(frame: CoordinateFrame | None) -> CoordinateFrame | None:
+    def _handle_empty_frame(
+        frame: BaseCoordinateFrame | None,
+    ) -> BaseCoordinateFrame | None:
         """
         Handle the case where the frame is an EmptyFrame.
         """
         return None if isinstance(frame, EmptyFrame) else frame
 
     @property
-    def input_frame(self) -> CoordinateFrame | None:
+    def input_frame(self) -> BaseCoordinateFrame | None:
         """
         Return the input frame name of the pipeline.
         """
@@ -205,7 +208,7 @@ class Pipeline:
         )
 
     @property
-    def output_frame(self) -> CoordinateFrame | None:
+    def output_frame(self) -> BaseCoordinateFrame | None:
         """
         Return the output frame name of the pipeline.
         """
@@ -235,7 +238,7 @@ class Pipeline:
         return cast(Model, reduce(_combine, transforms))
 
     @staticmethod
-    def _frame_name(frame: str | CoordinateFrame) -> str:
+    def _frame_name(frame: str | BaseCoordinateFrame) -> str:
         """
         Return the name of the frame.
 
@@ -248,9 +251,9 @@ class Pipeline:
         -------
         Name of the frame.
         """
-        return frame.name if isinstance(frame, CoordinateFrame) else frame
+        return frame.name if isinstance(frame, BaseCoordinateFrame) else frame
 
-    def _frame_index(self, frame: str | CoordinateFrame) -> int:
+    def _frame_index(self, frame: str | BaseCoordinateFrame) -> int:
         """
         Return the index of the given frame in the pipeline.
 
@@ -269,7 +272,7 @@ class Pipeline:
             msg = f"Frame {self._frame_name(frame)} is not in the available frames"
             raise CoordinateFrameError(msg) from err  # type: ignore[no-untyped-call]
 
-    def _get_step(self, frame: str | CoordinateFrame) -> IndexedStep:
+    def _get_step(self, frame: str | BaseCoordinateFrame) -> IndexedStep:
         """
         Get the index and step corresponding to the given frame.
         """
@@ -278,7 +281,7 @@ class Pipeline:
         return IndexedStep(index, self._pipeline[index])
 
     def get_transform(
-        self, from_frame: str | CoordinateFrame, to_frame: str | CoordinateFrame
+        self, from_frame: str | BaseCoordinateFrame, to_frame: str | BaseCoordinateFrame
     ) -> Mdl:
         """
         Return a transform between two coordinate frames.
@@ -318,8 +321,8 @@ class Pipeline:
 
     def set_transform(
         self,
-        from_frame: str | CoordinateFrame,
-        to_frame: str | CoordinateFrame,
+        from_frame: str | BaseCoordinateFrame,
+        to_frame: str | BaseCoordinateFrame,
         transform: Model,
     ) -> None:
         """
@@ -348,7 +351,7 @@ class Pipeline:
         self._pipeline[from_index].transform = transform
 
     def insert_transform(
-        self, frame: str | CoordinateFrame, transform: Model, after: bool = False
+        self, frame: str | BaseCoordinateFrame, transform: Model, after: bool = False
     ) -> None:
         """
         Insert a transform before (default) or after a coordinate frame.
@@ -383,9 +386,9 @@ class Pipeline:
 
     def insert_frame(
         self,
-        input_frame: str | CoordinateFrame,
+        input_frame: str | BaseCoordinateFrame,
         transform: Model,
-        output_frame: str | CoordinateFrame,
+        output_frame: str | BaseCoordinateFrame,
     ) -> None:
         """
         Insert a new frame into an existing pipeline. This frame must be
@@ -405,12 +408,12 @@ class Pipeline:
             Coordinate frame at end of new transform
         """
 
-        def get_index(frame: str | CoordinateFrame) -> int | None:
+        def get_index(frame: str | BaseCoordinateFrame) -> int | None:
             try:
                 index = self._frame_index(frame)
             except CoordinateFrameError as err:
                 index = None
-                if not isinstance(frame, CoordinateFrame):
+                if not isinstance(frame, BaseCoordinateFrame):
                     msg = (
                         f"New coordinate frame {self._frame_name(frame)} "
                         "must be defined"

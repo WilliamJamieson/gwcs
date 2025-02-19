@@ -6,18 +6,16 @@ from typing import NamedTuple, TypeAlias, cast
 from astropy.modeling.core import Model
 
 from gwcs._typing import Mdl
-from gwcs.coordinate_frames import CoordinateFrame, EmptyFrame
+from gwcs.coordinate_frames import BaseCoordinateFrame, EmptyFrame
 
 __all__ = [
     "IndexedStep",
     "Step",
-    "StepFrame",
     "StepTuple",
 ]
 
 
-StepFrame: TypeAlias = CoordinateFrame | EmptyFrame
-StepTuple: TypeAlias = tuple[CoordinateFrame, Mdl]
+StepTuple: TypeAlias = tuple[BaseCoordinateFrame, Mdl]
 
 
 class Step:
@@ -34,7 +32,7 @@ class Step:
     """
 
     def __init__(
-        self, frame: str | CoordinateFrame | None, transform: Mdl = None
+        self, frame: str | BaseCoordinateFrame | None, transform: Mdl = None
     ) -> None:
         # Allow for a string to be passed in for the frame but be turned into a
         # frame object
@@ -42,16 +40,18 @@ class Step:
         self.transform = transform
 
     @staticmethod
-    def _process_frame(frame: str | CoordinateFrame | None) -> StepFrame:
-        return frame if isinstance(frame, CoordinateFrame) else EmptyFrame(name=frame)
+    def _process_frame(frame: str | BaseCoordinateFrame | None) -> BaseCoordinateFrame:
+        return (
+            frame if isinstance(frame, BaseCoordinateFrame) else EmptyFrame(name=frame)
+        )
 
     @property
-    def frame(self) -> StepFrame:
+    def frame(self) -> BaseCoordinateFrame:
         return self._frame
 
     @frame.setter
-    def frame(self, frame: str | CoordinateFrame) -> None:
-        if not isinstance(frame, str | CoordinateFrame):
+    def frame(self, frame: str | BaseCoordinateFrame) -> None:
+        if not isinstance(frame, str | BaseCoordinateFrame):
             # This is a safety check, but if the hint is followed it will never
             # be reached
             msg = '"frame" should be an instance of CoordinateFrame or a string.'  # type: ignore[unreachable]
@@ -82,7 +82,7 @@ class Step:
     def frame_name(self) -> str:
         return self.frame.name
 
-    def __getitem__(self, index: int) -> StepFrame | Mdl:
+    def __getitem__(self, index: int) -> BaseCoordinateFrame | Mdl:
         warnings.warn(
             "Indexing a WCS.pipeline step is deprecated. "
             "Use the `frame` and `transform` attributes instead.",

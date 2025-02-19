@@ -1,6 +1,6 @@
 from astropy import units as u
 
-from gwcs._typing import AxisPhysicalTypes
+from gwcs.api import AxisPhysicalTypes
 
 from ._axis import AxesType, AxisType
 from ._core import CoordinateFrame

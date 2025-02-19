@@ -6,7 +6,7 @@ from astropy.units import Unit, dimensionless_unscaled
 from astropy.utils.misc import isiterable
 from astropy.wcs.wcsapi.low_level_api import VALID_UCDS, validate_physical_types
 
-from gwcs._typing import AxisPhysicalType, AxisPhysicalTypes
+from gwcs.api import AxisPhysicalType, AxisPhysicalTypes
 
 from ._axis import AxesType
 

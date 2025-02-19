@@ -8,8 +8,15 @@ from astropy import units as u
 from astropy.coordinates import BaseCoordinateFrame as _BaseCoordinateFrame
 from astropy.time import Time
 
-from gwcs._typing import AxisPhysicalTypes, LowLevelUnitValue
-from gwcs.api import WorldAxisClasses, WorldAxisComponent, WorldAxisComponents
+from gwcs.api import (
+    AxisPhysicalTypes,
+    GWCSLowLevelArray,
+    GWCSLowLevelArrays,
+    GWCSLowLevelValue,
+    WorldAxisClasses,
+    WorldAxisComponent,
+    WorldAxisComponents,
+)
 
 from ._axis import AxesType
 from ._properties import FrameProperties
@@ -141,7 +148,8 @@ class BaseCoordinateFrame(abc.ABC):
         """
 
     def add_units(
-        self, arrays: tuple[LowLevelUnitValue, ...]
+        self,
+        arrays: GWCSLowLevelArray,
     ) -> tuple[u.Quantity, ...]:
         """
         Add units to the arrays
@@ -152,13 +160,14 @@ class BaseCoordinateFrame(abc.ABC):
         )
 
     def remove_units(
-        self, arrays: tuple[LowLevelUnitValue, ...] | LowLevelUnitValue
+        self,
+        arrays: GWCSLowLevelArrays,
     ) -> tuple[npt.NDArray[np.number], ...]:
         """
         Remove units from the input arrays
         """
         if self.naxes == 1:
-            arrays = (cast(LowLevelUnitValue, arrays),)
+            arrays = (cast(GWCSLowLevelValue, arrays),)
 
         return tuple(
             cast(
@@ -168,6 +177,6 @@ class BaseCoordinateFrame(abc.ABC):
                 else array,
             )
             for array, unit in zip(
-                cast(tuple[LowLevelUnitValue, ...], arrays), self.unit, strict=True
+                cast(GWCSLowLevelArray, arrays), self.unit, strict=True
             )
         )

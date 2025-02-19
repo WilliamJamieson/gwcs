@@ -1,8 +1,7 @@
 from astropy import units as u
 from astropy.coordinates import BaseCoordinateFrame as _BaseCoordinateFrame
 
-from gwcs._typing import AxisPhysicalTypes
-from gwcs.api import WorldAxisClasses, WorldAxisComponents
+from gwcs.api import AxisPhysicalTypes, WorldAxisClasses, WorldAxisComponents
 
 from ._axis import AxesType
 from ._core import CoordinateFrame

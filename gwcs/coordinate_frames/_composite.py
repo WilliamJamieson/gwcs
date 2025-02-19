@@ -5,8 +5,8 @@ from typing import Any, cast
 import numpy as np
 from astropy import units as u
 
-from gwcs._typing import AxisPhysicalType
 from gwcs.api import (
+    AxisPhysicalType,
     WorldAxisClass,
     WorldAxisClasses,
     WorldAxisComponent,

@@ -9,8 +9,8 @@ from astropy.coordinates import (
     builtin_frames,
 )
 
-from gwcs._typing import AxisPhysicalTypes
 from gwcs.api import (
+    AxisPhysicalTypes,
     WorldAxisClass,
     WorldAxisClasses,
     WorldAxisComponent,

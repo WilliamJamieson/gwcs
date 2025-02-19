@@ -5,8 +5,8 @@ import numpy as np
 from astropy import units as u
 from astropy.time import Time, TimeDelta
 
-from gwcs._typing import AxisPhysicalTypes
 from gwcs.api import (
+    AxisPhysicalTypes,
     WorldAxisClasses,
     WorldAxisComponent,
     WorldAxisComponents,

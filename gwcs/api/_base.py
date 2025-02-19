@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 import abc
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, overload
 
 import numpy as np
 from astropy.modeling import Model
 
-from gwcs._typing import (
-    BoundingBox,
-    LowLevelArrays,
-    LowLevelValue,
-    Mdl,
-    Real,
+from gwcs._typing import BoundingBox, Mdl, Real
+
+from ._typing import (
+    GWCSArrays,
+    GWCSLowLevelArrays,
+    GWCSLowLevelValue,
+    GWCSValue,
+    HighLevelObject,
+    HighLevelObjects,
 )
 
 if TYPE_CHECKING:
@@ -82,38 +85,68 @@ class BaseGwcs(abc.ABC):
     @abc.abstractmethod
     def _call_forward(
         self,
-        *args: LowLevelValue,
+        *args: GWCSLowLevelValue,
         from_frame: BaseCoordinateFrame | None = None,
         to_frame: BaseCoordinateFrame | None = None,
         with_bounding_box: bool = True,
         fill_value: Real = np.nan,
         **kwargs: Any,
-    ) -> LowLevelArrays:
+    ) -> GWCSLowLevelArrays:
         """
         Executes the forward transform, but values only.
+
+        Notes
+        -----
+        Can accept pure quantities as inputs and my return quantities
+        as outputs depending on the nature of the transform.
         """
 
     @abc.abstractmethod
     def _call_backward(
         self,
-        *args: LowLevelArrays,
+        *args: GWCSLowLevelValue,
         with_bounding_box: bool = True,
         fill_value: Real = np.nan,
         **kwargs: Any,
-    ) -> LowLevelArrays:
+    ) -> GWCSLowLevelArrays:
         """
         Executes the backward transform, but values only.
+
+        Notes
+        -----
+        Can accept pure quantities as inputs and my return quantities
+        as outputs depending on the nature of the transform.
         """
 
-    @abc.abstractmethod
+    @overload
     def __call__(
         self,
-        *args: LowLevelArrays,
+        *args: GWCSLowLevelValue,
         with_bounding_box: bool = True,
         fill_value: Real = np.nan,
         with_units: bool = False,
         **kwargs: Any,
-    ) -> LowLevelArrays:
+    ) -> GWCSLowLevelArrays: ...
+
+    @overload
+    def __call__(
+        self,
+        *args: HighLevelObject,
+        with_bounding_box: bool = True,
+        fill_value: Real = np.nan,
+        with_units: bool = False,
+        **kwargs: Any,
+    ) -> HighLevelObjects: ...
+
+    @abc.abstractmethod
+    def __call__(
+        self,
+        *args: GWCSValue,
+        with_bounding_box: bool = True,
+        fill_value: Real = np.nan,
+        with_units: bool = False,
+        **kwargs: Any,
+    ) -> GWCSArrays:
         """
         Executes the forward transform.
 
