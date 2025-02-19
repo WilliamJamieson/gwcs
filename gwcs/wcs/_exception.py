@@ -1,3 +1,8 @@
+from typing import Any
+
+import numpy as np
+import numpy.typing as npt
+
 __all__ = [
     "GwcsBoundingBoxWarning",
     "GwcsFrameExistsError",
@@ -15,22 +20,22 @@ class NoConvergence(Exception):
     Attributes
     ----------
 
-    best_solution : `numpy.ndarray`
+    best_solution
         Best solution achieved by the numerical method.
 
-    accuracy : `numpy.ndarray`
+    accuracy
         Estimate of the accuracy of the ``best_solution``.
 
-    niter : `int`
+    niter
         Number of iterations performed by the numerical method
         to compute ``best_solution``.
 
-    divergent : None, `numpy.ndarray`
+    divergent
         Indices of the points in ``best_solution`` array
         for which the solution appears to be divergent. If the
         solution does not diverge, ``divergent`` will be set to `None`.
 
-    slow_conv : None, `numpy.ndarray`
+    slow_conv
         Indices of the solutions in ``best_solution`` array
         for which the solution failed to converge within the
         specified maximum number of iterations. If there are no
@@ -42,13 +47,13 @@ class NoConvergence(Exception):
 
     def __init__(
         self,
-        *args,
-        best_solution=None,
-        accuracy=None,
-        niter=None,
-        divergent=None,
-        slow_conv=None,
-    ):
+        *args: Any,
+        best_solution: npt.NDArray[np.number] | None = None,
+        accuracy: npt.NDArray[np.number] | None = None,
+        niter: int | None = None,
+        divergent: npt.NDArray[np.number] | None = None,
+        slow_conv: npt.NDArray[np.number] | None = None,
+    ) -> None:
         super().__init__(*args)
 
         self.best_solution = best_solution

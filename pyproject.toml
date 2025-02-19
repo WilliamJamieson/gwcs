@@ -219,7 +219,10 @@ follow_untyped_imports = true
 module = [
     "gwcs.tests.*",
     "gwcs.converters.*",
-    "gwcs.wcs.*",
+    "gwcs.wcs._pipeline.*",
+    "gwcs.wcs._step.*",
+    "gwcs.wcs._utils.*",
+    "gwcs.wcs._wcs.*",
     "gwcs.examples.*",
     "gwcs.extension.*",
     "gwcs.geometry.*",
