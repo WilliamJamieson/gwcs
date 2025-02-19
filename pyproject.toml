@@ -220,7 +220,6 @@ module = [
     "gwcs.tests.*",
     "gwcs.converters.*",
     "gwcs.wcs.*",
-    "gwcs.api.*",
     "gwcs.examples.*",
     "gwcs.extension.*",
     "gwcs.geometry.*",

@@ -81,7 +81,7 @@ class _WorldAxisInfo:
         self.input_axes = input_axes
 
 
-class WCS(GWCSAPIMixin, Pipeline):
+class WCS(Pipeline, GWCSAPIMixin):
     """
     Basic WCS class.
 
@@ -109,7 +109,8 @@ class WCS(GWCSAPIMixin, Pipeline):
         output_frame: CoordinateFrame | None = None,
         name: str | None = None,
     ) -> None:
-        super(GWCSAPIMixin, self).__init__(forward_transform, input_frame, output_frame)
+        super().__init__(forward_transform, input_frame, output_frame)
+        super(GWCSAPIMixin, self).__init__()
 
         self._approx_inverse = None
         self._name = "" if name is None else name

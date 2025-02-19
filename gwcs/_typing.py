@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import TypeAlias
+from typing import TypeAlias, Union
 
 import numpy as np
 import numpy.typing as npt
@@ -11,6 +11,7 @@ from astropy.coordinates import (
     SpectralCoord,
     StokesCoord,
 )
+from astropy.modeling import Model
 from astropy.modeling.bounding_box import CompoundBoundingBox, ModelBoundingBox
 from astropy.time import Time
 from astropy.units import Quantity
@@ -23,11 +24,12 @@ __all__ = [
     "HighLevelObject",
     "HighLevelObjects",
     "Interval",
+    "LowLevelArray",
     "LowLevelArrays",
     "LowLevelUnitArrays",
     "LowLevelUnitValue",
     "LowLevelValue",
-    "OutputLowLevelArray",
+    "Mdl",
     "Real",
 ]
 
@@ -44,15 +46,14 @@ LowLevelValue: TypeAlias = Real | npt.NDArray[np.number]
 LowLevelUnitValue: TypeAlias = LowLevelValue | Quantity
 
 # This is to represent all the values together for a single low-level function.
-LowLevelArrays: TypeAlias = tuple[LowLevelValue, ...] | LowLevelValue
+LowLevelArray: TypeAlias = tuple[LowLevelValue, ...]
+LowLevelArrays: TypeAlias = LowLevelArray | LowLevelValue
 LowLevelUnitArrays: TypeAlias = tuple[LowLevelUnitValue, ...]
-
-# This is to represent a general array output from a low-level function.
-# Due to the fact 1D outputs are returned as a single value, rather than a tuple.
-OutputLowLevelArray: TypeAlias = LowLevelValue | LowLevelArrays
 
 HighLevelObject: TypeAlias = Time | SkyCoord | SpectralCoord | StokesCoord | Quantity
 HighLevelObjects: TypeAlias = tuple[HighLevelObject, ...] | HighLevelObject
 
 AxisPhysicalType: TypeAlias = str | BaseCoordinateFrame
 AxisPhysicalTypes: TypeAlias = tuple[str | BaseCoordinateFrame, ...]
+
+Mdl: TypeAlias = Union[Model, None]  # noqa: UP007
