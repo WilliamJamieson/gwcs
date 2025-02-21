@@ -1,16 +1,28 @@
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
 import itertools
+from typing import Any, cast, overload
 
 import astropy.units as u
 import numpy as np
-from astropy.modeling import fix_inputs
+from astropy.modeling import Model, fix_inputs
 from astropy.modeling.parameters import _tofloat
 from astropy.wcs.wcsapi.high_level_api import (
     high_level_objects_to_values,
     values_to_high_level_objects,
 )
 
-from gwcs.api import GWCSAPIMixin, LowLevelArrays
+from gwcs._typing import Mdl, Real
+from gwcs.api import (
+    GWCSAPIMixin,
+    GWCSArray,
+    GWCSArrays,
+    GWCSLowLevelArray,
+    GWCSLowLevelArrays,
+    GWCSLowLevelValue,
+    GWCSValue,
+    HighLevelObject,
+    HighLevelObjects,
+)
 from gwcs.coordinate_frames import BaseCoordinateFrame
 from gwcs.utils import _toindex, is_high_level
 
@@ -29,17 +41,17 @@ class WCS(Pipeline, GWCSAPIMixin, NumericalMixin, FitsMixin):
 
     Parameters
     ----------
-    forward_transform : `~astropy.modeling.Model` or a list
+    forward_transform
         The transform between ``input_frame`` and ``output_frame``.
         A list of (frame, transform) tuples where ``frame`` is the starting frame and
         ``transform`` is the transform from this frame to the next one or
         ``output_frame``.  The last tuple is (transform, None), where None indicates
         the end of the pipeline.
-    input_frame : str, `~gwcs.coordinate_frames.CoordinateFrame`
+    input_frame
         A coordinates object or a string name.
-    output_frame : str, `~gwcs.coordinate_frames.CoordinateFrame`
+    output_frame
         A coordinates object or a string name.
-    name : str
+    name
         a name for this WCS
 
     """
@@ -59,29 +71,49 @@ class WCS(Pipeline, GWCSAPIMixin, NumericalMixin, FitsMixin):
         self._pixel_shape = None
 
     def _add_units_input(
-        self, arrays: LowLevelArrays, frame: BaseCoordinateFrame | None
-    ) -> tuple[u.Quantity, ...]:
+        self, arrays: GWCSLowLevelArray, frame: BaseCoordinateFrame | None
+    ) -> tuple[u.Quantity, ...] | GWCSLowLevelArray:
         if frame is not None:
             return frame.add_units(arrays)
 
         return arrays
 
     def _remove_units_input(
-        self, arrays: list[u.Quantity], frame: BaseCoordinateFrame | None
-    ) -> tuple[np.ndarray, ...]:
+        self, arrays: GWCSLowLevelArray, frame: BaseCoordinateFrame | None
+    ) -> GWCSLowLevelArray:
         if frame is not None:
             return frame.remove_units(arrays)
 
         return arrays
 
+    @overload
     def __call__(
         self,
-        *args,
+        *args: GWCSLowLevelValue,
         with_bounding_box: bool = True,
-        fill_value: float | np.number = np.nan,
+        fill_value: Real = np.nan,
         with_units: bool = False,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> GWCSLowLevelArrays: ...
+
+    @overload
+    def __call__(
+        self,
+        *args: HighLevelObject,
+        with_bounding_box: bool = True,
+        fill_value: Real = np.nan,
+        with_units: bool = False,
+        **kwargs: Any,
+    ) -> HighLevelObjects: ...
+
+    def __call__(
+        self,
+        *args: GWCSValue,
+        with_bounding_box: bool = True,
+        fill_value: Real = np.nan,
+        with_units: bool = False,
+        **kwargs: Any,
+    ) -> GWCSArrays:
         """
         Executes the forward transform.
 
@@ -99,28 +131,37 @@ class WCS(Pipeline, GWCSAPIMixin, NumericalMixin, FitsMixin):
             If ``True`` then high level Astropy objects will be returned.
             Optional, default=False.
         """
+        # MyPy indicates a failure of the defined API for GWCS here, which is true
+        # TODO: Fix this
         results = self._call_forward(
-            *args, with_bounding_box=with_bounding_box, fill_value=fill_value, **kwargs
+            *args,  # type: ignore[arg-type]
+            with_bounding_box=with_bounding_box,
+            fill_value=fill_value,
+            **kwargs,
         )
         if with_units:
             # values are always expected to be arrays or scalars not quantities
             results = self._remove_units_input(results, self.output_frame)
-            high_level = values_to_high_level_objects(*results, low_level_wcs=self)
+            high_level: GWCSArray = values_to_high_level_objects(
+                *results, low_level_wcs=self
+            )  # type: ignore[no-untyped-call]
             if len(high_level) == 1:
-                high_level = high_level[0]
+                # TODO: Fix this, its correct, but the typing is annoying
+                # May need to actually us overload to hint things.
+                high_level = high_level[0]  # type: ignore[assignment]
             return high_level
         return results
 
     def _evaluate_transform(
         self,
-        transform,
-        from_frame,
-        to_frame,
-        *args,
+        transform: Model,
+        from_frame: BaseCoordinateFrame | None,
+        to_frame: BaseCoordinateFrame | None,
+        *args: GWCSLowLevelValue,
         with_bounding_box: bool = True,
-        fill_value: float | np.number = np.nan,
-        **kwargs,
-    ):
+        fill_value: Real = np.nan,
+        **kwargs: Any,
+    ) -> GWCSLowLevelArray:
         """
         Introduces or removes units from the arguments as need so that the transform
         can be successfully evaluated.
@@ -155,10 +196,11 @@ class WCS(Pipeline, GWCSAPIMixin, NumericalMixin, FitsMixin):
         # Validate that the input type matches what the transform expects
         input_is_quantity = any(isinstance(a, u.Quantity) for a in args)
 
-        def _transform(*args):
+        def _transform(*args: GWCSLowLevelValue) -> GWCSLowLevelArray:
             """Wrap the transform evaluation"""
 
-            return transform(
+            # TODO: switch to callable hint above
+            return transform(  # type: ignore[no-any-return]
                 *args,
                 with_bounding_box=with_bounding_box,
                 fill_value=fill_value,
@@ -192,20 +234,21 @@ class WCS(Pipeline, GWCSAPIMixin, NumericalMixin, FitsMixin):
 
     def _call_forward(
         self,
-        *args,
+        *args: GWCSLowLevelValue,
         from_frame: BaseCoordinateFrame | None = None,
         to_frame: BaseCoordinateFrame | None = None,
         with_bounding_box: bool = True,
-        fill_value: float | np.number = np.nan,
-        **kwargs,
-    ):
+        fill_value: Real = np.nan,
+        **kwargs: Any,
+    ) -> GWCSLowLevelArray:
         """
         Executes the forward transform, but values only.
         """
         if from_frame is None and to_frame is None:
-            transform = self.forward_transform
+            transform: Mdl = self.forward_transform
         else:
-            transform = self.get_transform(from_frame, to_frame)
+            # MyPy issue, the above if, protects againsts the None, None case
+            transform = self.get_transform(from_frame, to_frame)  # type: ignore[arg-type]
         if from_frame is None:
             from_frame = self.input_frame
         if to_frame is None:
@@ -225,7 +268,8 @@ class WCS(Pipeline, GWCSAPIMixin, NumericalMixin, FitsMixin):
             **kwargs,
         )
 
-    def in_image(self, *args, **kwargs):
+    # TODO: Figure out the footprint API
+    def in_image(self, *args, **kwargs):  # type: ignore[no-untyped-def]
         """
         This method tests if one or more of the input world coordinates are
         contained within forward transformation's image and that it maps to
@@ -254,20 +298,20 @@ class WCS(Pipeline, GWCSAPIMixin, NumericalMixin, FitsMixin):
         """
         coords = self.invert(*args, **kwargs)
 
-        result = np.isfinite(coords)
-        if self.input_frame.naxes > 1:
+        result = np.isfinite(coords)  # type: ignore[arg-type]
+        if self.input_frame.naxes > 1:  # type: ignore[union-attr]
             result = np.all(result, axis=0)
 
         return result
 
     def invert(
         self,
-        *args,
+        *args: GWCSValue,
         with_bounding_box: bool = True,
-        fill_value: float | np.number = np.nan,
+        fill_value: Real = np.nan,
         with_units: bool = False,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> GWCSArrays:
         """
         Invert coordinates from output frame to input frame using analytical or
         user-supplied inverse. When neither analytical nor user-supplied
@@ -310,8 +354,12 @@ class WCS(Pipeline, GWCSAPIMixin, NumericalMixin, FitsMixin):
             transform returns ``Quantity`` objects, else values.
 
         """  # noqa: E501
-        if is_high_level(*args, low_level_wcs=self):
-            args = high_level_objects_to_values(*args, low_level_wcs=self)
+        # Astropy.wcs has no hints right now
+        if is_high_level(*args, low_level_wcs=self):  # type: ignore[no-untyped-call]
+            args = cast(
+                GWCSLowLevelArray,
+                high_level_objects_to_values(*args, low_level_wcs=self),  # type: ignore[no-untyped-call]
+            )
 
         results = self._call_backward(
             *args, with_bounding_box=with_bounding_box, fill_value=fill_value, **kwargs
@@ -331,11 +379,11 @@ class WCS(Pipeline, GWCSAPIMixin, NumericalMixin, FitsMixin):
 
     def _call_backward(
         self,
-        *args,
+        *args: GWCSLowLevelValue,
         with_bounding_box: bool = True,
-        fill_value: float | np.number = np.nan,
-        **kwargs,
-    ):
+        fill_value: Real = np.nan,
+        **kwargs: Any,
+    ) -> GWCSLowLevelArrays:
         try:
             transform = self.backward_transform
         except NotImplementedError:

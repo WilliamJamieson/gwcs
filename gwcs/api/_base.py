@@ -10,6 +10,7 @@ from gwcs._typing import BoundingBox, Mdl, Real
 
 from ._typing import (
     GWCSArrays,
+    GWCSLowLevelArray,
     GWCSLowLevelArrays,
     GWCSLowLevelValue,
     GWCSValue,
@@ -91,7 +92,7 @@ class BaseGwcs(abc.ABC):
         with_bounding_box: bool = True,
         fill_value: Real = np.nan,
         **kwargs: Any,
-    ) -> GWCSLowLevelArrays:
+    ) -> GWCSLowLevelArray:
         """
         Executes the forward transform, but values only.
 
@@ -108,7 +109,7 @@ class BaseGwcs(abc.ABC):
         with_bounding_box: bool = True,
         fill_value: Real = np.nan,
         **kwargs: Any,
-    ) -> GWCSLowLevelArrays:
+    ) -> GWCSLowLevelArray:
         """
         Executes the backward transform, but values only.
 

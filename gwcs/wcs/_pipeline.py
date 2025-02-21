@@ -27,6 +27,19 @@ class Pipeline(BaseGwcs):
     This is intended to act line a list of steps, but with built in protections
     for things like duplicate frames. In addition, this handles all the logic
     for handling steps and their frames/transforms.
+
+    Parameters
+    ----------
+    forward_transform
+        The transform between ``input_frame`` and ``output_frame``.
+        A list of (frame, transform) tuples where ``frame`` is the starting frame and
+        ``transform`` is the transform from this frame to the next one or
+        ``output_frame``.  The last tuple is (transform, None), where None indicates
+        the end of the pipeline.
+    input_frame
+        A coordinates object or a string name.
+    output_frame
+        A coordinates object or a string name.
     """
 
     def __init__(
