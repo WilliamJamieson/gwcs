@@ -7,6 +7,7 @@ from astropy.modeling.bounding_box import CompoundBoundingBox, ModelBoundingBox
 from astropy.units import Unit
 
 from gwcs.coordinate_frames import CoordinateFrame, EmptyFrame
+from gwcs.geometry import ParametricLineSegment
 from gwcs.utils import CoordinateFrameError
 
 from ._exception import GwcsBoundingBoxWarning, GwcsFrameExistsError
@@ -500,6 +501,82 @@ class Pipeline:
 
         self.set_transform(frames[0], frames[1], transform_0)
 
+    @property
+    def bounding_box_boundary(self) -> Model | None:
+        """
+        Return the boundary function for the bounding box of the pipeline.
+        --> This is a parameterization of the bounding box:
+                f: [0, 1] -> bounding_box
+            Such that f is continuous and f(0) = f(1). That is this is the function
+            defining a simple closed curve tracing the bounding box outline.
+        --> Note that this is only defined for 1 and 2 dimensional bounding boxes.
+
+        --> Parameterization clockwise starting from the lower left corner
+
+        Returns
+        -------
+        Model or None
+            The boundary function for the bounding box of the pipeline.
+            If the bounding box is not defined, returns None.
+
+        Raises
+        ------
+        NotImplementedError
+            If the bounding box is not defined or if the bounding box is not
+            2 dimensional.
+        NotImplementedError
+            If the bounding box is a compound bounding box and the boundary
+        """
+
+        if self.bounding_box is None:
+            return None
+
+        if isinstance(self.bounding_box, CompoundBoundingBox):
+            msg = (
+                "The bounding box boundary is not defined for compound bounding boxes."
+            )
+            raise NotImplementedError(msg)
+
+        if len(self.bounding_box) != 2:
+            msg = (
+                "The bounding box boundary is only defined for 2 dimensional "
+                f"bounding boxes, got {len(self.bounding_box)} dimensions."
+            )
+            raise NotImplementedError(msg)
+
+        bounding_box = self.bounding_box.bounding_box(order="F")
+
+        return (
+            ParametricLineSegment(
+                p0=(bounding_box[0][0], bounding_box[1][0]),
+                p1=(bounding_box[0][0], bounding_box[1][1]),
+                t0=0,
+                t1=1 / 4,
+                name="bounding_box_segment_0",
+            )
+            + ParametricLineSegment(
+                p0=(bounding_box[0][0], bounding_box[1][1]),
+                p1=(bounding_box[0][1], bounding_box[1][1]),
+                t0=1 / 4,
+                t1=1 / 2,
+                name="bounding_box_segment_1",
+            )
+            + ParametricLineSegment(
+                p0=(bounding_box[0][1], bounding_box[1][1]),
+                p1=(bounding_box[0][1], bounding_box[1][0]),
+                t0=1 / 2,
+                t1=3 / 4,
+                name="bounding_box_segment_2",
+            )
+            + ParametricLineSegment(
+                p0=(bounding_box[0][1], bounding_box[1][0]),
+                p1=(bounding_box[0][0], bounding_box[1][0]),
+                t0=3 / 4,
+                t1=1,
+                name="bounding_box_segment_3",
+            )
+        )
+
     def attach_compound_bounding_box(
         self, cbbox: dict[tuple[str], tuple], selector_args: tuple[str]
     ):
@@ -540,7 +617,7 @@ class Pipeline:
         return transform
 
     @property
-    def backward_transform(self):
+    def backward_transform(self) -> Model:
         """
         Return the total backward transform if available - from output to input
         coordinate system.
@@ -561,3 +638,12 @@ class Pipeline:
         except NotImplementedError:  # means "hasattr" won't work
             backward.inverse = self.forward_transform
         return backward
+
+    def footprint_boundary(self, boundary: Model | None = None) -> Model:
+        """
+        Return footprint boundary function for the pipeline given specified
+        boundary function.
+        """
+        boundary = self.bounding_box_boundary if boundary is None else boundary
+
+        return boundary | self.forward_transform

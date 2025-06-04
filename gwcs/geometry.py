@@ -7,11 +7,12 @@ import numbers
 
 import numpy as np
 from astropy import units as u
-from astropy.modeling.core import Model
+from astropy.modeling.core import Model, Parameter
 
 __all__ = [
     "CartesianToSpherical",
     "FromDirectionCosines",
+    "ParametricLineSegment",
     "SphericalToCartesian",
     "ToDirectionCosines",
 ]
@@ -218,3 +219,82 @@ class CartesianToSpherical(Model):
 
     def inverse(self):
         return SphericalToCartesian(wrap_lon_at=self._wrap_lon_at)
+
+
+class ParametricLineSegment(Model):
+    """
+    A model from the real line to a line segment in N-dimensional space.
+    -> p0 when x = t0
+    -> p1 when x = t1
+    -> linear interpolation in between p0 and p1 when t0 < x < t1
+    -> 0 when x < t0 or x > t1
+
+    Formulas:
+        Rescale input so that when x = t0 we get 0 and when x = t1 we get 1:
+            t(x) = (x - t0) / (t1 - t0)
+        Line such that p0 is at t = 0 and p1 is at t = 1:
+            p(t) = (1 - t) * p0 + t * p1
+        Indicator function to return 0 when t is outside [0, 1]:
+            ind(t) = 1 if 0 <= t <= 1 else 0
+        Final formula:
+            output(x) = ind(t(x)) * p(t(x))
+    """
+
+    n_inputs = 1
+
+    p0 = Parameter(description="Starting point of the line.")
+    p1 = Parameter(description="Ending point of the line.")
+    t0 = Parameter(default=0.0, description="Starting parameter value.")
+    t1 = Parameter(default=1.0, description="Ending parameter value.")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.p0.ndim != 1 or self.p1.ndim != 1:
+            msg = "Starting and ending points must be 1-dimensional arrays."
+            raise ValueError(msg)
+
+        if len(self.p0) != len(self.p1):
+            msg = "Starting and ending points must have the same number of dimensions."
+            raise ValueError(msg)
+
+        if self.t0 >= self.t1:
+            msg = (
+                "Starting parameter value (t0) must be less than ending parameter "
+                "value (t1)."
+            )
+            raise ValueError(msg)
+
+    @property
+    def n_outputs(self) -> int:
+        return len(self.p0)
+
+    def evaluate(self, x, p0, p1, t0=0.0, t1=1.0):
+        """
+        Evaluate the line at parameter t.
+
+        Parameters
+        ----------
+        x : float
+            The value
+        p0 : ndarray
+            Starting point of the line.
+        p1 : ndarray
+            Ending point of the line.
+        t0 : float, optional
+            Starting parameter value (default is 0.0).
+        t1 : float, optional
+
+        Returns
+        -------
+        ndarray
+            Point on the line at parameter t.
+        """
+        # Rescale input so that when x = t0 we get 0 and when x = t1 we get 1
+        t = (x - t0) / (t1 - t0)
+
+        # Multiply by 0 when t is outside [0, 1]
+        indicator = np.where(np.logical_or(t >= 0, t <= 1), 1, 0)
+
+        # Return the p0 when t is 0, p1 when t is 1, 0 when t is outside [0, 1]
+        return ((1 - t) * p0 + t * p1) * indicator
