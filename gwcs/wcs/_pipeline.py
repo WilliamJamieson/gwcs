@@ -1,4 +1,5 @@
 import warnings
+from collections.abc import Callable
 from functools import reduce
 from typing import TypeAlias, Union
 
@@ -7,6 +8,7 @@ from astropy.modeling.bounding_box import CompoundBoundingBox, ModelBoundingBox
 from astropy.units import Unit
 
 from gwcs.coordinate_frames import CoordinateFrame, EmptyFrame
+from gwcs.numerical_inverse import NumericalInverseModel
 from gwcs.utils import CoordinateFrameError
 
 from ._exception import GwcsBoundingBoxWarning, GwcsFrameExistsError
@@ -17,6 +19,9 @@ __all__ = ["ForwardTransform", "Pipeline"]
 # Type aliases due to the use of the `|` for type hints not working with Model
 ForwardTransform: TypeAlias = Union[Model, list[Step | StepTuple], None]  # noqa: UP007
 Mdl: TypeAlias = Union[Model, None]  # noqa: UP007
+
+# Type alias for a factory function that creates NumericalInverseModel instances
+InvMdlFactory: TypeAlias = Callable[[Model], NumericalInverseModel] | None
 
 
 class Pipeline:
@@ -36,6 +41,8 @@ class Pipeline:
     ) -> None:
         self._pipeline: list[Step] = []
         self._initialize_pipeline(forward_transform, input_frame, output_frame)
+
+        self.numerical_inverse_factory: InvMdlFactory = None
 
     def _initialize_pipeline(
         self,
@@ -548,6 +555,31 @@ class Pipeline:
         return transform
 
     @property
+    def _backward_transform(self) -> Model:
+        """
+        Return the backward transform via the total inverse of the forward transform
+
+        Returns
+        -------
+            The inverse of the total forward transform
+
+        Raises
+        ------
+        NotImplementedError
+            If the forward_transform's model does not have an inverse
+        """
+        backward = self.forward_transform.inverse
+
+        # Attach the forward transform as the inverse of the backward
+        #    transform model
+        try:
+            _ = backward.inverse
+        except NotImplementedError:  # means "hasattr" won't work
+            backward.inverse = self.forward_transform
+
+        return backward
+
+    @property
     def backward_transform(self):
         """
         Return the total backward transform if available - from output to input
@@ -560,12 +592,27 @@ class Pipeline:
 
         """
         try:
-            backward = self.forward_transform.inverse
+            # Fist try to get the inverse from the forward transform directly
+
+            return self._backward_transform
         except NotImplementedError as err:
-            msg = f"Could not construct backward transform. \n{err}"
-            raise NotImplementedError(msg) from err
-        try:
-            _ = backward.inverse
-        except NotImplementedError:  # means "hasattr" won't work
-            backward.inverse = self.forward_transform
-        return backward
+            # Try to build the transform manually from the individual steps
+            inverses: list[Model] = []
+            for step in self._pipeline[:-1]:
+                try:
+                    # Try to get the defined inverse for the step first
+                    inv = step.transform.inverse
+                except NotImplementedError:
+                    # If that fails try to build it numerically
+                    if self.numerical_inverse_factory is None:
+                        # If no numerical inverse factory is defined, we cannot
+                        # build the inverse
+                        msg = f"Could not construct backward transform. \n{err}"
+                        raise NotImplementedError(msg) from err
+
+                    inv = self.numerical_inverse_factory(step.transform)
+
+                inverses.append(inv)
+
+            # Reverse the list of inverses and then combine them
+            return self._combine_transforms(inverses[::-1])
