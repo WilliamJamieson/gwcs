@@ -5,16 +5,125 @@ in astropy APE 14 (https://doi.org/10.5281/zenodo.1188875).
 
 """
 
+from __future__ import annotations
+
+import abc
+from typing import TYPE_CHECKING
+
 import astropy.units as u
+import numpy as np
 from astropy.modeling import separable
 from astropy.wcs.wcsapi import BaseLowLevelWCS, HighLevelWCSMixin
 
 from gwcs import utils
+from gwcs.coordinate_frames import EmptyFrame
 
-__all__ = ["GWCSAPIMixin"]
+if TYPE_CHECKING:
+    from typing import Any
+
+    from astropy.modeling import Model
+    from astropy.modeling.bounding_box import CompoundBoundingBox, ModelBoundingBox
+
+    from gwcs.coordinate_frames import CoordinateFrame
+
+__all__ = ["GWCSAPIMixin", "NativeGWCSAPI"]
 
 
-class GWCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin):
+class NativeGWCSAPI(abc.ABC):
+    """Abstract base class for GWCS Native API."""
+
+    @property
+    @abc.abstractmethod
+    def input_frame(self) -> CoordinateFrame:
+        """The input coordinate frame."""
+
+    @property
+    @abc.abstractmethod
+    def output_frame(self) -> CoordinateFrame:
+        """The output coordinate frame."""
+
+    @property
+    @abc.abstractmethod
+    def forward_transform(self) -> Model:
+        """The forward transform of the WCS from input to output frame."""
+
+    @property
+    @abc.abstractmethod
+    def bounding_box(self) -> ModelBoundingBox | CompoundBoundingBox | None:
+        """The bounding box of the WCS for the input frame."""
+
+    @abc.abstractmethod
+    def __call__(
+        self,
+        *args,
+        with_bounding_box: bool = True,
+        fill_value: float | np.number = np.nan,
+        **kwargs,
+    ) -> Any:
+        """
+        Executes the forward transform.
+
+        args : float or array-like
+            Inputs in the input coordinate system, separate inputs
+            for each dimension.
+        with_bounding_box : bool, optional
+             If True(default) values in the result which correspond to
+             any of the inputs being outside the bounding_box are set
+             to ``fill_value``.
+        fill_value : float, optional
+            Output value for inputs outside the bounding_box
+            (default is np.nan).
+        """
+
+    @abc.abstractmethod
+    def invert(
+        self,
+        *args,
+        with_bounding_box: bool = True,
+        fill_value: float | np.number = np.nan,
+        **kwargs,
+    ) -> Any:
+        """
+        Invert coordinates from output frame to input frame using analytical or
+        user-supplied inverse. When neither analytical nor user-supplied
+        inverses are defined, a numerical solution will be attempted using
+        :py:meth:`numerical_inverse`.
+
+        .. note::
+            Currently numerical inverse is implemented only for 2D imaging WCS.
+
+        Parameters
+        ----------
+        args : float, array like, `~astropy.coordinates.SkyCoord` or `~astropy.units.Unit`
+            Coordinates to be inverted. The number of arguments must be equal
+            to the number of world coordinates given by ``world_n_dim``.
+
+        with_bounding_box : bool, optional
+             If `True` (default) values in the result which correspond to any
+             of the inputs being outside the bounding_box are set to
+             ``fill_value``.
+
+        fill_value : float, optional
+            Output value for inputs outside the bounding_box (default is ``np.nan``).
+
+        Other Parameters
+        ----------------
+        kwargs : dict
+            Keyword arguments to be passed to :py:meth:`numerical_inverse`
+            (when defined) or to the iterative invert method.
+
+        Returns
+        -------
+        result : tuple or value
+            Returns a tuple of scalar or array values for each axis. Unless
+            ``input_frame.naxes == 1`` when it shall return the value.
+            The return type will be `~astropy.units.Quantity` objects if the
+            transform returns ``Quantity`` objects, else values.
+
+        """  # noqa: E501
+
+
+class GWCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin, NativeGWCSAPI):
     """
     A mix-in class that is intended to be inherited by the
     :class:`~gwcs.wcs.WCS` class and provides the low- and high-level
@@ -24,21 +133,23 @@ class GWCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin):
 
     # Low Level APE 14 API
     @property
-    def pixel_n_dim(self):
+    def pixel_n_dim(self) -> int:
         """
         The number of axes in the pixel coordinate system.
         """
-        if self.input_frame is None:
-            return self.forward_transform.n_inputs
+        if isinstance(self.input_frame, EmptyFrame):
+            # This is because astropy.modeling.Model does not type hint n_inputs
+            return self.forward_transform.n_inputs  # type: ignore[no-any-return]
         return self.input_frame.naxes
 
     @property
-    def world_n_dim(self):
+    def world_n_dim(self) -> int:
         """
         The number of axes in the world coordinate system.
         """
-        if self.output_frame is None:
-            return self.forward_transform.n_outputs
+        if isinstance(self.output_frame, EmptyFrame):
+            # This is because astropy.modeling.Model does not type hint n_outputs
+            return self.forward_transform.n_outputs  # type: ignore[no-any-return]
         return self.output_frame.naxes
 
     @property
@@ -65,8 +176,8 @@ class GWCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin):
         """
         return tuple(unit.to_string(format="vounit") for unit in self.output_frame.unit)
 
-    def _remove_quantity_output(self, result, frame):
-        if frame is not None:
+    def _remove_quantity_output(self, result, frame: CoordinateFrame):
+        if not isinstance(frame, EmptyFrame):
             if frame.naxes == 1:
                 result = [result]
 
@@ -77,7 +188,7 @@ class GWCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin):
 
         # If we only have one output axes, we shouldn't return a tuple.
         if (
-            self.output_frame is not None
+            not isinstance(self.output_frame, EmptyFrame)
             and self.output_frame.naxes == 1
             and isinstance(result, tuple)
         ):
@@ -124,7 +235,6 @@ class GWCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin):
         horizontal coordinate and ``y`` is the vertical coordinate.
         """
         result = self.invert(*world_arrays)
-
         return self._remove_quantity_output(result, self.input_frame)
 
     def world_to_array_index_values(self, *world_arrays):
@@ -215,7 +325,7 @@ class GWCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin):
         if value is None:
             self._pixel_shape = None
             return
-        wcs_naxes = self.input_frame.naxes
+        wcs_naxes = self.pixel_n_dim
         if len(value) != wcs_naxes:
             msg = (
                 "The number of data axes, "
@@ -248,7 +358,7 @@ class GWCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin):
 
     @property
     def world_axis_object_classes(self):
-        if self.output_frame is None:
+        if isinstance(self.output_frame, EmptyFrame):
             return None
 
         return self.output_frame.world_axis_object_classes
@@ -262,7 +372,7 @@ class GWCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin):
         """
         An iterable of strings describing the name for each pixel axis.
         """
-        if self.input_frame is not None:
+        if not isinstance(self.input_frame, EmptyFrame):
             return self.input_frame.axes_names
         return tuple([""] * self.pixel_n_dim)
 
@@ -271,6 +381,6 @@ class GWCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin):
         """
         An iterable of strings describing the name for each world axis.
         """
-        if self.output_frame is not None:
+        if not isinstance(self.output_frame, EmptyFrame):
             return self.output_frame.axes_names
         return tuple([""] * self.world_n_dim)

@@ -84,7 +84,7 @@ class _WorldAxisInfo:
         self.input_axes = input_axes
 
 
-class WCS(GWCSAPIMixin, Pipeline):
+class WCS(Pipeline, GWCSAPIMixin):
     """
     Basic WCS class.
 
@@ -112,25 +112,25 @@ class WCS(GWCSAPIMixin, Pipeline):
         output_frame: CoordinateFrame | None = None,
         name: str | None = None,
     ) -> None:
-        super(GWCSAPIMixin, self).__init__(forward_transform, input_frame, output_frame)
+        super().__init__(forward_transform, input_frame, output_frame)
 
         self._approx_inverse = None
         self._name = "" if name is None else name
         self._pixel_shape = None
 
     def _add_units_input(
-        self, arrays: np.ndarray | tuple[float, ...], frame: CoordinateFrame | None
+        self, arrays: np.ndarray | tuple[float, ...], frame: CoordinateFrame
     ) -> tuple[u.Quantity, ...]:
-        if frame is not None:
+        if not isinstance(frame, EmptyFrame):
             return frame.add_units(arrays)
 
         # This is a falllback that should be rarely used if ever
         return arrays  # type: ignore[return-value]
 
     def _remove_units_input(
-        self, arrays: tuple[u.Quantity, ...], frame: CoordinateFrame | None
+        self, arrays: tuple[u.Quantity, ...], frame: CoordinateFrame
     ) -> tuple[np.ndarray, ...]:
-        if frame is not None:
+        if not isinstance(frame, EmptyFrame):
             return frame.remove_units(arrays)
 
         return arrays
@@ -175,7 +175,7 @@ class WCS(GWCSAPIMixin, Pipeline):
         result = transform(
             *args, with_bounding_box=with_bounding_box, fill_value=fill_value, **kwargs
         )
-        if self.output_frame is not None:
+        if not isinstance(self.output_frame, EmptyFrame):
             if self.output_frame.naxes == 1:
                 result = (result,)
             result = self._make_output_units_consistent(
@@ -185,8 +185,8 @@ class WCS(GWCSAPIMixin, Pipeline):
                 input_is_quantity=input_is_quantity,
                 transform_uses_quantity=transform_uses_quantity,
             )
-        if self.output_frame is not None and self.output_frame.naxes == 1:
-            return result[0]
+            if self.output_frame.naxes == 1:
+                return result[0]
         return result
 
     def _units_are_present(self, args, transform):
@@ -215,7 +215,7 @@ class WCS(GWCSAPIMixin, Pipeline):
         self,
         transform,
         *args,
-        frame: CoordinateFrame | None = None,
+        frame: CoordinateFrame,
         input_is_quantity=False,
         transform_uses_quantity=False,
         **kwargs,
@@ -241,7 +241,7 @@ class WCS(GWCSAPIMixin, Pipeline):
         self,
         transform,
         *args,
-        frame: CoordinateFrame | None = None,
+        frame: CoordinateFrame,
         input_is_quantity=False,
         transform_uses_quantity=False,
         **kwargs,
@@ -389,7 +389,7 @@ class WCS(GWCSAPIMixin, Pipeline):
         if with_bounding_box and self.bounding_box is not None:
             result = self.out_of_bounds(result, fill_value=fill_value)
 
-        if self.input_frame is not None:
+        if not isinstance(self.input_frame, EmptyFrame):
             if self.input_frame.naxes == 1:
                 result = (result,)
             result = self._make_output_units_consistent(
@@ -1151,18 +1151,9 @@ class WCS(GWCSAPIMixin, Pipeline):
             msg = f"No transformation found from {from_frame} to {to_frame}."
             raise ValueError(msg)
 
-        # If frames are of type ``str``, set the object to ``None``.
-        from_frame_obj = (
-            getattr(self, from_frame) if isinstance(from_frame, str) else from_frame
-        )
-        if isinstance(from_frame_obj, EmptyFrame):
-            from_frame_obj = None
-
-        to_frame_obj = (
-            getattr(self, to_frame) if isinstance(to_frame, str) else to_frame
-        )
-        if isinstance(to_frame_obj, EmptyFrame):
-            to_frame_obj = None
+        # Get the frame objects from the wcs pipeline
+        from_frame_obj = self.get_frame(from_frame)
+        to_frame_obj = self.get_frame(to_frame)
 
         input_is_quantity, transform_uses_quantity = self._units_are_present(
             args, transform
@@ -1291,7 +1282,7 @@ class WCS(GWCSAPIMixin, Pipeline):
                 [self._remove_units_input(b, self.input_frame) for b in bb]
             )
         else:
-            vertices = np.array(list(itertools.product(*bb))).T
+            vertices = np.array(list(itertools.product(*bb))).T  # type: ignore[assignment]
 
         # workaround an issue with bbox with quantity, interval needs to be a cquantity,
         # not a list of quantities strip units
