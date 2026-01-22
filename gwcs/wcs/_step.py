@@ -7,12 +7,14 @@ from gwcs.coordinate_frames import CoordinateFrame, EmptyFrame
 
 __all__ = [
     "IndexedStep",
+    "Mdl",
     "Step",
     "StepTuple",
 ]
 
 
-StepTuple: TypeAlias = tuple[CoordinateFrame, Union[Model, None]]  # noqa: UP007
+Mdl: TypeAlias = Union[Model, None]  # noqa: UP007
+StepTuple: TypeAlias = tuple[CoordinateFrame, Mdl]
 
 
 class Step:
@@ -28,7 +30,7 @@ class Step:
         The transform of the last step should be `None`.
     """
 
-    def __init__(self, frame: str | CoordinateFrame | None, transform=None):
+    def __init__(self, frame: str | CoordinateFrame | None, transform: Mdl = None):
         # Allow for a string to be passed in for the frame but be turned into a
         # frame object
         self.frame = (
@@ -49,18 +51,19 @@ class Step:
         self._frame = val
 
     @property
-    def transform(self):
+    def transform(self) -> Mdl:
         return self._transform
 
     @transform.setter
-    def transform(self, val):
-        if val is not None and not isinstance(val, (Model)):
+    def transform(self, val: Mdl):
+        if val is not None and not isinstance(val, Model):
             msg = '"transform" should be an instance of astropy.modeling.Model.'
             raise TypeError(msg)
+
         self._transform = val
 
     @property
-    def frame_name(self):
+    def frame_name(self) -> str:
         if isinstance(self.frame, str):
             return self.frame
         return self.frame.name

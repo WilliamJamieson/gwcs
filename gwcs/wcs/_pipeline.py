@@ -9,14 +9,17 @@ from astropy.units import Unit
 from gwcs.coordinate_frames import CoordinateFrame
 from gwcs.utils import CoordinateFrameError
 
-from ._exception import GwcsBoundingBoxWarning, GwcsFrameExistsError
-from ._step import IndexedStep, Step, StepTuple
+from ._exception import (
+    GwcsBoundingBoxWarning,
+    GwcsFrameExistsError,
+    GwcsTransformDoesNotExistError,
+)
+from ._step import IndexedStep, Mdl, Step, StepTuple
 
 __all__ = ["ForwardTransform", "Pipeline"]
 
 # Type aliases due to the use of the `|` for type hints not working with Model
-ForwardTransform: TypeAlias = Union[Model, list[Step | StepTuple], None]  # noqa: UP007
-Mdl: TypeAlias = Union[Model, None]  # noqa: UP007
+ForwardTransform: TypeAlias = Union[Model, list[Step | StepTuple]]  # noqa: UP007
 
 
 class Pipeline:
@@ -30,7 +33,8 @@ class Pipeline:
 
     def __init__(
         self,
-        forward_transform: ForwardTransform = None,
+        forward_transform: ForwardTransform,
+        *,
         input_frame: str | CoordinateFrame | None = None,
         output_frame: str | CoordinateFrame | None = None,
     ) -> None:
@@ -64,18 +68,6 @@ class Pipeline:
         -------
         An initialized pipeline.
         """
-        if forward_transform is None:
-            # Initialize a WCS without a forward_transform - allows building a
-            # WCS programmatically.
-            if output_frame is None:
-                msg = "An output_frame must be specified if forward_transform is None."
-                raise CoordinateFrameError(msg)
-
-            forward_transform = [
-                Step(input_frame, None),
-                Step(output_frame, None),
-            ]
-
         if isinstance(forward_transform, Model):
             if output_frame is None:
                 msg = (
@@ -218,6 +210,10 @@ class Pipeline:
         """
         Combine a list of transforms into a single transform.
         """
+        if None in transforms:
+            msg = "One of the transforms in the list is None."
+            raise GwcsTransformDoesNotExistError(msg)
+
         return reduce(lambda x, y: x | y, transforms)
 
     @staticmethod
@@ -287,7 +283,7 @@ class Pipeline:
         # Moving backwards over the pipeline
         if to_index < from_index:
             transforms = [
-                step.transform.inverse
+                step.transform.inverse if step.transform is not None else None
                 for step in self._pipeline[to_index:from_index][::-1]
             ]
 

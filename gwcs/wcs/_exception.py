@@ -1,6 +1,7 @@
 __all__ = [
     "GwcsBoundingBoxWarning",
     "GwcsFrameExistsError",
+    "GwcsTransformDoesNotExistError",
     "NoConvergence",
 ]
 
@@ -61,6 +62,12 @@ class NoConvergence(Exception):
 class GwcsFrameExistsError(ValueError):
     """
     An error used to report when a frame already exists in a pipeline.
+    """
+
+
+class GwcsTransformDoesNotExistError(ValueError):
+    """
+    An error used to report when a transform does not exist in a pipeline.
     """
 
 
