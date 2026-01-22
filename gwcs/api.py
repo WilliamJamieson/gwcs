@@ -19,8 +19,6 @@ from gwcs import utils
 from gwcs.coordinate_frames import EmptyFrame
 
 if TYPE_CHECKING:
-    from typing import Any
-
     from astropy.modeling import Model
     from astropy.modeling.bounding_box import CompoundBoundingBox, ModelBoundingBox
 
@@ -59,7 +57,7 @@ class NativeGWCSAPI(abc.ABC):
         with_bounding_box: bool = True,
         fill_value: float | np.number = np.nan,
         **kwargs,
-    ) -> Any:
+    ):
         """
         Executes the forward transform.
 
@@ -82,12 +80,12 @@ class NativeGWCSAPI(abc.ABC):
         with_bounding_box: bool = True,
         fill_value: float | np.number = np.nan,
         **kwargs,
-    ) -> Any:
+    ):
         """
         Invert coordinates from output frame to input frame using analytical or
         user-supplied inverse. When neither analytical nor user-supplied
         inverses are defined, a numerical solution will be attempted using
-        :py:meth:`numerical_inverse`.
+        ``numerical_inverse``.
 
         .. note::
             Currently numerical inverse is implemented only for 2D imaging WCS.
@@ -109,7 +107,7 @@ class NativeGWCSAPI(abc.ABC):
         Other Parameters
         ----------------
         kwargs : dict
-            Keyword arguments to be passed to :py:meth:`numerical_inverse`
+            Keyword arguments to be passed to ``numerical_inverse``
             (when defined) or to the iterative invert method.
 
         Returns
