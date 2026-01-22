@@ -4,11 +4,12 @@ import itertools
 import sys
 import warnings
 from copy import copy
+from typing import overload
 
 import astropy.units as u
 import numpy as np
 from astropy.io import fits
-from astropy.modeling import fix_inputs, projections
+from astropy.modeling import Model, fix_inputs, projections
 from astropy.modeling.bounding_box import ModelBoundingBox as Bbox
 from astropy.modeling.models import (
     Mapping,
@@ -37,6 +38,7 @@ from gwcs.utils import _compute_lon_pole, is_high_level, to_index
 
 from ._exception import NoConvergence
 from ._pipeline import ForwardTransform, Pipeline
+from ._step import Step, StepTuple
 from ._utils import (
     fit_2D_poly,
     fix_transform_inputs,
@@ -105,6 +107,24 @@ class WCS(Pipeline, GWCSAPIMixin):
 
     """
 
+    @overload
+    def __init__(
+        self,
+        forward_transform: Model,
+        input_frame: str | CoordinateFrame,
+        output_frame: str | CoordinateFrame,
+        name: str | None = None,
+    ) -> None: ...
+
+    @overload
+    def __init__(
+        self,
+        forward_transform: list[Step | StepTuple],
+        input_frame: None = None,
+        output_frame: None = None,
+        name: str | None = None,
+    ) -> None: ...
+
     def __init__(
         self,
         forward_transform: ForwardTransform,
@@ -112,10 +132,11 @@ class WCS(Pipeline, GWCSAPIMixin):
         output_frame: str | CoordinateFrame | None = None,
         name: str | None = None,
     ) -> None:
+        # mypy for some reason isn't able to infer the correct overload here
         super().__init__(
             forward_transform=forward_transform,
-            input_frame=input_frame,
-            output_frame=output_frame,
+            input_frame=input_frame,  # type: ignore[arg-type]
+            output_frame=output_frame,  # type: ignore[arg-type]
         )
 
         self._approx_inverse = None

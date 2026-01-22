@@ -1,6 +1,6 @@
 import warnings
 from functools import reduce
-from typing import TypeAlias, Union
+from typing import TypeAlias, Union, overload
 
 from astropy.modeling import Model
 from astropy.modeling.bounding_box import CompoundBoundingBox, ModelBoundingBox
@@ -31,6 +31,24 @@ class Pipeline:
     for handling steps and their frames/transforms.
     """
 
+    @overload
+    def __init__(
+        self,
+        forward_transform: Model,
+        *,
+        input_frame: str | CoordinateFrame,
+        output_frame: str | CoordinateFrame,
+    ) -> None: ...
+
+    @overload
+    def __init__(
+        self,
+        forward_transform: list[Step | StepTuple],
+        *,
+        input_frame: None,
+        output_frame: None,
+    ) -> None: ...
+
     def __init__(
         self,
         forward_transform: ForwardTransform,
@@ -52,12 +70,11 @@ class Pipeline:
 
         Parameters
         ----------
-        forward_transform " `~astropy.modeling.Model`, list of `~gwcs.wcs.Step`, or None
+        forward_transform " `~astropy.modeling.Model`, list of `~gwcs.wcs.Step`
             The forward transform to initialize the pipeline with.
             - Can be a single model which acts as the entire transform.
             - List of steps for the pipeline
             - List of tuples[CoordinateFrame, Model] for the pipeline
-            - None for an empty pipeline
         input_frame : `~gwcs.coordinate_frames.CoordinateFrame` or None
             The input frame of the pipeline.
         output_frame : `~gwcs.coordinate_frames.CoordinateFrame` or None
@@ -68,30 +85,64 @@ class Pipeline:
         -------
         An initialized pipeline.
         """
-        if isinstance(forward_transform, Model):
-            if output_frame is None:
+        match forward_transform:
+            case Model():
+                if output_frame is None:
+                    msg = (
+                        "An output_frame must be specified if forward_transform "
+                        "is a model."
+                    )
+                    raise CoordinateFrameError(msg)
+
+                if input_frame is None:
+                    msg = (
+                        "An input_frame must be specified if forward_transform "
+                        "is a model."
+                    )
+                    raise CoordinateFrameError(msg)
+
+                forward_transform = [
+                    Step(input_frame, forward_transform.copy()),
+                    Step(output_frame, None),
+                ]
+            case list():
+                if input_frame is not None and (
+                    (
+                        isinstance(forward_transform[0], Step)
+                        and input_frame is not forward_transform[0].frame
+                    )
+                    or (
+                        not isinstance(forward_transform[0], Step)
+                        and input_frame is not forward_transform[0][0]
+                    )
+                ):
+                    msg = (
+                        "input_frame does not match the first frame in the "
+                        "forward_transform pipeline."
+                    )
+                    raise CoordinateFrameError(msg)
+
+                if output_frame is not None and (
+                    (
+                        isinstance(forward_transform[-1], Step)
+                        and output_frame is not forward_transform[-1].frame
+                    )
+                    or (
+                        not isinstance(forward_transform[-1], Step)
+                        and output_frame is not forward_transform[-1][0]
+                    )
+                ):
+                    msg = (
+                        "output_frame does not match the first frame in the "
+                        "forward_transform pipeline."
+                    )
+                    raise CoordinateFrameError(msg)
+            case _:
                 msg = (
-                    "An output_frame must be specified if forward_transform is a model."
+                    "Expected forward_transform to be a None, model, or a "
+                    f"(frame, transform) list, got {type(forward_transform)}"
                 )
-                raise CoordinateFrameError(msg)
-
-            if input_frame is None:
-                msg = (
-                    "An input_frame must be specified if forward_transform is a model."
-                )
-                raise CoordinateFrameError(msg)
-
-            forward_transform = [
-                Step(input_frame, forward_transform.copy()),
-                Step(output_frame, None),
-            ]
-
-        if not isinstance(forward_transform, list):
-            msg = (
-                "Expected forward_transform to be a None, model, or a "
-                f"(frame, transform) list, got {type(forward_transform)}"
-            )
-            raise TypeError(msg)
+                raise TypeError(msg)
 
         self._extend(forward_transform)
 

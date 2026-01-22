@@ -799,7 +799,7 @@ def test_to_fits_sip():
 @pytest.mark.parametrize(
     "matrix_type", ["CD", "PC-CDELT1", "PC-SUM1", "PC-DET1", "PC-SCALE"]
 )
-def test_to_fits_sip_pc_normalization(gwcs_simple_imaging_units, matrix_type):
+def test_to_fits_sip_pc_normalization(matrix_type):
     y, x = np.mgrid[:1024:10, :1024:10]
     xflat = np.ravel(x[1:-1, 1:-1])
     yflat = np.ravel(y[1:-1, 1:-1])
@@ -819,11 +819,12 @@ def test_to_fits_sip_pc_normalization(gwcs_simple_imaging_units, matrix_type):
 
     wcs_forward = wcslin | tan | n2c
 
+    detector = cf.Frame2D(name="detector")
     sky_cs = cf.CelestialFrame(reference_frame=coord.ICRS(), name="sky")
-    pipeline = [("detector", wcs_forward), (sky_cs, None)]
+    pipeline = [(detector, wcs_forward), (sky_cs, None)]
 
     wcs_lin = wcs.WCS(
-        input_frame=cf.Frame2D(name="detector"),
+        input_frame=detector,
         output_frame=sky_cs,
         forward_transform=pipeline,
     )
