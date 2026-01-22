@@ -30,7 +30,7 @@ class Step:
         The transform of the last step should be `None`.
     """
 
-    def __init__(self, frame: str | CoordinateFrame | None, transform: Mdl = None):
+    def __init__(self, frame: str | CoordinateFrame, transform: Mdl = None):
         # Allow for a string to be passed in for the frame but be turned into a
         # frame object
         self.frame = (

@@ -75,6 +75,12 @@ class Pipeline:
                 )
                 raise CoordinateFrameError(msg)
 
+            if input_frame is None:
+                msg = (
+                    "An input_frame must be specified if forward_transform is a model."
+                )
+                raise CoordinateFrameError(msg)
+
             forward_transform = [
                 Step(input_frame, forward_transform.copy()),
                 Step(output_frame, None),
