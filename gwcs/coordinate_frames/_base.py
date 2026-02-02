@@ -132,13 +132,15 @@ class BaseCoordinateFrame(abc.ABC):
         """
         Add units to the arrays
         """
-        if self.naxes == 1 and np.isscalar(arrays):
-            return u.Quantity(arrays, self.unit[0])
-
-        return tuple(
-            u.Quantity(array, unit=unit)
+        output = tuple(
+            array if unit is None else u.Quantity(array, unit=unit)
             for array, unit in zip(arrays, self.unit, strict=True)
         )
+
+        if self.naxes == 1 and np.isscalar(arrays):
+            return output[0]
+
+        return output
 
     def remove_units(
         self, arrays: u.Quantity | np.ndarray | list[float]
