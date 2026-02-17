@@ -16,6 +16,8 @@ from numpy.testing import assert_allclose, assert_array_equal
 import gwcs
 import gwcs.coordinate_frames as cf
 
+RNG = np.random.default_rng(42)
+
 
 # Shorthand the name of the 2d gwcs fixture
 @pytest.fixture
@@ -65,34 +67,24 @@ def wcs_ndim_types_units(request):
 x, y = 1, 2
 xarr, yarr = np.ones((3, 4)), np.ones((3, 4)) + 1
 
-fixture_names = [
+_fixture_names = [
     "gwcs_2d_spatial_shift",
     "gwcs_2d_spatial_reordered",
     "gwcs_1d_freq",
     "gwcs_3d_spatial_wave",
     "gwcs_4d_identity_units",
 ]
+fixture_wcses = pytest.mark.parametrize("wcsobj", _fixture_names, indirect=True)
 fixture_wcs_ndim_types_units = pytest.mark.parametrize(
-    "wcs_ndim_types_units", fixture_names, indirect=True
+    "wcs_ndim_types_units", _fixture_names, indirect=True
 )
 all_wcses_names = [
-    *fixture_names,
+    *_fixture_names,
     "gwcs_3d_identity_units",
     "gwcs_stokes_lookup",
     "gwcs_3d_galactic_spectral",
 ]
 fixture_all_wcses = pytest.mark.parametrize("wcsobj", all_wcses_names, indirect=True)
-
-
-@fixture_all_wcses
-def test_lowlevel_types(wcsobj):
-    try:
-        # Skip this on older versions of astropy where it doesn't exist.
-        from astropy.wcs.wcsapi.tests.utils import validate_low_level_wcs_types
-    except ImportError:
-        return
-
-    validate_low_level_wcs_types(wcsobj)
 
 
 @fixture_all_wcses
@@ -110,28 +102,304 @@ def test_names_split(gwcs_3d_galactic_spectral):
     )
 
 
-@fixture_wcs_ndim_types_units
-def test_pixel_n_dim(wcs_ndim_types_units):
-    wcsobj, ndims, *_ = wcs_ndim_types_units
-    assert wcsobj.pixel_n_dim == ndims[0]
+_fixture_names_ = [
+    "gwcs_2d_spatial_shift",
+    "gwcs_2d_spatial_reordered",
+    "gwcs_2d_quantity_shift",
+    "gwcs_1d_freq",
+    "gwcs_3d_spatial_wave",
+    "gwcs_3d_identity_units",
+    "gwcs_4d_identity_units",
+]
 
 
-@fixture_wcs_ndim_types_units
-def test_world_n_dim(wcs_ndim_types_units):
-    wcsobj, ndims, *_ = wcs_ndim_types_units
-    assert wcsobj.world_n_dim == ndims[1]
+@pytest.fixture(params=_fixture_names_)
+def fixture_name(request):
+    return request.param
 
 
-@fixture_wcs_ndim_types_units
-def test_world_axis_physical_types(wcs_ndim_types_units):
-    wcsobj, ndims, physical_types, world_units = wcs_ndim_types_units
-    assert wcsobj.world_axis_physical_types == physical_types
+@pytest.fixture
+def wcs_object(request, fixture_name):
+    return request.getfixturevalue(fixture_name)
 
 
-@fixture_wcs_ndim_types_units
-def test_world_axis_units(wcs_ndim_types_units):
-    wcsobj, ndims, physical_types, world_units = wcs_ndim_types_units
-    assert wcsobj.world_axis_units == world_units
+@pytest.fixture
+def wcs_ndim(fixture_name):
+    return {
+        "gwcs_2d_spatial_shift": (2, 2),
+        "gwcs_2d_spatial_reordered": (2, 2),
+        "gwcs_2d_quantity_shift": (2, 2),
+        "gwcs_1d_freq": (1, 1),
+        "gwcs_3d_spatial_wave": (3, 3),
+        "gwcs_3d_identity_units": (3, 3),
+        "gwcs_4d_identity_units": (4, 4),
+    }[fixture_name]
+
+
+@pytest.fixture
+def wcs_types(fixture_name):
+    return {
+        "gwcs_2d_spatial_shift": ("pos.eq.ra", "pos.eq.dec"),
+        "gwcs_2d_spatial_reordered": ("pos.eq.dec", "pos.eq.ra"),
+        "gwcs_2d_quantity_shift": ("custom:SPATIAL", "custom:SPATIAL"),
+        "gwcs_1d_freq": ("em.freq",),
+        "gwcs_3d_spatial_wave": ("pos.eq.ra", "pos.eq.dec", "em.wl"),
+        "gwcs_3d_identity_units": ("pos.eq.ra", "pos.eq.dec", "em.wl"),
+        "gwcs_4d_identity_units": ("pos.eq.ra", "pos.eq.dec", "em.wl", "time"),
+    }[fixture_name]
+
+
+@pytest.fixture
+def wcs_units(fixture_name):
+    return {
+        "gwcs_2d_spatial_shift": ("deg", "deg"),
+        "gwcs_2d_spatial_reordered": ("deg", "deg"),
+        "gwcs_2d_quantity_shift": ("km", "km"),
+        "gwcs_1d_freq": ("Hz",),
+        "gwcs_3d_spatial_wave": ("deg", "deg", "m"),
+        "gwcs_3d_identity_units": ("arcsec", "arcsec", "nm"),
+        "gwcs_4d_identity_units": ("deg", "deg", "nm", "s"),
+    }[fixture_name]
+
+
+@pytest.fixture
+def wcs_component_names(fixture_name):
+    return {
+        "gwcs_2d_spatial_shift": ("celestial", "celestial"),
+        "gwcs_2d_spatial_reordered": ("celestial", "celestial"),
+        "gwcs_2d_quantity_shift": ("SPATIAL", "SPATIAL1"),
+        "gwcs_1d_freq": ("spectral",),
+        "gwcs_3d_spatial_wave": ("celestial", "celestial", "spectral"),
+        "gwcs_3d_identity_units": ("celestial", "celestial", "spectral"),
+        "gwcs_4d_identity_units": ("celestial", "celestial", "spectral", "temporal"),
+    }[fixture_name]
+
+
+@pytest.fixture
+def wcs_component_positions(fixture_name):
+    return {
+        "gwcs_2d_spatial_shift": (0, 1),
+        "gwcs_2d_spatial_reordered": (1, 0),
+        "gwcs_2d_quantity_shift": (0, 0),
+        "gwcs_1d_freq": (0,),
+        "gwcs_3d_spatial_wave": (0, 1, 0),
+        "gwcs_3d_identity_units": (0, 1, 0),
+        "gwcs_4d_identity_units": (0, 1, 0, 0),
+    }[fixture_name]
+
+
+@pytest.fixture
+def wcs_component_properties(fixture_name):
+    return {
+        "gwcs_2d_spatial_shift": (
+            (coord.SkyCoord(27, 90, unit="deg"), 27),
+            (coord.SkyCoord(34.7, -45.7, unit="deg"), -45.7),
+        ),
+        "gwcs_2d_spatial_reordered": (
+            (coord.SkyCoord(3.14, 90, unit="deg"), 90),
+            (coord.SkyCoord(34.7, -2.72, unit="deg"), 34.7),
+        ),
+        "gwcs_2d_quantity_shift": ("value", "value"),
+        "gwcs_1d_freq": ((coord.SpectralCoord(3, unit="Hz"), 3),),
+        "gwcs_3d_spatial_wave": (
+            (coord.SkyCoord(27, 90, unit="deg"), 27),
+            (coord.SkyCoord(34.7, -45.7, unit="deg"), -45.7),
+            (coord.SpectralCoord(3, unit="m"), 3),
+        ),
+        "gwcs_3d_identity_units": (
+            (coord.SkyCoord(27, 90, unit="arcsec"), 27),
+            (coord.SkyCoord(34.7, -45.7, unit="arcsec"), -45.7),
+            (coord.SpectralCoord(3, unit="nm"), 3),
+        ),
+        "gwcs_4d_identity_units": (
+            (coord.SkyCoord(27, 90, unit="deg"), 27),
+            (coord.SkyCoord(34.7, -45.7, unit="deg"), -45.7),
+            (coord.SpectralCoord(3, unit="nm"), 3),
+            (time.Time("2020-01-01T00:00:03", format="isot", scale="utc"), 631152008.0),
+        ),
+    }[fixture_name]
+
+
+@pytest.fixture
+def wcs_component_object_classes(fixture_name, wcs_object):
+    match fixture_name:
+        case "gwcs_3d_identity_units":
+            celestial_unit = (u.arcsec, u.arcsec)
+        case _:
+            celestial_unit = (u.deg, u.deg)
+    celestial = (
+        coord.SkyCoord,
+        (),
+        {
+            "frame": wcs_object.output_frame.frames[0].reference_frame
+            if isinstance(wcs_object.output_frame, cf.CompositeFrame)
+            else wcs_object.output_frame.reference_frame,
+            "unit": celestial_unit,
+        },
+    )
+    match fixture_name:
+        case "gwcs_1d_freq":
+            spectral_unit = u.Hz
+        case "gwcs_3d_spatial_wave":
+            spectral_unit = u.m
+        case _:
+            spectral_unit = u.nm
+    spectral = (
+        coord.SpectralCoord,
+        (),
+        {"unit": spectral_unit},
+    )
+
+    return {
+        "gwcs_2d_spatial_shift": {"celestial": celestial},
+        "gwcs_2d_spatial_reordered": {"celestial": celestial},
+        "gwcs_2d_quantity_shift": {
+            "SPATIAL": (u.Quantity, (), {"unit": u.km}),
+            "SPATIAL1": (u.Quantity, (), {"unit": u.km}),
+        },
+        "gwcs_1d_freq": {"spectral": spectral},
+        "gwcs_3d_spatial_wave": {
+            "celestial": celestial,
+            "spectral": spectral,
+        },
+        "gwcs_3d_identity_units": {
+            "celestial": celestial,
+            "spectral": spectral,
+        },
+        "gwcs_4d_identity_units": {
+            "celestial": celestial,
+            "spectral": spectral,
+            "temporal": (
+                time.Time,
+                (),
+                {
+                    "format": "isot",
+                    "in_subfmt": "*",
+                    "location": None,
+                    "out_subfmt": "*",
+                    "precision": 3,
+                    "scale": "utc",
+                    "unit": u.s,
+                },
+            ),
+        },
+    }[fixture_name]
+
+
+class TestAPE14LowLevelAPIProperties:
+    """Test the low level API Properties defined in APE 14."""
+
+    def test_pixel_n_dim(self, wcs_object, wcs_ndim):
+        """Test the pixel_n_dim returns the number of pixel axes."""
+        assert wcs_object.pixel_n_dim == wcs_ndim[0]
+
+    def test_world_n_dim(sellf, wcs_object, wcs_ndim):
+        """Test the world_n_dim returns the number of world axes."""
+        assert wcs_object.world_n_dim == wcs_ndim[1]
+
+    def test_array_shape_and_pixel_shape(self, wcs_object):
+        """Test the array_shape and pixel_shape properties and how they relate."""
+        assert wcs_object.array_shape is None
+
+        array_shape = tuple(RNG.integers(1020, 4096, size=wcs_object.pixel_n_dim))
+
+        wcs_object.array_shape = array_shape
+        assert_array_equal(wcs_object.array_shape, array_shape)
+
+        assert wcs_object.array_shape == wcs_object.pixel_shape[::-1]
+
+        pixel_shape = tuple(RNG.integers(1020, 4096, size=wcs_object.pixel_n_dim))
+        assert not (np.array(pixel_shape) == np.array(array_shape)).all()
+
+        wcs_object.pixel_shape = pixel_shape
+        assert wcs_object.array_shape == pixel_shape[::-1]
+
+    def test_pixel_bounds(self, wcs_object):
+        """Test the pixel_bounds property is the bounding box."""
+        assert wcs_object.pixel_bounds is None
+
+        bbox = tuple(
+            (-0.5, RNG.uniform(1020, 4096)) for _ in range(wcs_object.pixel_n_dim)
+        )
+
+        wcs_object.bounding_box = bbox
+        assert_array_equal(wcs_object.pixel_bounds, wcs_object.bounding_box)
+        # Reset the bounding box or this will affect other tests
+        wcs_object.bounding_box = None
+
+    def test_world_axis_physical_types(self, wcs_object, wcs_types):
+        """Test the world_axis_physical_types property returns the physical types."""
+        assert wcs_object.world_axis_physical_types == wcs_types
+
+    def test_world_axis_units(self, wcs_object, wcs_units):
+        """Test the world_axis_units property returns the units."""
+        assert wcs_object.world_axis_units == wcs_units
+
+    def test_axis_correlation_matrix(self, fixture_name, wcs_object):
+        """Test the axis_correlation_matrix property returns the correct matrix."""
+        matrix = np.identity(wcs_object.pixel_n_dim)
+        # spatial_reorderd happens to be flipped
+        if fixture_name == "gwcs_2d_spatial_reordered":
+            matrix = np.flipud(matrix)
+
+        assert_array_equal(wcs_object.axis_correlation_matrix, matrix)
+
+    def test_serialized_classes(self, wcs_object):
+        """Test the serialized_classes property returns `False`."""
+        assert wcs_object.serialized_classes is False
+
+    def test_world_axis_object_components(
+        self,
+        wcs_object,
+        wcs_component_names,
+        wcs_component_positions,
+        wcs_component_properties,
+    ):
+        """
+        Test the world_axis_object_components property returns the correct components.
+        """
+        waoc = wcs_object.world_axis_object_components
+        assert isinstance(waoc, list)
+        assert len(waoc) == wcs_object.world_n_dim
+
+        for component, component_name, component_position, component_property in zip(
+            waoc,
+            wcs_component_names,
+            wcs_component_positions,
+            wcs_component_properties,
+            strict=True,
+        ):
+            assert isinstance(component, tuple)
+            assert len(component) == 3
+            name, position, property_ = component
+            assert component_name == name
+            assert component_position == position
+
+            if not callable(property_):
+                assert component_property == property_
+            else:
+                assert property_(component_property[0]) == component_property[1]
+
+    def test_world_axis_object_classes(
+        self, wcs_object, wcs_component_names, wcs_component_object_classes
+    ):
+        """
+        Test the world_axis_object_classes property returns the correct dictionarly.
+        """
+        waoc = wcs_object.world_axis_object_classes
+        assert set(waoc.keys()) == set(wcs_component_names)
+
+        for component_name, component in waoc.items():
+            assert isinstance(component, tuple)
+            if component_name == "temporal":
+                assert len(component) == 4
+                assert callable(component[3])
+            else:
+                assert len(component) == 3
+
+            assert component[0] == wcs_component_object_classes[component_name][0]
+            assert component[1] == wcs_component_object_classes[component_name][1]
+            assert component[2] == wcs_component_object_classes[component_name][2]
 
 
 @pytest.mark.parametrize(("x", "y"), zip((x, xarr), (y, yarr), strict=False))
@@ -192,83 +460,6 @@ def test_pixel_to_world_values_units_1d(gwcs_1d_freq_quantity, x):
 def test_array_index_to_world_values(gwcs_2d_spatial_shift, x, y):
     wcsobj = gwcs_2d_spatial_shift
     assert_allclose(wcsobj.array_index_to_world_values(x, y), wcsobj(y, x))
-
-
-def test_world_axis_object_components_2d(gwcs_2d_spatial_shift):
-    waoc = gwcs_2d_spatial_shift.world_axis_object_components
-    assert waoc[0][:2] == ("celestial", 0)
-    assert callable(waoc[0][2])
-    assert waoc[1][:2] == ("celestial", 1)
-    assert callable(waoc[1][2])
-
-
-def test_world_axis_object_components_2d_generic(gwcs_2d_quantity_shift):
-    waoc = gwcs_2d_quantity_shift.world_axis_object_components
-    assert waoc == [("SPATIAL", 0, "value"), ("SPATIAL1", 0, "value")]
-
-
-def test_world_axis_object_components_1d(gwcs_1d_freq):
-    waoc = gwcs_1d_freq.world_axis_object_components
-    assert [c[:2] for c in waoc] == [("spectral", 0)]
-    assert callable(waoc[0][2])
-
-
-def test_world_axis_object_components_4d(gwcs_4d_identity_units):
-    waoc = gwcs_4d_identity_units.world_axis_object_components
-    first_two = [c[:2] for c in waoc]
-    last_one = [c[2] for c in waoc]
-    assert first_two == [
-        ("celestial", 0),
-        ("celestial", 1),
-        ("spectral", 0),
-        ("temporal", 0),
-    ]
-    assert all(callable(last) for last in last_one)
-
-
-def test_world_axis_object_classes_2d(gwcs_2d_spatial_shift):
-    waoc = gwcs_2d_spatial_shift.world_axis_object_classes
-    assert waoc["celestial"][0] is coord.SkyCoord
-    assert waoc["celestial"][1] == ()
-    assert "frame" in waoc["celestial"][2]
-    assert "unit" in waoc["celestial"][2]
-    assert isinstance(waoc["celestial"][2]["frame"], coord.ICRS)
-    assert tuple(waoc["celestial"][2]["unit"]) == (u.deg, u.deg)
-
-
-def test_world_axis_object_classes_2d_generic(gwcs_2d_quantity_shift):
-    waoc = gwcs_2d_quantity_shift.world_axis_object_classes
-    assert waoc["SPATIAL"][0] is u.Quantity
-    assert waoc["SPATIAL1"][0] is u.Quantity
-    assert waoc["SPATIAL"][1] == ()
-    assert waoc["SPATIAL1"][1] == ()
-    assert "unit" in waoc["SPATIAL"][2]
-    assert "unit" in waoc["SPATIAL1"][2]
-    assert waoc["SPATIAL"][2]["unit"] == u.km
-    assert waoc["SPATIAL1"][2]["unit"] == u.km
-
-
-def test_world_axis_object_classes_4d(gwcs_4d_identity_units):
-    waoc = gwcs_4d_identity_units.world_axis_object_classes
-    assert waoc["celestial"][0] is coord.SkyCoord
-    assert waoc["celestial"][1] == ()
-    assert "frame" in waoc["celestial"][2]
-    assert "unit" in waoc["celestial"][2]
-    assert isinstance(waoc["celestial"][2]["frame"], coord.ICRS)
-    assert tuple(waoc["celestial"][2]["unit"]) == (u.deg, u.deg)
-
-    temporal = waoc["temporal"]
-    assert temporal[0] is time.Time
-    assert temporal[1] == ()
-    assert temporal[2] == {
-        "unit": u.s,
-        "format": "isot",
-        "scale": "utc",
-        "precision": 3,
-        "in_subfmt": "*",
-        "out_subfmt": "*",
-        "location": None,
-    }
 
 
 def _compare_frame_output(wc1, wc2):
@@ -383,39 +574,6 @@ def test_stokes_wrapper(gwcs_stokes_lookup):
 
     assert isinstance(out, coord.StokesCoord)
     assert out == "Q"
-
-
-@wcs_objs
-def test_array_shape(wcsobj):
-    assert wcsobj.array_shape is None
-
-    wcsobj.array_shape = (2040, 1020)
-    assert_array_equal(wcsobj.array_shape, (2040, 1020))
-
-    assert wcsobj.array_shape == wcsobj.pixel_shape[::-1]
-
-    wcsobj.pixel_shape = (1111, 2222)
-    assert wcsobj.array_shape == (2222, 1111)
-
-
-@wcs_objs
-def test_pixel_bounds(wcsobj):
-    assert wcsobj.pixel_bounds is None
-
-    wcsobj.bounding_box = ((-0.5, 2039.5), (-0.5, 1019.5))
-    assert_array_equal(wcsobj.pixel_bounds, wcsobj.bounding_box)
-    # Reset the bounding box or this will affect other tests
-    wcsobj.bounding_box = None
-
-
-@wcs_objs
-def test_axis_correlation_matrix(wcsobj):
-    assert_array_equal(wcsobj.axis_correlation_matrix, np.identity(2))
-
-
-@wcs_objs
-def test_serialized_classes(wcsobj):
-    assert not wcsobj.serialized_classes
 
 
 @wcs_objs
@@ -595,7 +753,7 @@ def test_coordinate_frame_api():
     assert u.allclose(pixel2, 0 * u.pix)
 
 
-def test_world_axis_object_components_units(gwcs_3d_identity_units):
+def test_high_level_objects_to_values_units(gwcs_3d_identity_units):
     from astropy.wcs.wcsapi.high_level_api import high_level_objects_to_values
 
     wcs = gwcs_3d_identity_units
