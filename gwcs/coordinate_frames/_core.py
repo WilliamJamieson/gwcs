@@ -272,7 +272,7 @@ class CoordinateFrame(CoordinateFrameProtocol):
         Returns
         -------
         values : `numbers.Number` or `numpy.ndarray`
-           ``naxis`` number of coordinates as scalars or arrays.
+            ``naxis`` number of coordinates as scalars or arrays.
         """
         values = high_level_objects_to_values(*high_level_coords, low_level_wcs=self)
         if len(values) == 1:

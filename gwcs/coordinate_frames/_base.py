@@ -150,7 +150,7 @@ class CoordinateFrameProtocol(Protocol):
 
     @property
     @abstractmethod
-    def unit(self) -> tuple[u.Unit, ...]:
+    def unit(self) -> tuple[u.Unit | None, ...]:
         """
         The units of the axes in this frame.
         """
