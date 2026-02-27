@@ -89,7 +89,7 @@ def test_create_wcs():
         gw1.available_frames
         == gw2.available_frames
         == gw3.available_frames
-        == ["detector", "icrs"]
+        == ("detector", "icrs")
     )
     res = m(1, 2)
     assert_allclose(gw1(1, 2), res)
@@ -564,7 +564,7 @@ def test_format_output():
 
 def test_available_frames():
     w = wcs.WCS(pipe)
-    assert w.available_frames == ["detector", "focal", "icrs"]
+    assert w.available_frames == ("detector", "focal", "icrs")
 
 
 def test_footprint():

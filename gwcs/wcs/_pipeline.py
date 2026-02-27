@@ -153,7 +153,7 @@ class Pipeline:
             raise ValueError(msg)
 
     @property
-    def pipeline(self) -> list[Step]:
+    def pipeline(self) -> tuple[Step, ...]:
         """
         Allow direct access to the raw pipeline steps.
         """
@@ -162,14 +162,14 @@ class Pipeline:
         #       without any of the checks and handling that have been put in
         #       place in order to ensure the pipeline is functional.
         #       -> Maybe we should return a copy?
-        return self._pipeline
+        return tuple(self._pipeline)
 
     @property
-    def available_frames(self) -> list[str]:
+    def available_frames(self) -> tuple[str, ...]:
         """
         List of all the frame names in this WCS in their order in the pipeline
         """
-        return [step.frame.name for step in self._pipeline]
+        return tuple(step.frame.name for step in self._pipeline)
 
     def get_frame(
         self, frame: str | CoordinateFrameProtocol
@@ -210,7 +210,7 @@ class Pipeline:
         # the control of the pipeline
         value = step.copy() if isinstance(step, Step) else Step(*step)
 
-        frames = self.available_frames
+        frames = list(self.available_frames)
 
         # If we are replacing a step, remove it from the list of frames as we will
         # not be duplicating it in that case
@@ -275,6 +275,10 @@ class Pipeline:
         """
         Combine a list of transforms into a single transform.
         """
+        if any(t is None for t in transforms):
+            msg = "Can not combine transforms if any are None."
+            raise NotImplementedError(msg)
+
         return reduce(lambda x, y: x | y, transforms)
 
     @staticmethod
@@ -346,8 +350,7 @@ class Pipeline:
         # Moving backwards over the pipeline
         if to_index < from_index:
             transforms = [
-                step.transform.inverse
-                for step in self._pipeline[to_index:from_index][::-1]
+                step.inverse for step in self._pipeline[to_index:from_index][::-1]
             ]
 
         # from and to are the same
@@ -582,8 +585,8 @@ class Pipeline:
         self.set_transform(frames[0], frames[1], transform)
 
     def attach_compound_bounding_box(
-        self, cbbox: dict[tuple[str], tuple], selector_args: tuple[str]
-    ):
+        self, cbbox: dict[tuple[str, ...], tuple], selector_args: tuple[str, ...]
+    ) -> None:
         """
         Attach a compound bounding box dictionary to the pipeline.
 
