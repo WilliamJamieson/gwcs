@@ -646,10 +646,13 @@ def test_no_input_frame(gwcs_simple_2d):
 
 def test_empty_output_frame(gwcs_empty_output_2d):
     """Test running the API on the WCS with an empty output frame."""
-    assert (np.array([3]), np.array([1])) == gwcs_empty_output_2d.pixel_to_world_values(
-        np.array([2]), np.array([-1])
-    )
-    assert (
-        np.array([2]),
-        np.array([-1]),
-    ) == gwcs_empty_output_2d.world_to_pixel_values(np.array([3]), np.array([1]))
+    with pytest.warns(UserWarning, match=r"EmptyFrame.*does not have any unit.*"):
+        assert (
+            np.array([3]),
+            np.array([1]),
+        ) == gwcs_empty_output_2d.pixel_to_world_values(np.array([2]), np.array([-1]))
+    with pytest.warns(UserWarning, match=r"EmptyFrame.*does not have any unit.*"):
+        assert (
+            np.array([2]),
+            np.array([-1]),
+        ) == gwcs_empty_output_2d.world_to_pixel_values(np.array([3]), np.array([1]))

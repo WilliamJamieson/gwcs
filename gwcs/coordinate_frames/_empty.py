@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Self
 from ._axis import AxesType, AxisType
 from ._base import (
     CoordinateFrameProtocol,
+    LowLevelInput,
     WorldAxisObjectClass,
     WorldAxisObjectClasses,
     WorldAxisObjectComponent,
@@ -142,3 +143,17 @@ class EmptyFrame(CoordinateFrameProtocol):
 
     def from_high_level_coordinates(self, *high_level_coords):
         self._raise_error()
+
+    def add_units(
+        self, arrays: tuple[LowLevelInput, ...] | LowLevelInput
+    ) -> tuple[LowLevelInput, ...]:
+        msg = (
+            "EmptyFrame (string frame) does not have any unit information. "
+            "Therefore, GWCS cannot ensure that units are being properly handled. "
+            "If an error occurs due to units, please provide a proper CoordinateFrame "
+            "and/or ensure that the input values you are providing have the correct "
+            "units attached (or removed) in order to be compatible with the transform."
+        )
+        warnings.warn(msg, UserWarning, stacklevel=2)
+
+        return super().add_units(arrays)
