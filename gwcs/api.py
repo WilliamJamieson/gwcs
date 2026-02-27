@@ -8,13 +8,12 @@ This module defines the abstract APIs for the GWCS Package:
 from __future__ import annotations
 
 import abc
-from typing import TYPE_CHECKING, TypeAlias, cast
+from typing import TYPE_CHECKING
 
 import numpy as np
 from astropy import units as u
 from astropy.modeling import separable
 from astropy.wcs.wcsapi import BaseLowLevelWCS, HighLevelWCSMixin
-from numpy import typing as npt
 
 from gwcs import utils
 from gwcs.coordinate_frames import EmptyFrame
@@ -25,14 +24,13 @@ if TYPE_CHECKING:
 
     from gwcs.coordinate_frames import (
         CoordinateFrameProtocol,
+        LowLevelArray,
+        LowLevelInput,
         WorldAxisObjectClasses,
         WorldAxisObjectComponent,
     )
 
-__all__ = ["LowLevelInput", "NativeAPIMixin", "WCSAPIMixin"]
-
-LowLevelArray: TypeAlias = npt.NDArray[np.generic]
-LowLevelInput: TypeAlias = LowLevelArray | u.Quantity
+__all__ = ["NativeAPIMixin", "WCSAPIMixin"]
 
 
 class NativeAPIMixin(abc.ABC):
@@ -193,8 +191,8 @@ class WCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin, NativeAPIMixin):
             return ()
         return tuple(unit.to_string(format="vounit") for unit in self.output_frame.unit)
 
+    @staticmethod
     def _remove_quantity_frame(
-        self,
         result: tuple[LowLevelInput, ...] | LowLevelInput,
         frame: CoordinateFrameProtocol,
     ) -> tuple[LowLevelArray, ...] | LowLevelArray:
@@ -204,13 +202,7 @@ class WCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin, NativeAPIMixin):
         if frame.naxes == 1:
             result = (result,)
 
-        output: tuple[LowLevelArray, ...] = tuple(
-            # `cast` is used here for mypy as to_value isn't type hinted properly for
-            # Quantity. `cast` is a no-op at runtime, so there is no performance impact.
-            cast(LowLevelArray, r.to_value(unit)) if isinstance(r, u.Quantity) else r
-            # ToDo: use zip_longest here to support "non-coordinate" inputs/outputs.
-            for r, unit in zip(result, frame.unit, strict=False)
-        )
+        output = frame.remove_units(result)
 
         # If we only have one output axes, we shouldn't return a tuple.
         if frame.naxes == 1 and isinstance(output, tuple):

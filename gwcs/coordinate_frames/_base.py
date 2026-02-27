@@ -10,6 +10,7 @@ import numpy as np
 from astropy import units as u
 from astropy.coordinates import BaseCoordinateFrame as _AstropyBaseCoordinateFrame
 from astropy.time import Time
+from numpy import typing as npt
 
 from ._axis import AxesType
 
@@ -17,12 +18,16 @@ __all__ = [
     "AstropyBuiltInFrame",
     "BaseCoordinateFrame",
     "CoordinateFrameProtocol",
+    "LowLevelArray",
+    "LowLevelInput",
     "WorldAxisObjectClass",
     "WorldAxisObjectClassConverter",
     "WorldAxisObjectComponent",
 ]
 
 AstropyBuiltInFrame: TypeAlias = Time | _AstropyBaseCoordinateFrame
+LowLevelArray: TypeAlias = npt.NDArray[np.generic]
+LowLevelInput: TypeAlias = LowLevelArray | u.Quantity
 
 
 class WorldAxisObjectClass(NamedTuple):
@@ -213,15 +218,21 @@ class CoordinateFrameProtocol(Protocol):
         """
 
     def add_units(
-        self, arrays: u.Quantity | np.ndarray | list[float]
-    ) -> tuple[u.Quantity, ...] | u.Quantity:
+        self, arrays: tuple[LowLevelInput, ...] | LowLevelInput
+    ) -> tuple[LowLevelInput, ...]:
         """
         Add units to the arrays
         """
-        if self.naxes == 1 and np.isscalar(arrays):
-            return u.Quantity(arrays, self.unit[0])
+        # Handle the case where we have a single axis input which maybe passed as a
+        #    scalar rather than a tuple of length 1.
+        if self.naxes == 1 and (np.isscalar(arrays) or isinstance(arrays, u.Quantity)):
+            return (
+                arrays if self.unit[0] is None else u.Quantity(arrays, self.unit[0]),
+            )
 
         return tuple(
+            # Add units to the array if there is a unit for the axis, otherwise
+            #    just pass it through.
             array if unit is None else u.Quantity(array, unit=unit)
             # zip_longest is used here to support "non-coordinate" inputs/outputs
             #   This implicitly assumes that the "non-coordinate" inputs/outputs
@@ -230,20 +241,26 @@ class CoordinateFrameProtocol(Protocol):
         )
 
     def remove_units(
-        self, arrays: u.Quantity | np.ndarray | list[float]
-    ) -> tuple[np.ndarray, ...]:
+        self, arrays: tuple[LowLevelInput, ...] | LowLevelInput
+    ) -> tuple[LowLevelArray, ...]:
         """
         Remove units from the input arrays
         """
-        if self.naxes == 1 and (np.isscalar(arrays) or isinstance(arrays, u.Quantity)):
-            arrays = (arrays,)
-
         return tuple(
-            array.to_value(unit) if isinstance(array, u.Quantity) else array
-            # zip_longest is used here to support "non-coordinate" inputs/outputs
-            #   This implicitly assumes that the "non-coordinate" inputs/outputs
-            #   are tacked onto the end of the tuple of "coordinate" inputs/outputs.
-            for array, unit in zip_longest(arrays, self.unit)
+            # Strip the unit off an axis if the axis is a quantity,
+            #     otherwise just pass it through.
+            array.value if isinstance(array, u.Quantity) else array
+            # self.add_units is used first because:
+            # 1. If something is a Quantity, then it will be converted to the
+            #    unit of the frame.
+            # 2. If something is not a Quantity, but the frame has a unit for that
+            #    axis, then we treat that as the correct magnitude but just missing
+            #    the unit, so we get a Quantity with the correct unit.
+            # 3. If there is no unit for the axis, then we just pass whatever it is
+            #    through and hope for the best.
+            # Now we have an array with the correct units, so we can safely strip
+            #    the units off by accessing the .value (magnitude) of the attribute.
+            for array in self.add_units(arrays)
         )
 
 
