@@ -74,7 +74,7 @@ The GWCS object, which by default when called executes for forward transformatio
 can be used to convert coordinates from pixel to world.
 
   >>> gwcs_obj(36.235,642.215)    # doctest: +FLOAT_CMP
-  (246.72158004206716, 43.46075091731673)
+  (np.float64(246.72158004206716), np.float64(43.46075091731673))
 
 Or using the common WCS API
 
