@@ -14,12 +14,13 @@ from astropy.time import Time, TimeDelta
 from astropy.wcs.wcsapi.fitswcs import CTYPE_TO_UCD1
 from numpy.testing import assert_allclose
 
-from gwcs import WCS
 from gwcs import coordinate_frames as cf
 from gwcs.coordinate_frames._utils import (
     _ALLOWED_UCD_DUPLICATES,
     _ucd1_to_ctype_name_mapping,
 )
+from gwcs.wcs import WCS
+from gwcs.wcs._step import _is_coordinate_frame
 
 astropy_version = astropy.__version__
 
@@ -135,7 +136,7 @@ def coordinate_to_quantity(*inputs, frame):
 
 @pytest.mark.parametrize("frame", _FRAMES)
 def test_frame_protocol(frame):
-    assert isinstance(frame, cf.CoordinateFrameProtocol)
+    assert _is_coordinate_frame(frame)
 
 
 @pytest.mark.parametrize("inputs", inputs2)

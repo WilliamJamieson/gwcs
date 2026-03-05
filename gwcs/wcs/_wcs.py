@@ -350,6 +350,14 @@ class WCS(Pipeline, WCSAPIMixin):
 
         fill_value : float, optional
             Output value for inputs outside the bounding_box
+
+        force_high_level : bool, optional
+            If True, forces the output to be returned as high-level objects
+            even if the output frame does not have any high-level objects.
+            If False (default), it will return high-level objects if the
+            input arguments are non-quantity high-level objects otherwise it
+            will return Quantities if Quantities are input or pure low-level
+            arrays if low-level arrays are input.
             (default is np.nan).
 
         force_high_level : bool, optional
