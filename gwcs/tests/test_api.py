@@ -49,12 +49,6 @@ fixture_all_wcses = pytest.mark.parametrize("wcsobj", all_wcses_names, indirect=
 
 
 @pytest.mark.parametrize(("x", "y"), zip((x, xarr), (y, yarr), strict=False))
-def test_pixel_to_world_values(gwcs_2d_spatial_shift, x, y):
-    wcsobj = gwcs_2d_spatial_shift
-    assert_allclose(wcsobj.pixel_to_world_values(x, y), wcsobj(x, y))
-
-
-@pytest.mark.parametrize(("x", "y"), zip((x, xarr), (y, yarr), strict=False))
 def test_pixel_to_world_values_units_2d(gwcs_2d_shift_scale_quantity, x, y):
     wcsobj = gwcs_2d_shift_scale_quantity
 
@@ -100,12 +94,6 @@ def test_pixel_to_world_values_units_1d(gwcs_1d_freq_quantity, x):
 
     new_api_pixel = wcsobj.world_to_pixel_values(api_world)
     assert_allclose(new_api_pixel, api_pixel)
-
-
-@pytest.mark.parametrize(("x", "y"), zip((x, xarr), (y, yarr), strict=False))
-def test_array_index_to_world_values(gwcs_2d_spatial_shift, x, y):
-    wcsobj = gwcs_2d_spatial_shift
-    assert_allclose(wcsobj.array_index_to_world_values(x, y), wcsobj(y, x))
 
 
 def _compare_frame_output(wc1, wc2):
@@ -342,16 +330,6 @@ def test_world_to_pixel_values(gwcs_2d_spatial_shift, sky_ra_dec):
     assert_allclose(wcsobj.world_to_pixel_values(ra, dec), wcsobj.invert(ra, dec))
 
 
-def test_world_to_array_index_values(gwcs_simple_imaging, sky_ra_dec):
-    wcsobj = gwcs_simple_imaging
-    sky, ra, dec = sky_ra_dec
-
-    assert_allclose(
-        wcsobj.world_to_array_index_values(ra, dec),
-        wcsobj.invert(ra, dec)[::-1],
-    )
-
-
 def test_ndim_str_frames(gwcs_with_frames_strings):
     wcsobj = gwcs_with_frames_strings
     assert wcsobj.pixel_n_dim == 4
@@ -436,28 +414,6 @@ def test_mismatched_high_level_types(gwcs_3d_identity_units):
         match="Invalid types were passed.*got.*Quantity.*expected.*SpectralCoord.*",
     ):
         wcs.invert(coord.SkyCoord(1 * u.deg, 2 * u.deg), 10 * u.nm)
-
-
-def test_no_input_frame(gwcs_simple_2d):
-    """Test running the API on the WCS with no input frame."""
-    assert (np.array([2]), np.array([-1])) == gwcs_simple_2d.world_to_pixel_values(
-        np.array([3]), np.array([1])
-    )
-    assert (np.array([4]), np.array([3])) == gwcs_simple_2d.pixel_to_world_values(
-        np.array([3]), np.array([1])
-    )
-
-
-def test_empty_output_frame(gwcs_empty_output_2d):
-    """Test running the API on the WCS with an empty output frame."""
-    assert (
-        np.array([3]),
-        np.array([1]),
-    ) == gwcs_empty_output_2d.pixel_to_world_values(np.array([2]), np.array([-1]))
-    assert (
-        np.array([2]),
-        np.array([-1]),
-    ) == gwcs_empty_output_2d.world_to_pixel_values(np.array([3]), np.array([1]))
 
 
 def test_empty_frame_units_warning(gwcs_empty_output_2d):

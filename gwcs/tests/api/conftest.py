@@ -1,6 +1,6 @@
 import pytest
 
-fixture_names = [
+fixture_names = (
     "gwcs_2d_spatial_shift",
     "gwcs_2d_spatial_reordered",
     "gwcs_2d_quantity_shift",
@@ -17,7 +17,7 @@ fixture_names = [
     "gwcs_empty_output_2d",
     "gwcs_simple_imaging",
     "gwcs_with_frames_strings",
-]
+)
 
 
 @pytest.fixture(params=fixture_names)
