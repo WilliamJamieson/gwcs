@@ -114,10 +114,12 @@ class _UnitHandler:
         inputs: tuple[LowLevelInput, ...],
         transform: Model,
         frame: CoordinateFrameProtocol,
+        is_high_level: bool,
     ):
         # Handle the case where a HLO is passed into the Native API
-        self._is_high_level = frame.is_high_level(*inputs)
-        if self._is_high_level:
+        self._is_high_level = is_high_level
+        if frame.is_high_level(*inputs):
+            self._is_high_level = True
             inputs = frame.from_high_level_coordinates(*inputs, correct_1d=False)
 
         # Determine if the inputs are quantities
@@ -231,7 +233,9 @@ class _UnitHandler:
 
         outputs = self._handle_output_type(*outputs, frame=frame)
 
-        if frame.naxes == 1:
+        # When len(outputs) == 1 and frame.naxes > 1, we have something
+        #   like SkyCoord, a high-level object with multiple axes.
+        if frame.naxes == 1 or (len(outputs) == 1 and frame.naxes > 1):
             return outputs[0]
 
         return outputs
@@ -299,13 +303,14 @@ class WCS(Pipeline, WCSAPIMixin):
         *args: LowLevelInput,
         with_bounding_box: bool = True,
         fill_value: float | np.number = np.nan,
+        force_high_level: bool = False,
         **kwargs,
     ) -> tuple[LowLevelInput, ...] | LowLevelInput:
         # Call into variable as this involves computing the forward transform
         #   after each call to it.
         transform = self.forward_transform
 
-        unit_handler = _UnitHandler(args, transform, self.input_frame)
+        unit_handler = _UnitHandler(args, transform, self.input_frame, force_high_level)
 
         result = transform(
             *unit_handler.args,
@@ -321,6 +326,7 @@ class WCS(Pipeline, WCSAPIMixin):
         *args: LowLevelInput,
         with_bounding_box: bool = True,
         fill_value: float | np.number = np.nan,
+        force_high_level: bool = False,
         **kwargs,
     ) -> tuple[LowLevelInput, ...] | LowLevelInput:
         """
@@ -329,16 +335,30 @@ class WCS(Pipeline, WCSAPIMixin):
         args : float or array-like
             Inputs in the input coordinate system, separate inputs
             for each dimension.
+
         with_bounding_box : bool, optional
             If True(default) values in the result which correspond to
             any of the inputs being outside the bounding_box are set
             to ``fill_value``.
+
         fill_value : float, optional
             Output value for inputs outside the bounding_box
+
+        force_high_level : bool, optional
+            If True, forces the output to be returned as high-level objects
+            even if the output frame does not have any high-level objects.
+            If False (default), it will return high-level objects if the
+            input arguments are non-quantity high-level objects otherwise it
+            will return Quantities if Quantities are input or pure low-level
+            arrays if low-level arrays are input.
             (default is np.nan).
         """
         return self.evaluate(
-            *args, with_bounding_box=with_bounding_box, fill_value=fill_value, **kwargs
+            *args,
+            with_bounding_box=with_bounding_box,
+            fill_value=fill_value,
+            force_high_level=force_high_level,
+            **kwargs,
         )
 
     def in_image(
@@ -389,6 +409,7 @@ class WCS(Pipeline, WCSAPIMixin):
         *args: LowLevelInput,
         with_bounding_box: bool = True,
         fill_value: float | np.number = np.nan,
+        force_high_level: bool = False,
         **kwargs,
     ) -> tuple[LowLevelInput, ...] | LowLevelInput:
         """
@@ -414,6 +435,14 @@ class WCS(Pipeline, WCSAPIMixin):
         fill_value : float, optional
             Output value for inputs outside the bounding_box (default is ``np.nan``).
 
+        force_high_level : bool, optional
+            If True, forces the output to be returned as high-level objects
+            even if the output frame does not have any high-level objects.
+            If False (default), it will return high-level objects if the
+            input arguments are non-quantity high-level objects otherwise it
+            will return Quantities if Quantities are input or pure low-level
+            arrays if low-level arrays are input.
+
         Other Parameters
         ----------------
         kwargs : dict
@@ -434,7 +463,9 @@ class WCS(Pipeline, WCSAPIMixin):
         except NotImplementedError:
             transform = None
 
-        unit_handler = _UnitHandler(args, transform, self.output_frame)
+        unit_handler = _UnitHandler(
+            args, transform, self.output_frame, force_high_level
+        )
 
         inputs = unit_handler.args
         if with_bounding_box and self.bounding_box is not None:
@@ -1186,6 +1217,7 @@ class WCS(Pipeline, WCSAPIMixin):
         *args: float | np.ndarray,
         with_bounding_box: bool = True,
         fill_value: float | np.number = np.nan,
+        force_high_level: bool = False,
         **kwargs,
     ) -> tuple[LowLevelArray, ...] | LowLevelArray:
         """
@@ -1195,16 +1227,28 @@ class WCS(Pipeline, WCSAPIMixin):
         ----------
         from_frame : str or `~gwcs.coordinate_frames.CoordinateFrame`
             Initial coordinate frame.
+
         to_frame : str, or instance of `~gwcs.coordinate_frames.CoordinateFrame`
             Coordinate frame into which to transform.
+
         args : float or array-like
             Inputs in ``from_frame``, separate inputs for each dimension.
+
         with_bounding_box : bool, optional
             If True(default) values in the result which correspond to any of
             the inputs being outside the bounding_box are set to ``fill_value``.
+
         fill_value : float, optional
             Output value for inputs outside the bounding_box
             (default is np.nan).
+
+        force_high_level : bool, optional
+            If True, forces the output to be returned as high-level objects
+            even if the output frame does not have any high-level objects.
+            If False (default), it will return high-level objects if the
+            input arguments are non-quantity high-level objects otherwise it
+            will return Quantities if Quantities are input or pure low-level
+            arrays if low-level arrays are input.
         """
         direction = self.pipeline_between(from_frame, to_frame)
 
@@ -1217,11 +1261,16 @@ class WCS(Pipeline, WCSAPIMixin):
                 *args,
                 with_bounding_box=with_bounding_box,
                 fill_value=fill_value,
+                force_high_level=force_high_level,
                 **kwargs,
             )
 
         return direction.wcs.invert(
-            *args, with_bounding_box=with_bounding_box, fill_value=fill_value, **kwargs
+            *args,
+            with_bounding_box=with_bounding_box,
+            fill_value=fill_value,
+            force_high_level=force_high_level,
+            **kwargs,
         )
 
     @property

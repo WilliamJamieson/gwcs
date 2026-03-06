@@ -65,6 +65,7 @@ class NativeAPIMixin(abc.ABC):
         *args: LowLevelInput,
         with_bounding_box: bool = True,
         fill_value: float | np.number = np.nan,
+        force_high_level: bool = False,
         **kwargs,
     ) -> tuple[LowLevelInput, ...] | LowLevelInput:
         """
@@ -73,13 +74,23 @@ class NativeAPIMixin(abc.ABC):
         args : float or array-like
             Inputs in the input coordinate system, separate inputs
             for each dimension.
+
         with_bounding_box : bool, optional
             If True(default) values in the result which correspond to
             any of the inputs being outside the bounding_box are set
             to ``fill_value``.
+
         fill_value : float, optional
             Output value for inputs outside the bounding_box
             (default is np.nan).
+
+        force_high_level : bool, optional
+            If True, forces the output to be returned as high-level objects
+            even if the output frame does not have any high-level objects.
+            If False (default), it will return high-level objects if the
+            input arguments are non-quantity high-level objects otherwise it
+            will return Quantities if Quantities are input or pure low-level
+            arrays if low-level arrays are input.
 
         Other Parameters
         ----------------
@@ -93,6 +104,7 @@ class NativeAPIMixin(abc.ABC):
         *args: LowLevelInput,
         with_bounding_box: bool = True,
         fill_value: float | np.number = np.nan,
+        force_high_level: bool = False,
         **kwargs,
     ) -> tuple[LowLevelInput, ...] | LowLevelInput:
         """
@@ -117,6 +129,14 @@ class NativeAPIMixin(abc.ABC):
 
         fill_value : float, optional
             Output value for inputs outside the bounding_box (default is ``np.nan``).
+
+        force_high_level : bool, optional
+            If True, forces the output to be returned as high-level objects
+            even if the output frame does not have any high-level objects.
+            If False (default), it will return high-level objects if the
+            input arguments are non-quantity high-level objects otherwise it
+            will return Quantities if Quantities are input or pure low-level
+            arrays if low-level arrays are input.
 
         Other Parameters
         ----------------
@@ -393,3 +413,23 @@ class WCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin, NativeAPIMixin):
         An iterable of strings describing the name for each world axis.
         """
         return self.output_frame.axes_names
+
+    def pixel_to_world(self, *pixel_arrays):
+        """
+        Convert pixel coordinates to world coordinates (represented by Astropy
+        objects). See ``pixel_to_world_values`` for pixel indexing and ordering
+        conventions.
+        """
+        # Need to convert any non-Quantity high-level inputs to low-level inputs
+        #   here because astropy.wcs does not do this because it assumes the
+        #   pixel "frame" doesn't have any real high-level objects, but in GWCS
+        #   this is permissible.
+        arrays = (
+            self.input_frame.from_high_level_coordinates(
+                *pixel_arrays, correct_1d=False
+            )
+            if self.input_frame.is_high_level(*pixel_arrays)
+            else pixel_arrays
+        )
+
+        return super().pixel_to_world(*arrays)
