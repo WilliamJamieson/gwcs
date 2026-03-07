@@ -360,6 +360,9 @@ class CoordinateFrameProtocol(Protocol):
             raise TypeError(msg)
 
         high_level = values_to_high_level_objects(*values, low_level_wcs=self)
+        if isinstance(high_level, list):
+            high_level = tuple(high_level)
+
         if correct_1d and len(high_level) == 1:
             high_level = high_level[0]
         return high_level

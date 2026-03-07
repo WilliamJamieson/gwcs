@@ -1,4 +1,18 @@
+from contextlib import nullcontext
+
+import numpy as np
 import pytest
+from astropy import coordinates as coord
+from astropy import time
+from astropy import units as u
+from numpy.testing import assert_allclose
+
+from gwcs.coordinate_frames import (
+    CoordinateFrameProtocol,
+    EmptyFrame,
+    EmptyFrameUnitsWarning,
+)
+from gwcs.wcs import WCS
 
 fixture_names = (
     "gwcs_2d_spatial_shift",
@@ -27,12 +41,22 @@ def fixture_name(request):
 
 
 @pytest.fixture
-def wcs_object(request, fixture_name):
+def wcs_object(request, fixture_name) -> WCS:
     return request.getfixturevalue(fixture_name)
 
 
+@pytest.fixture(params=["scalar", "array"])
+def dimension(request):
+    return request.param
+
+
+@pytest.fixture(params=["low", "quantity", "high"])
+def level(request):
+    return request.param
+
+
 @pytest.fixture
-def pixels(fixture_name):
+def pixel_scalar(fixture_name):
     match fixture_name:
         case "gwcs_1d_freq" | "gwcs_1d_freq_quantity" | "gwcs_stokes_lookup":
             return (1,)
@@ -60,7 +84,89 @@ def pixels(fixture_name):
 
 
 @pytest.fixture
-def world(fixture_name):  # noqa: PLR0911
+def pixel_low(pixel_scalar, dimension):
+    if dimension == "scalar":
+        return pixel_scalar
+
+    return tuple(np.ones((3, 4)) * arg for arg in pixel_scalar)
+
+
+@pytest.fixture
+def array_index_low(pixel_low):
+    return pixel_low[::-1]
+
+
+def pixel_to_quantity(wcs_object, pixel):
+    """Convert pixel coordinates to world coordinates as quantities."""
+
+    with (
+        pytest.warns(EmptyFrameUnitsWarning, match=r"EmptyFrame.*")
+        if isinstance(wcs_object.input_frame, EmptyFrame)
+        else nullcontext()
+    ):
+        return wcs_object.input_frame.add_units(pixel)
+
+
+def pixel_to_high_level(wcs_object, pixel, correct_1d=True):
+    """Convert pixel coordinates to high-level world coordinates."""
+    return wcs_object.input_frame.to_high_level_coordinates(
+        *pixel, correct_1d=correct_1d
+    )
+
+
+@pytest.fixture
+def pixel_high(wcs_object, pixel_low):
+    """Convert pixel coordinates to high-level world coordinates."""
+
+    return pixel_to_high_level(wcs_object, pixel_low, correct_1d=False)
+
+
+@pytest.fixture
+def pixel(wcs_object, pixel_low, pixel_high, level):
+    if level == "quantity":
+        return pixel_to_quantity(wcs_object, pixel_low)
+
+    if level == "high":
+        return pixel_high
+
+    return pixel_low
+
+
+# TODO: Should this be turned into a method on the Frame?
+def pixel_to_low_level(wcs_object: WCS, pixel):
+    """Convert world coordinates to low-level world coordinates."""
+
+    remove_tuple = False
+    if not isinstance(pixel, tuple):
+        remove_tuple = True
+        pixel = (pixel,)
+
+    # If we are high-level, convert to low-level
+    if wcs_object.input_frame.is_high_level(*pixel):
+        return wcs_object.input_frame.from_high_level_coordinates(*pixel)
+
+    # Remove units just in case
+    pixel = wcs_object.input_frame.remove_units(pixel)
+
+    if remove_tuple:
+        return pixel[0]
+
+    return pixel
+
+
+@pytest.fixture
+def array_index(wcs_object, pixel):
+    """Convert pixel coordinates to array index coordinates."""
+
+    # True high-level inputs have no corresponding array index
+    if wcs_object.input_frame.is_high_level(*pixel):
+        return pixel
+
+    return pixel[::-1]
+
+
+@pytest.fixture
+def world_scalar(fixture_name):  # noqa: PLR0911
     match fixture_name:
         case "gwcs_1d_freq" | "gwcs_stokes_lookup":
             return (2,)
@@ -93,3 +199,153 @@ def world(fixture_name):  # noqa: PLR0911
         case _:
             msg = f"Unknown fixture name: {fixture_name}"
             raise ValueError(msg)
+
+
+@pytest.fixture
+def world_low(world_scalar, dimension):
+    if dimension == "scalar":
+        return world_scalar
+
+    return tuple(np.ones((3, 4)) * arg for arg in world_scalar)
+
+
+def world_to_quantity(wcs_object, world):
+    """Convert world coordinates to world coordinates as quantities."""
+
+    with (
+        pytest.warns(EmptyFrameUnitsWarning, match=r"EmptyFrame.*")
+        if isinstance(wcs_object.output_frame, EmptyFrame)
+        else nullcontext()
+    ):
+        return wcs_object.output_frame.add_units(world)
+
+
+def world_to_high_level(wcs_object, world, correct_1d=True):
+    """Convert world coordinates to high-level world coordinates."""
+    return wcs_object.output_frame.to_high_level_coordinates(
+        *world, correct_1d=correct_1d
+    )
+
+
+@pytest.fixture
+def world_high(wcs_object, world_low):
+    """Convert world coordinates to high-level world coordinates."""
+
+    return world_to_high_level(wcs_object, world_low, correct_1d=False)
+
+
+@pytest.fixture
+def world(wcs_object, world_low, world_high, level):
+    if level == "quantity":
+        return world_to_quantity(wcs_object, world_low)
+
+    if level == "high":
+        return world_high
+
+    return world_low
+
+
+# TODO: Should this be turned into a method on the Frame?
+def world_to_low_level(wcs_object: WCS, world):
+    """Convert world coordinates to low-level world coordinates."""
+
+    remove_tuple = False
+    if not isinstance(world, tuple):
+        remove_tuple = True
+        world = (world,)
+
+    # If we are high-level, convert to
+    if wcs_object.output_frame.is_high_level(*world):
+        world = wcs_object.output_frame.from_high_level_coordinates(*world)
+    else:
+        world = wcs_object.output_frame.remove_units(world)
+
+    if remove_tuple:
+        return world[0]
+
+    return world
+
+
+@pytest.fixture
+def xfail_gwcs_with_frames_strings(fixture_name, request):
+    if fixture_name == "gwcs_with_frames_strings":
+        request.node.add_marker(
+            pytest.mark.xfail(
+                reason="Numerical inverse not supported when n_inputs != n_outputs"
+            )
+        )
+
+
+@pytest.fixture
+def xfail_gwcs_with_frames_strings_high(level, request):
+    if level == "high":
+        request.getfixturevalue("xfail_gwcs_with_frames_strings")
+
+
+@pytest.fixture
+def rtol(fixture_name):
+    """
+    gwcs_simple_imaging's inverse is not exact, so we need a looser tolerance for it.
+    """
+    return 0.1 if fixture_name == "gwcs_simple_imaging" else 1e-07
+
+
+def check_is_low_level(frame: CoordinateFrameProtocol, output):
+    if isinstance(output, tuple | list):
+        assert not any(isinstance(p, u.Quantity) for p in output)
+        assert not frame.is_high_level(*output)
+    else:
+        assert not isinstance(output, u.Quantity)
+        assert not frame.is_high_level(*(output,))
+
+
+def check_is_high_level(frame: CoordinateFrameProtocol, output):
+    if isinstance(output, tuple | list):
+        assert all(isinstance(w, u.Quantity) for w in output) or frame.is_high_level(
+            *output
+        )
+    else:
+        assert isinstance(output, u.Quantity) or frame.is_high_level(*(output,))
+
+
+def empty_frame_warning_context(frame: CoordinateFrameProtocol, inputs):
+    return (
+        pytest.warns(EmptyFrameUnitsWarning, match=r"EmptyFrame.*")
+        if isinstance(frame, EmptyFrame)
+        and all(isinstance(arr, u.Quantity) for arr in inputs)
+        else nullcontext()
+    )
+
+
+def compare_frame_output(wc1, wc2, rtol=1e-07):
+    if isinstance(wc1, coord.SkyCoord):
+        assert isinstance(wc1.frame, type(wc2.frame))
+        assert u.allclose(
+            wc1.spherical.lon, wc2.spherical.lon, equal_nan=True, rtol=rtol
+        )
+        assert u.allclose(
+            wc1.spherical.lat, wc2.spherical.lat, equal_nan=True, rtol=rtol
+        )
+        assert u.allclose(
+            wc1.spherical.distance, wc2.spherical.distance, equal_nan=True, rtol=rtol
+        )
+
+    elif isinstance(wc1, u.Quantity):
+        assert u.allclose(wc1, wc2, equal_nan=True, rtol=rtol)
+
+    elif isinstance(wc1, time.Time):
+        assert u.allclose((wc1 - wc2).to(u.s), 0 * u.s, rtol=rtol)
+
+    elif isinstance(wc1, str | coord.StokesCoord):
+        assert np.array(wc1 == wc2, dtype=bool).all()
+
+    elif isinstance(wc1, np.ndarray | np.float64 | float):
+        assert_allclose(wc1, wc2, equal_nan=True, rtol=rtol)
+
+    elif isinstance(wc1, (tuple, list)):
+        for w1, w2 in zip(wc1, wc2, strict=True):
+            compare_frame_output(w1, w2, rtol=rtol)
+
+    else:
+        msg = f"Can't Compare {type(wc1)}"
+        raise TypeError(msg)

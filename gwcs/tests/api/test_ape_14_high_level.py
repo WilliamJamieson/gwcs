@@ -2,316 +2,400 @@
 Test the high-level API functions defined in APE 14 (https://doi.org/10.5281/zenodo.1188875).
 """
 
-from contextlib import nullcontext
-
 import numpy as np
 import pytest
 from astropy import coordinates as coord
-from astropy import time
 from astropy import units as u
 from astropy.wcs.wcsapi import HighLevelWCSWrapper
 from numpy.testing import assert_allclose
 
-from gwcs import EmptyFrame, EmptyFrameUnitsWarning
+from gwcs.wcs import WCS
+
+from .conftest import (
+    check_is_high_level,
+    check_is_low_level,
+    compare_frame_output,
+    empty_frame_warning_context,
+    pixel_to_low_level,
+)
 
 
-def _compare_frame_output(wc1, wc2, rtol=1e-07):
-    if isinstance(wc1, coord.SkyCoord):
-        assert isinstance(wc1.frame, type(wc2.frame))
-        assert u.allclose(
-            wc1.spherical.lon, wc2.spherical.lon, equal_nan=True, rtol=rtol
-        )
-        assert u.allclose(
-            wc1.spherical.lat, wc2.spherical.lat, equal_nan=True, rtol=rtol
-        )
-        assert u.allclose(
-            wc1.spherical.distance, wc2.spherical.distance, equal_nan=True, rtol=rtol
-        )
-
-    elif isinstance(wc1, u.Quantity):
-        assert u.allclose(wc1, wc2, equal_nan=True, rtol=rtol)
-
-    elif isinstance(wc1, time.Time):
-        assert u.allclose((wc1 - wc2).to(u.s), 0 * u.s, rtol=rtol)
-
-    elif isinstance(wc1, str | coord.StokesCoord):
-        assert np.array(wc1 == wc2, dtype=bool).all()
-
-    elif isinstance(wc1, np.ndarray | np.float64 | float):
-        assert_allclose(wc1, wc2, equal_nan=True, rtol=rtol)
-
-    elif isinstance(wc1, (tuple, list)):
-        for w1, w2 in zip(wc1, wc2, strict=True):
-            _compare_frame_output(w1, w2, rtol=rtol)
-
-    else:
-        msg = f"Can't Compare {type(wc1)}"
-        raise TypeError(msg)
-
-
-def _pixel_to_high_level(wcs_object, pixels, correct_1d=True):
-    """Convert pixel coordinates to high-level world coordinates."""
-    return wcs_object.input_frame.to_high_level_coordinates(
-        *pixels, correct_1d=correct_1d
-    )
-
-
-def _world_to_high_level(wcs_object, world, correct_1d=True):
-    """Convert world coordinates to high-level world coordinates."""
-    return wcs_object.output_frame.to_high_level_coordinates(
-        *world, correct_1d=correct_1d
-    )
-
-
-@pytest.mark.parametrize("use_array", [False, True])
 class TestPixToWorld:
     """Test the high-level pixel to world API functions defined in APE 14."""
 
-    def test_pixel_to_world(self, wcs_object, pixels, world, use_array):
+    def test_pixel_to_world(self, wcs_object: WCS, pixel, world_high):
         """Test the pixel to world API function."""
-        # Turn the input pixels and world into arrays
-        if use_array:
-            pixels = tuple(np.ones((3, 4)) * arg for arg in pixels)
-            if len(world) == 1:
-                world = np.ones((3, 4)) * world[0]
-            else:
-                world = tuple(np.ones((3, 4)) * arg for arg in world)
 
-        # Turn world into high-level world coordinates
-        world = _world_to_high_level(wcs_object, world)
+        # The pixel_to_world always returns a high-level world coordinate,
+        #    which is the world_high fixture
+        world = world_high
+
+        # For 1D world coordinates, the fixture will return a tuple, but we want to
+        #   have a single value here
+        if isinstance(world, tuple | list) and len(world) == 1:
+            world = world[0]
 
         # Check that we can pass low-level pixel coordinates into this without
         #   any issues and get the high-level world coordinates out
         # Note this works only because APE 14 does not really describe any
         #    non-quantity high-level pixel coordinates.
-        _compare_frame_output(wcs_object.pixel_to_world(*pixels), world)
+        # Note we need to catch the warning when an EmptyFrame and
+        #     non-low-level is involved
+        with empty_frame_warning_context(wcs_object.output_frame, pixel):
+            pixel_to_world = wcs_object.pixel_to_world(*pixel)
 
-        # Check that we can also get high-level world coordinates matching the
-        #   high-level pixel coordinates
-        _compare_frame_output(wcs_object(*pixels, force_high_level=True), world)
+        # This should always be a high-level world coordinate
+        check_is_high_level(wcs_object.output_frame, pixel_to_world)
 
-        # Check that we can also pass high-level pixel coordinates into this and
-        #   get the same high-level world coordinates out
-        with (
-            pytest.warns(EmptyFrameUnitsWarning, match=r"EmptyFrame.*")
-            if isinstance(wcs_object.input_frame, EmptyFrame)
-            else nullcontext()
-        ):
-            _compare_frame_output(
-                wcs_object.pixel_to_world(
-                    *_pixel_to_high_level(wcs_object, pixels, correct_1d=False)
-                ),
-                world,
-            )
+        # For API consistency, GWCS should always return a tuple or a single object
+        #    astropy.wcs may return a list instead of a tuple
+        assert not isinstance(pixel_to_world, list)
 
-    def test_array_index_to_world(self, wcs_object, pixels, world, use_array):
+        # Check the values are correct
+        compare_frame_output(pixel_to_world, world)
+
+        # Note we need to catch the warning when an EmptyFrame and
+        #     non-low-level is involved
+        with empty_frame_warning_context(wcs_object.output_frame, pixel):
+            native_pixel_to_world = wcs_object(*pixel, force_high_level=True)
+
+        # Now we check against the native API call
+        compare_frame_output(pixel_to_world, native_pixel_to_world)
+
+    def test_array_index_to_world(self, wcs_object: WCS, array_index, world_high):
         """Test the array index to world API function."""
-        # Turn the input pixels and world into arrays
-        if use_array:
-            pixels = tuple(np.ones((3, 4)) * arg for arg in pixels)
-            if len(world) == 1:
-                world = np.ones((3, 4)) * world[0]
-            else:
-                world = tuple(np.ones((3, 4)) * arg for arg in world)
 
-        # Turn world into high-level world coordinates
-        world = _world_to_high_level(wcs_object, world)
+        # The array_index_to_world always returns a high-level world coordinate,
+        #    which is the world_high fixture
+        world = world_high
+
+        # For 1D world coordinates, the fixture will return a tuple, but we want to
+        #   have a single value here
+        if isinstance(world, tuple | list) and len(world) == 1:
+            world = world[0]
 
         # Check that we can pass low-level pixel coordinates into this without
         #   any issues and get the high-level world coordinates out
         # Note this works only because APE 14 does not really describe any
         #    non-quantity high-level pixel coordinates.
-        _compare_frame_output(wcs_object.array_index_to_world(*pixels[::-1]), world)
+        # Note we need to catch the warning when an EmptyFrame and
+        #     non-low-level is involved
+        with empty_frame_warning_context(wcs_object.output_frame, array_index):
+            array_index_to_world = wcs_object.array_index_to_world(*array_index)
 
-        # Check that we can also pass high-level pixel coordinates into this and
-        #   get the same high-level world coordinates out
-        with (
-            pytest.warns(EmptyFrameUnitsWarning, match=r"EmptyFrame.*")
-            if isinstance(wcs_object.input_frame, EmptyFrame)
-            else nullcontext()
-        ):
-            _compare_frame_output(
-                wcs_object.array_index_to_world(
-                    *_pixel_to_high_level(wcs_object, pixels, correct_1d=False)[::-1]
-                ),
-                world,
+        # This should always be a high-level world coordinate
+        check_is_high_level(wcs_object.output_frame, array_index_to_world)
+
+        # For API consistency, GWCS should always return a tuple or a single object
+        #    astropy.wcs may return a list instead of a tuple
+        assert not isinstance(array_index_to_world, list)
+
+        # Check the values are correct
+        compare_frame_output(array_index_to_world, world)
+
+        # Note we need to catch the warning when an EmptyFrame and
+        #     non-low-level is involved
+        with empty_frame_warning_context(wcs_object.output_frame, array_index):
+            native_array_index_to_world = wcs_object(
+                *array_index[::-1], force_high_level=True
             )
 
-    def test_high_level_wrapper(
-        self, fixture_name, wcs_object, pixels, world, use_array, request
+        # Now we check against the native API call
+        compare_frame_output(array_index_to_world, native_array_index_to_world)
+
+    def test_high_level_wrapper_pixel(
+        self, fixture_name, wcs_object: WCS, pixel, world_high, level, request
     ):
-        """Test the high-level wrapper."""
-        if fixture_name == "gwcs_high_level_pixel":
+        """Test the high-level wrapper with pixel_to_world."""
+        if fixture_name == "gwcs_high_level_pixel" and level == "high":
             msg = (
                 "The `astropy.wcs` wrapper does not support wcs that are not"
                 " purely pixel in the input_frame."
             )
             request.node.add_marker(pytest.mark.xfail(reason=msg))
 
+        # The high-level wrapper only works with high-level world coordinates
+        world = world_high
+
+        # For 1D world coordinates, the fixture will return a tuple, but we want to
+        #   have a single value here
+        if isinstance(world, tuple | list) and len(world) == 1:
+            world = world[0]
+
         hlvl = HighLevelWCSWrapper(wcs_object)
 
-        # Turn the input pixels and world into arrays
-        if use_array:
-            pixels = tuple(np.ones((3, 4)) * arg for arg in pixels)
-            if len(world) == 1:
-                world = np.ones((3, 4)) * world[0]
-            else:
-                world = tuple(np.ones((3, 4)) * arg for arg in world)
+        with empty_frame_warning_context(wcs_object.output_frame, pixel):
+            pixel_to_world = hlvl.pixel_to_world(*pixel)
 
-        # Turn world into high-level world coordinates
-        world = _world_to_high_level(wcs_object, world)
+        # This should always be a high-level world coordinate
+        check_is_high_level(wcs_object.output_frame, pixel_to_world)
 
-        # Check that we can pass low-level pixel coordinates into this without
-        #   any issues and get the high-level world coordinates out
-        _compare_frame_output(hlvl.pixel_to_world(*pixels), world)
+        # Check that the values are correct
+        compare_frame_output(pixel_to_world, world)
 
-        # Check that we can also pass high-level pixel coordinates into this and
-        #   get the same high-level world coordinates out
-        with (
-            pytest.warns(EmptyFrameUnitsWarning, match=r"EmptyFrame.*")
-            if isinstance(wcs_object.input_frame, EmptyFrame)
-            else nullcontext()
-        ):
-            # Note this is where the xfail occurs
-            _compare_frame_output(
-                hlvl.pixel_to_world(
-                    *_pixel_to_high_level(wcs_object, pixels, correct_1d=False)
-                ),
-                world,
+    def test_high_level_wrapper_array_index(
+        self, fixture_name, wcs_object: WCS, array_index, world_high, level, request
+    ):
+        """Test the high-level wrapper with array_index_to_world."""
+        if fixture_name == "gwcs_high_level_pixel" and level == "high":
+            msg = (
+                "The `astropy.wcs` wrapper does not support wcs that are not"
+                " purely pixel in the input_frame."
             )
+            request.node.add_marker(pytest.mark.xfail(reason=msg))
+
+        # The high-level wrapper only works with high-level world coordinates
+        world = world_high
+
+        # For 1D world coordinates, the fixture will return a tuple, but we want to
+        #   have a single value here
+        if isinstance(world, tuple | list) and len(world) == 1:
+            world = world[0]
+
+        hlvl = HighLevelWCSWrapper(wcs_object)
+
+        with empty_frame_warning_context(wcs_object.output_frame, array_index):
+            array_index_to_world = hlvl.array_index_to_world(*array_index)
+
+        # This should always be a high-level world coordinate
+        check_is_high_level(wcs_object.output_frame, array_index_to_world)
+
+        # Check that the values are correct
+        compare_frame_output(array_index_to_world, world)
 
 
-@pytest.mark.parametrize("use_array", [False, True])
 class TestWorldToPixel:
     """Test the high-level world to pixel API functions defined in APE 14."""
 
+    @pytest.mark.usefixtures("xfail_gwcs_with_frames_strings_high")
     def test_world_to_pixel(
-        self, fixture_name, wcs_object, pixels, world, use_array, request
+        self, wcs_object: WCS, world, world_high, pixel_low, pixel_high, dimension, rtol
     ):
         """Test the world to pixel API function."""
-        if fixture_name == "gwcs_with_frames_strings":
-            request.node.add_marker(
-                pytest.mark.xfail(
-                    reason="Numerical inverse not supported when n_inputs != n_outputs"
-                )
-            )
-        # Turn the input pixels and world into arrays
-        if use_array:
-            pixels = tuple(np.ones((3, 4)) * arg for arg in pixels)
-            if len(pixels) == 1:
-                pixels = pixels[0]
 
-            if isinstance(world, tuple):
-                world = tuple(np.ones((3, 4)) * arg for arg in world)
-            else:
-                world = np.ones((3, 4)) * world
+        # The world_to_pixel always returns a low-level pixel coordinate, which is
+        #    the pixel_low fixture
+        pixel = pixel_low
+
+        # For the 1D pixel we need to turn the tuple into a single value
+        if (dimension == "array") and len(pixel) == 1:
+            pixel = pixel[0]
 
         # Test that we cannot pass low-level world coordinates into this
-        with pytest.raises(ValueError, match=r".*"):
-            wcs_object.world_to_pixel(*world)
+        try:
+            world_to_pixel = wcs_object.world_to_pixel(*world)
 
-        # The gwcs_simple_imaging's inverse is not exact so we need to relax the
-        #    tolerance for this test
-        rtol = 0.1 if fixture_name == "gwcs_simple_imaging" else 1e-07
+        # Any failure here should be because the world fixture is not identical
+        #   to the high-level world fixture. In some cases, Quantities maybe
+        #   considered high-level for APE 14
+        # In this case we want to make sure we are failing when a non-high-level
+        #    world coordinate object is passed into the high-level API
+        except ValueError:
+            assert world is not world_high
+            # Cannot progress further in these cases
+            return
 
-        # Check that we can also pass high-level world coordinates into this and
-        #   get the same low-level pixel coordinates out
-        # Note that a simple read of APE 14 might make it seem like we should get
-        #   high-level (Quantity) pixel coordinates out here, but the APE 14 API
-        #   but it is not quite stated that there are no high-level like objects
-        #   for pixel coordinates, so it will just return simple arrays here.
-        # This is consistent with `astropy.wcs` so it is what we have to live with.
-        _compare_frame_output(
-            wcs_object.world_to_pixel(
-                *_world_to_high_level(wcs_object, world, correct_1d=False)
-            ),
-            pixels,
-            rtol=rtol,
-        )
+        # APE 14 always returns a low-level pixel coordinate from the world_to_pixel
+        #   function
+        check_is_low_level(wcs_object.input_frame, world_to_pixel)
 
-        # Turn pixel into high-level pixel coordinates
-        pixels = _pixel_to_high_level(wcs_object, pixels)
+        # For API consistency, GWCS should always return a tuple or a single object
+        #    astropy.wcs may return a list instead of a tuple
+        assert not isinstance(world_to_pixel, list)
 
-        # Check that we can also get low-level pixel coordinates matching the
-        #   high-level world coordinates
-        _compare_frame_output(
-            wcs_object.invert(*world, force_high_level=True), pixels, rtol=rtol
-        )
+        assert_allclose(world_to_pixel, pixel, rtol=rtol)
 
+        with empty_frame_warning_context(wcs_object.input_frame, world):
+            native_world_to_pixel = wcs_object.invert(*world, force_high_level=True)
+
+        # Since force_hign_level=True this should always be a high_level pixel
+        #    coordinate
+        check_is_high_level(wcs_object.input_frame, native_world_to_pixel)
+
+        # For 1D pixel coordinates, the fixture will return a tuple, but we want to
+        #   have a single value here
+        if isinstance(pixel_high, tuple | list) and len(pixel_high) == 1:
+            pixel_high = pixel_high[0]
+
+        compare_frame_output(native_world_to_pixel, pixel_high, rtol=rtol)
+
+        with empty_frame_warning_context(wcs_object.input_frame, native_world_to_pixel):
+            native_world_to_pixel_value = pixel_to_low_level(
+                wcs_object, native_world_to_pixel
+            )
+
+        # Now we check against the native API call
+        assert_allclose(world_to_pixel, native_world_to_pixel_value)
+
+    @pytest.mark.usefixtures("xfail_gwcs_with_frames_strings_high")
     def test_world_to_array_index(
-        self, fixture_name, wcs_object, pixels, world, use_array, request
+        self,
+        wcs_object: WCS,
+        world,
+        world_high,
+        array_index_low,
+        pixel_high,
+        dimension,
+        rtol,
     ):
         """Test the world to array index API function."""
-        if fixture_name == "gwcs_with_frames_strings":
-            request.node.add_marker(
-                pytest.mark.xfail(
-                    reason="Numerical inverse not supported when n_inputs != n_outputs"
-                )
-            )
-        # Turn the input pixels and world into arrays
-        if use_array:
-            pixels = tuple(np.ones((3, 4)) * arg for arg in pixels)
-            if len(pixels) == 1:
-                pixels = pixels[0]
 
-            if isinstance(world, tuple):
-                world = tuple(np.ones((3, 4)) * arg for arg in world)
-            else:
-                world = np.ones((3, 4)) * world
+        # The world_to_pixel always returns a low-level pixel coordinate, which is
+        #    the pixel_low fixture
+        array_index = array_index_low
+
+        # For the 1D array_index we need to turn the tuple into a single value
+        if (dimension == "array") and len(array_index) == 1:
+            array_index = array_index[0]
 
         # Test that we cannot pass low-level world coordinates into this
-        with pytest.raises(ValueError, match=r".*"):
-            wcs_object.world_to_array_index(*world)
+        try:
+            world_to_array_index = wcs_object.world_to_array_index(*world)
 
-        # The gwcs_simple_imaging's inverse is not exact so we need to relax the
-        #    tolerance for this test
-        rtol = 0.1 if fixture_name == "gwcs_simple_imaging" else 1e-07
+        # Any failure here should be because the world fixture is not identical
+        #   to the high-level world fixture. In some cases, Quantities maybe
+        #   considered high-level for APE 14
+        # In this case we want to make sure we are failing when a non-high-level
+        #    world coordinate object is passed into the high-level API
+        except ValueError:
+            assert world is not world_high
+            # Cannot progress further in these cases
+            return
 
-        # Check that we can also pass high-level world coordinates into this and
-        #   get the same low-level pixel coordinates out
-        # See note in the world_to_pixel test about the expected output here.
-        _compare_frame_output(
-            wcs_object.world_to_array_index(
-                *_world_to_high_level(wcs_object, world, correct_1d=False)
-            ),
-            pixels[::-1],
-            rtol=rtol,
+        # APE 14 always returns a low-level array_index coordinate from the
+        #   world_to_array_index function
+        check_is_low_level(wcs_object.input_frame, world_to_array_index)
+
+        # For API consistency, GWCS should always return a tuple or a single object
+        #    astropy.wcs may return a list instead of a tuple
+        assert not isinstance(world_to_array_index, list)
+
+        assert_allclose(world_to_array_index, array_index, rtol=rtol)
+
+        with empty_frame_warning_context(wcs_object.input_frame, world):
+            native_world_to_pixel = wcs_object.invert(*world, force_high_level=True)
+
+        # Since force_hign_level=True this should always be a high_level array_index
+        #    coordinate
+        check_is_high_level(wcs_object.input_frame, native_world_to_pixel)
+
+        # For 1D pixel coordinates, the fixture will return a tuple, but we want to
+        #   have a single value here
+        if isinstance(pixel_high, tuple | list) and len(pixel_high) == 1:
+            pixel_high = pixel_high[0]
+
+        compare_frame_output(native_world_to_pixel, pixel_high, rtol=rtol)
+
+        with empty_frame_warning_context(wcs_object.input_frame, native_world_to_pixel):
+            native_world_to_pixel_value = pixel_to_low_level(
+                wcs_object, native_world_to_pixel
+            )
+        # Switch from pixel to array_index coordinates if needed
+        native_world_to_array_index = (
+            native_world_to_pixel_value[::-1]
+            if isinstance(native_world_to_pixel_value, tuple | list)
+            else native_world_to_pixel_value
         )
 
-    def test_high_level_wrapper(
-        self, fixture_name, wcs_object, pixels, world, use_array, request
+        # Now we check against the native API call
+        assert_allclose(world_to_array_index, native_world_to_array_index, rtol=rtol)
+
+    def test_high_level_wrapper_pixel(
+        self,
+        fixture_name,
+        wcs_object: WCS,
+        pixel_low,
+        world,
+        world_high,
+        dimension,
+        level,
+        request,
+        rtol,
     ):
-        """Test the high-level wrapper."""
-        if fixture_name == "gwcs_with_frames_strings":
+        """Test the high-level wrapper with world_to_pixel."""
+        if fixture_name == "gwcs_with_frames_strings" and level == "high":
             request.node.add_marker(
                 pytest.mark.xfail(
                     reason="Numerical inverse not supported when n_inputs != n_outputs"
                 )
             )
+        # APE 14 always returns a low-level pixel coordinate from the world_to_pixel
+        pixel = pixel_low
+
+        # For the 1D pixel we need to turn the tuple into a single value
+        if (dimension == "array") and len(pixel) == 1:
+            pixel = pixel[0]
 
         hlvl = HighLevelWCSWrapper(wcs_object)
 
-        # Turn the input pixels and world into arrays
-        if use_array:
-            pixels = tuple(np.ones((3, 4)) * arg for arg in pixels)
-            if len(pixels) == 1:
-                pixels = pixels[0]
+        # Test that we cannot pass low-level world coordinates into this
+        try:
+            world_to_pixel = hlvl.world_to_pixel(*world)
 
-            if isinstance(world, tuple):
-                world = tuple(np.ones((3, 4)) * arg for arg in world)
-            else:
-                world = np.ones((3, 4)) * world
+        # Any failure here should be because the world fixture is not identical
+        #   to the high-level world fixture. In some cases, Quantities maybe
+        #   considered high-level for APE 14
+        # In this case we want to make sure we are failing when a non-high-level
+        #    world coordinate object is passed into the high-level API
+        except ValueError:
+            assert world is not world_high
+            # Cannot progress further in these cases
+            return
 
-        # The gwcs_simple_imaging's inverse is not exact so we need to relax the
-        #    tolerance for this test
-        rtol = 0.1 if fixture_name == "gwcs_simple_imaging" else 1e-07
+        # This should always be a low-level pixel coordinate
+        check_is_low_level(wcs_object.input_frame, world_to_pixel)
 
-        # Turn world into high-level world coordinates
-        world = _world_to_high_level(wcs_object, world, correct_1d=False)
+        # Check that the values are correct
+        assert_allclose(world_to_pixel, pixel, rtol=rtol)
 
-        # Check that we can pass high-level world coordinates into this and get the
-        #     same low-level pixel coordinates out
-        _compare_frame_output(hlvl.world_to_pixel(*world), pixels, rtol=rtol)
+    def test_high_level_wrapper_array_index(
+        self,
+        fixture_name,
+        wcs_object: WCS,
+        array_index_low,
+        world,
+        world_high,
+        dimension,
+        level,
+        request,
+        rtol,
+    ):
+        """Test the high-level wrapper with world_to_array_index."""
+        if fixture_name == "gwcs_with_frames_strings" and level == "high":
+            request.node.add_marker(
+                pytest.mark.xfail(
+                    reason="Numerical inverse not supported when n_inputs != n_outputs"
+                )
+            )
+        # APE 14 always returns a low-level array_index coordinate from the
+        #    world_to_array_index
+        array_index = array_index_low
+
+        # For the 1D array_index we need to turn the tuple into a single value
+        if (dimension == "array") and len(array_index) == 1:
+            array_index = array_index[0]
+
+        hlvl = HighLevelWCSWrapper(wcs_object)
+
+        # Test that we cannot pass low-level world coordinates into this
+        try:
+            world_to_array_index = hlvl.world_to_array_index(*world)
+
+        # Any failure here should be because the world fixture is not identical
+        #   to the high-level world fixture. In some cases, Quantities maybe
+        #   considered high-level for APE 14
+        # In this case we want to make sure we are failing when a non-high-level
+        #    world coordinate object is passed into the high-level API
+        except ValueError:
+            assert world is not world_high
+            # Cannot progress further in these cases
+            return
+
+        # This should always be a low-level array_index coordinate
+        check_is_low_level(wcs_object.input_frame, world_to_array_index)
+
+        # Check that the values are correct
+        assert_allclose(world_to_array_index, array_index)
 
 
 def test_stokes_wrapper(gwcs_stokes_lookup):

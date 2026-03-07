@@ -432,4 +432,6 @@ class WCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin, NativeAPIMixin):
             else pixel_arrays
         )
 
-        return super().pixel_to_world(*arrays)
+        if isinstance(output := super().pixel_to_world(*arrays), list):
+            return tuple(output)
+        return output
