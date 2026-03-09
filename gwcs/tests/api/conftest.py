@@ -19,6 +19,7 @@ fixture_names = (
     "gwcs_2d_spatial_reordered",
     "gwcs_2d_quantity_shift",
     "gwcs_1d_freq",
+    "gwcs_1d_spectral",
     "gwcs_3d_spatial_wave",
     "gwcs_3d_identity_units",
     "gwcs_4d_identity_units",
@@ -30,8 +31,20 @@ fixture_names = (
     "gwcs_simple_2d",
     "gwcs_empty_output_2d",
     "gwcs_simple_imaging",
+    "gwcs_simple_imaging_units",
     "gwcs_with_frames_strings",
     "gwcs_high_level_pixel",
+    "gwcs_3spectral_orders",
+    "gwcs_spec_cel_time_4d",
+    # This fixture exposes a bug in the world object classes and world object
+    #    components
+    # "gwcs_7d_complex_mapping",
+    "gwcs_with_pipeline_celestial",
+    "gwcs_romanisim",
+    "gwcs_2d_spatial_shift_reverse",
+    # This fixture exposes a bug in the from_high_level_coordinates method of the
+    #     Frame class
+    # "gwcs_multi_stage",
 )
 
 
@@ -56,10 +69,17 @@ def level(request):
 
 
 @pytest.fixture
-def pixel_scalar(fixture_name):
+def pixel_scalar(fixture_name):  # noqa: PLR0911
     match fixture_name:
-        case "gwcs_1d_freq" | "gwcs_1d_freq_quantity" | "gwcs_stokes_lookup":
+        case (
+            "gwcs_1d_freq"
+            | "gwcs_1d_freq_quantity"
+            | "gwcs_stokes_lookup"
+            | "gwcs_multi_stage"
+        ):
             return (1,)
+        case "gwcs_1d_spectral":
+            return (30,)
         case (
             "gwcs_2d_spatial_shift"
             | "gwcs_2d_spatial_reordered"
@@ -69,15 +89,26 @@ def pixel_scalar(fixture_name):
             | "gwcs_simple_2d"
             | "gwcs_empty_output_2d"
             | "gwcs_simple_imaging"
+            | "gwcs_simple_imaging_units"
             | "gwcs_high_level_pixel"
+            | "gwcs_3spectral_orders"
+            | "gwcs_with_pipeline_celestial"
+            | "gwcs_romanisim"
+            | "gwcs_2d_spatial_shift_reverse"
         ):
             return 1, 2
         case "gwcs_3d_spatial_wave" | "gwcs_3d_identity_units":
             return 1, 2, 3
         case "gwcs_3d_galactic_spectral":
             return 10, 20, 30
-        case "gwcs_4d_identity_units" | "gwcs_with_frames_strings":
+        case (
+            "gwcs_4d_identity_units"
+            | "gwcs_with_frames_strings"
+            | "gwcs_spec_cel_time_4d"
+        ):
             return 1, 2, 3, 4
+        case "gwcs_7d_complex_mapping":
+            return 1, 2, 3, 4, 5, 0.5
         case _:
             msg = f"Unknown fixture name: {fixture_name}"
             raise ValueError(msg)
@@ -177,6 +208,8 @@ def world_scalar(fixture_name):  # noqa: PLR0911
     match fixture_name:
         case "gwcs_1d_freq" | "gwcs_stokes_lookup":
             return (2,)
+        case "gwcs_1d_spectral":
+            return (112.5,)
         case "gwcs_1d_freq_quantity":
             return (1,)
         case (
@@ -185,14 +218,21 @@ def world_scalar(fixture_name):  # noqa: PLR0911
             | "gwcs_simple_2d"
             | "gwcs_empty_output_2d"
             | "gwcs_high_level_pixel"
+            | "gwcs_2d_spatial_shift_reverse"
         ):
             return 2, 4
         case "gwcs_2d_spatial_reordered":
             return 4, 2
         case "gwcs_2d_shift_scale" | "gwcs_2d_shift_scale_quantity":
             return 10, 40
-        case "gwcs_simple_imaging":
+        case "gwcs_simple_imaging" | "gwcs_simple_imaging_units":
             return 5.525098, -72.051902
+        case "gwcs_with_pipeline_celestial":
+            return 3620.0, 115200.0
+        case "gwcs_romanisim":
+            return 3.0555555554143875e-05, 6.111111e-05
+        case "gwcs_multi_stage":
+            return -22.0, -11.0
         case "gwcs_3d_spatial_wave":
             return 2, 4, 6
         case "gwcs_3d_identity_units":
@@ -203,6 +243,12 @@ def world_scalar(fixture_name):  # noqa: PLR0911
             return 2.777778e-04, 5.555556e-04, 3, 4
         case "gwcs_with_frames_strings":
             return 2, 3, 0
+        case "gwcs_3spectral_orders":
+            return 2, 4, 4
+        case "gwcs_spec_cel_time_4d":
+            return 5.2, -72.049906, 5.629411, 4
+        case "gwcs_7d_complex_mapping":
+            return 10.8, -72.054537, 5.627349, 6.75066, -0.14, 1.87885, 10.8
         case _:
             msg = f"Unknown fixture name: {fixture_name}"
             raise ValueError(msg)
@@ -301,7 +347,12 @@ def rtol(fixture_name):
     """
     gwcs_simple_imaging's inverse is not exact, so we need a looser tolerance for it.
     """
-    return 0.1 if fixture_name == "gwcs_simple_imaging" else 1e-07
+    return (
+        0.1
+        if fixture_name
+        in ("gwcs_simple_imaging", "gwcs_simple_imaging_units", "gwcs_spec_cel_time_4d")
+        else 1e-07
+    )
 
 
 def check_is_low_level(frame: CoordinateFrameProtocol, output):
