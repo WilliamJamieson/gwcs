@@ -775,7 +775,9 @@ def gwcs_multi_stage():
     intermediate = cf.CoordinateFrame(
         name="intermediate", naxes=1, unit=("m",), axes_type="SPATIAL", axes_order=(0,)
     )
-    cel = cf.CelestialFrame(name="sky", axes_names=("ra", "dec"))
+    cel = cf.CelestialFrame(
+        name="sky", axes_names=("ra", "dec"), reference_frame=coord.ICRS()
+    )
     return wcs.WCS([(det, tr1), (intermediate, tr2), (cel, None)])
 
 

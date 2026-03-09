@@ -42,7 +42,7 @@ fixture_names = (
     "gwcs_2d_spatial_shift_reverse",
     # This fixture exposes a bug in the from_high_level_coordinates method of the
     #     Frame class
-    # "gwcs_multi_stage",
+    "gwcs_multi_stage",
 )
 
 
@@ -69,13 +69,10 @@ def level(request):
 @pytest.fixture
 def pixel_scalar(fixture_name):  # noqa: PLR0911
     match fixture_name:
-        case (
-            "gwcs_1d_freq"
-            | "gwcs_1d_freq_quantity"
-            | "gwcs_stokes_lookup"
-            | "gwcs_multi_stage"
-        ):
+        case "gwcs_1d_freq" | "gwcs_1d_freq_quantity" | "gwcs_stokes_lookup":
             return (1,)
+        case "gwcs_multi_stage":
+            return (-11,)
         case "gwcs_1d_spectral":
             return (30,)
         case (
@@ -230,7 +227,7 @@ def world_scalar(fixture_name):  # noqa: PLR0911
         case "gwcs_romanisim":
             return 3.0555555554143875e-05, 6.111111e-05
         case "gwcs_multi_stage":
-            return -22.0, -11.0
+            return 2, 1
         case "gwcs_3d_spatial_wave":
             return 2, 4, 6
         case "gwcs_3d_identity_units":
