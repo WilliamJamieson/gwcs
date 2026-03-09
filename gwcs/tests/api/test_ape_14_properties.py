@@ -203,7 +203,7 @@ def wcs_types(fixture_name):
         "gwcs_with_pipeline_celestial": ("custom:CUSTOM", "custom:CUSTOM"),
         "gwcs_romanisim": ("pos.eq.ra", "pos.eq.dec"),
         "gwcs_2d_spatial_shift_reverse": ("custom:x", "custom:y"),
-        "gwcs_multi_stage": ("custom:ra", "custom:dec"),
+        "gwcs_multi_stage": ("pos.eq.ra", "pos.eq.dec"),
     }[fixture_name]
 
 
@@ -638,6 +638,7 @@ def wcs_component_object_classes(fixture_name, wcs_object):
             | "gwcs_simple_imaging_units"
             | "gwcs_high_level_pixel"
             | "gwcs_romanisim"
+            | "gwcs_multi_stage"
         ):
             frame = wcs_object.output_frame.reference_frame
         case (
