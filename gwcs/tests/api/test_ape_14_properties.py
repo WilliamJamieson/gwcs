@@ -9,8 +9,6 @@ from astropy import time
 from astropy import units as u
 from numpy.testing import assert_array_equal
 
-from gwcs import coordinate_frames as cf
-
 RNG = np.random.default_rng(42)
 
 
@@ -21,6 +19,7 @@ def wcs_ndim(fixture_name):
         "gwcs_2d_spatial_reordered": (2, 2),
         "gwcs_2d_quantity_shift": (2, 2),
         "gwcs_1d_freq": (1, 1),
+        "gwcs_1d_spectral": (1, 1),
         "gwcs_3d_spatial_wave": (3, 3),
         "gwcs_3d_identity_units": (3, 3),
         "gwcs_4d_identity_units": (4, 4),
@@ -32,8 +31,16 @@ def wcs_ndim(fixture_name):
         "gwcs_simple_2d": (2, 2),
         "gwcs_empty_output_2d": (2, 2),
         "gwcs_simple_imaging": (2, 2),
+        "gwcs_simple_imaging_units": (2, 2),
         "gwcs_with_frames_strings": (4, 3),
         "gwcs_high_level_pixel": (2, 2),
+        "gwcs_3spectral_orders": (2, 3),
+        "gwcs_spec_cel_time_4d": (4, 4),
+        "gwcs_7d_complex_mapping": (6, 7),
+        "gwcs_with_pipeline_celestial": (2, 2),
+        "gwcs_romanisim": (2, 2),
+        "gwcs_2d_spatial_shift_reverse": (2, 2),
+        "gwcs_multi_stage": (1, 2),
     }[fixture_name]
 
 
@@ -54,6 +61,7 @@ def wcs_shape(fixture_name):
         "gwcs_2d_spatial_reordered": None,
         "gwcs_2d_quantity_shift": None,
         "gwcs_1d_freq": None,
+        "gwcs_1d_spectral": (44,),
         "gwcs_3d_spatial_wave": None,
         "gwcs_3d_identity_units": None,
         "gwcs_4d_identity_units": None,
@@ -65,8 +73,16 @@ def wcs_shape(fixture_name):
         "gwcs_simple_2d": None,
         "gwcs_empty_output_2d": None,
         "gwcs_simple_imaging": None,
+        "gwcs_simple_imaging_units": None,
         "gwcs_with_frames_strings": None,
         "gwcs_high_level_pixel": None,
+        "gwcs_3spectral_orders": None,
+        "gwcs_spec_cel_time_4d": (10, 256, 128, 64),
+        "gwcs_7d_complex_mapping": (2, 11, 11, 21, 32, 16),
+        "gwcs_with_pipeline_celestial": None,
+        "gwcs_romanisim": None,
+        "gwcs_2d_spatial_shift_reverse": None,
+        "gwcs_multi_stage": None,
     }[fixture_name]
 
 
@@ -99,6 +115,7 @@ def wcs_pixel_bounds(fixture_name):
         "gwcs_2d_spatial_reordered": None,
         "gwcs_2d_quantity_shift": None,
         "gwcs_1d_freq": None,
+        "gwcs_1d_spectral": ((7, 50),),
         "gwcs_3d_spatial_wave": None,
         "gwcs_3d_identity_units": None,
         "gwcs_4d_identity_units": None,
@@ -110,8 +127,23 @@ def wcs_pixel_bounds(fixture_name):
         "gwcs_simple_2d": None,
         "gwcs_empty_output_2d": None,
         "gwcs_simple_imaging": None,
+        "gwcs_simple_imaging_units": None,
         "gwcs_with_frames_strings": None,
         "gwcs_high_level_pixel": None,
+        "gwcs_3spectral_orders": None,
+        "gwcs_spec_cel_time_4d": ((0, 63), (0, 127), (0, 255), (0, 9)),
+        "gwcs_7d_complex_mapping": (
+            (0, 15),
+            (0, 31),
+            (0, 20),
+            (0, 10),
+            (0, 10),
+            (0, 1),
+        ),
+        "gwcs_with_pipeline_celestial": None,
+        "gwcs_romanisim": None,
+        "gwcs_2d_spatial_shift_reverse": None,
+        "gwcs_multi_stage": None,
     }[fixture_name]
 
 
@@ -134,6 +166,7 @@ def wcs_types(fixture_name):
         "gwcs_2d_spatial_reordered": ("pos.eq.dec", "pos.eq.ra"),
         "gwcs_2d_quantity_shift": ("custom:SPATIAL", "custom:SPATIAL"),
         "gwcs_1d_freq": ("em.freq",),
+        "gwcs_1d_spectral": ("em.freq",),
         "gwcs_3d_spatial_wave": ("pos.eq.ra", "pos.eq.dec", "em.wl"),
         "gwcs_3d_identity_units": ("pos.eq.ra", "pos.eq.dec", "em.wl"),
         "gwcs_4d_identity_units": ("pos.eq.ra", "pos.eq.dec", "em.wl", "time"),
@@ -149,12 +182,28 @@ def wcs_types(fixture_name):
         "gwcs_simple_2d": ("custom:x", "custom:y"),
         "gwcs_empty_output_2d": ("custom:UNKNOWN", "custom:UNKNOWN"),
         "gwcs_simple_imaging": ("pos.eq.ra", "pos.eq.dec"),
+        "gwcs_simple_imaging_units": ("pos.eq.ra", "pos.eq.dec"),
         "gwcs_with_frames_strings": (
             "custom:UNKNOWN",
             "custom:UNKNOWN",
             "custom:UNKNOWN",
         ),
         "gwcs_high_level_pixel": ("pos.eq.ra", "pos.eq.dec"),
+        "gwcs_3spectral_orders": ("pos.eq.ra", "pos.eq.dec", "em.wl"),
+        "gwcs_spec_cel_time_4d": ("em.wl", "pos.eq.dec", "pos.eq.ra", "time"),
+        "gwcs_7d_complex_mapping": (
+            "time",
+            "pos.eq.dec",
+            "pos.eq.ra",
+            "em.wl",
+            "em.wl",
+            "em.wl",
+            "time",
+        ),
+        "gwcs_with_pipeline_celestial": ("custom:CUSTOM", "custom:CUSTOM"),
+        "gwcs_romanisim": ("pos.eq.ra", "pos.eq.dec"),
+        "gwcs_2d_spatial_shift_reverse": ("custom:x", "custom:y"),
+        "gwcs_multi_stage": ("custom:ra", "custom:dec"),
     }[fixture_name]
 
 
@@ -170,6 +219,7 @@ def wcs_units(fixture_name):
         "gwcs_2d_spatial_reordered": ("deg", "deg"),
         "gwcs_2d_quantity_shift": ("km", "km"),
         "gwcs_1d_freq": ("Hz",),
+        "gwcs_1d_spectral": ("Hz",),
         "gwcs_3d_spatial_wave": ("deg", "deg", "m"),
         "gwcs_3d_identity_units": ("arcsec", "arcsec", "nm"),
         "gwcs_4d_identity_units": ("deg", "deg", "nm", "s"),
@@ -181,8 +231,24 @@ def wcs_units(fixture_name):
         "gwcs_simple_2d": ("pixel", "pixel"),
         "gwcs_empty_output_2d": ("None", "None"),
         "gwcs_simple_imaging": ("deg", "deg"),
+        "gwcs_simple_imaging_units": ("deg", "deg"),
         "gwcs_with_frames_strings": ("None", "None", "None"),
         "gwcs_high_level_pixel": ("deg", "deg"),
+        "gwcs_3spectral_orders": ("deg", "deg", "m"),
+        "gwcs_spec_cel_time_4d": ("m", "deg", "deg", "s"),
+        "gwcs_7d_complex_mapping": (
+            "s",
+            "deg",
+            "deg",
+            "m",
+            "m",
+            "m",
+            "s",
+        ),
+        "gwcs_with_pipeline_celestial": ("arcsec", "arcsec"),
+        "gwcs_romanisim": ("deg", "deg"),
+        "gwcs_2d_spatial_shift_reverse": ("pixel", "pixel"),
+        "gwcs_multi_stage": ("deg", "deg"),
     }[fixture_name]
 
 
@@ -213,6 +279,7 @@ def wcs_axis_correlation_matrix(fixture_name):
             ]
         ),
         "gwcs_1d_freq": np.array([[True]]),
+        "gwcs_1d_spectral": np.array([[True]]),
         "gwcs_3d_spatial_wave": np.array(
             [
                 [True, False, False],
@@ -274,6 +341,12 @@ def wcs_axis_correlation_matrix(fixture_name):
                 [True, True],
             ]
         ),
+        "gwcs_simple_imaging_units": np.array(
+            [
+                [True, True],
+                [True, True],
+            ]
+        ),
         "gwcs_with_frames_strings": np.array(
             [
                 [True, False, False, False],
@@ -287,6 +360,51 @@ def wcs_axis_correlation_matrix(fixture_name):
                 [False, True],
             ]
         ),
+        "gwcs_3spectral_orders": np.array(
+            [
+                [True, False],
+                [False, True],
+                [False, True],
+            ]
+        ),
+        "gwcs_spec_cel_time_4d": np.array(
+            [
+                [True, False, False, False],
+                [False, True, True, False],
+                [False, True, True, False],
+                [False, False, False, True],
+            ]
+        ),
+        "gwcs_7d_complex_mapping": np.array(
+            [
+                [False, False, False, True, False, False],
+                [True, True, False, False, False, False],
+                [True, True, False, False, False, False],
+                [False, False, False, False, True, True],
+                [False, False, True, False, False, False],
+                [False, False, False, False, True, True],
+                [False, False, False, True, False, False],
+            ]
+        ),
+        "gwcs_with_pipeline_celestial": np.array(
+            [
+                [True, False],
+                [False, True],
+            ]
+        ),
+        "gwcs_romanisim": np.array(
+            [
+                [True, True],
+                [True, True],
+            ]
+        ),
+        "gwcs_2d_spatial_shift_reverse": np.array(
+            [
+                [True, False],
+                [False, True],
+            ]
+        ),
+        "gwcs_multi_stage": np.array([[True], [True]]),
     }[fixture_name]
 
 
@@ -308,6 +426,7 @@ def wcs_component_names(fixture_name):
         "gwcs_2d_spatial_reordered": ("celestial", "celestial"),
         "gwcs_2d_quantity_shift": ("SPATIAL", "SPATIAL1"),
         "gwcs_1d_freq": ("spectral",),
+        "gwcs_1d_spectral": ("spectral",),
         "gwcs_3d_spatial_wave": ("celestial", "celestial", "spectral"),
         "gwcs_3d_identity_units": ("celestial", "celestial", "spectral"),
         "gwcs_4d_identity_units": ("celestial", "celestial", "spectral", "temporal"),
@@ -319,12 +438,28 @@ def wcs_component_names(fixture_name):
         "gwcs_simple_2d": ("SPATIAL", "SPATIAL1"),
         "gwcs_empty_output_2d": ("UNKNOWN", "UNKNOWN1"),
         "gwcs_simple_imaging": ("celestial", "celestial"),
+        "gwcs_simple_imaging_units": ("celestial", "celestial"),
         "gwcs_with_frames_strings": (
             "UNKNOWN",
             "UNKNOWN1",
             "UNKNOWN2",
         ),
         "gwcs_high_level_pixel": ("celestial", "celestial"),
+        "gwcs_3spectral_orders": ("celestial", "celestial", "spectral"),
+        "gwcs_spec_cel_time_4d": ("spectral", "celestial", "celestial", "temporal"),
+        "gwcs_7d_complex_mapping": (
+            "TIME2",
+            "celestial",
+            "celestial",
+            "SPATIAL",
+            "spectral",
+            "SPATIAL1",
+            "TIME3",
+        ),
+        "gwcs_with_pipeline_celestial": ("CUSTOM", "CUSTOM1"),
+        "gwcs_romanisim": ("celestial", "celestial"),
+        "gwcs_2d_spatial_shift_reverse": ("SPATIAL", "SPATIAL1"),
+        "gwcs_multi_stage": ("celestial", "celestial"),
     }[fixture_name]
 
 
@@ -335,6 +470,7 @@ def wcs_component_positions(fixture_name):
         "gwcs_2d_spatial_reordered": (1, 0),
         "gwcs_2d_quantity_shift": (0, 0),
         "gwcs_1d_freq": (0,),
+        "gwcs_1d_spectral": (0,),
         "gwcs_3d_spatial_wave": (0, 1, 0),
         "gwcs_3d_identity_units": (0, 1, 0),
         "gwcs_4d_identity_units": (0, 1, 0, 0),
@@ -346,8 +482,16 @@ def wcs_component_positions(fixture_name):
         "gwcs_simple_2d": (0, 0),
         "gwcs_empty_output_2d": (0, 0),
         "gwcs_simple_imaging": (0, 1),
+        "gwcs_simple_imaging_units": (0, 1),
         "gwcs_with_frames_strings": (0, 0, 0),
         "gwcs_high_level_pixel": (0, 1),
+        "gwcs_3spectral_orders": (0, 1, 0),
+        "gwcs_spec_cel_time_4d": (0, 1, 0, 0),
+        "gwcs_7d_complex_mapping": (0, 1, 0, 0, 0, 0, 0),
+        "gwcs_with_pipeline_celestial": (0, 0),
+        "gwcs_romanisim": (0, 1),
+        "gwcs_2d_spatial_shift_reverse": (0, 0),
+        "gwcs_multi_stage": (0, 1),
     }[fixture_name]
 
 
@@ -364,6 +508,7 @@ def wcs_component_properties(fixture_name):
         ),
         "gwcs_2d_quantity_shift": ("value", "value"),
         "gwcs_1d_freq": ((coord.SpectralCoord(3, unit="Hz"), 3),),
+        "gwcs_1d_spectral": ((coord.SpectralCoord(3, unit="Hz"), 3),),
         "gwcs_3d_spatial_wave": (
             (coord.SkyCoord(27, 90, unit="deg"), 27),
             (coord.SkyCoord(34.7, -45.7, unit="deg"), -45.7),
@@ -401,8 +546,42 @@ def wcs_component_properties(fixture_name):
             (coord.SkyCoord(27, 90, unit="deg"), 27),
             (coord.SkyCoord(34.7, -45.7, unit="deg"), -45.7),
         ),
+        "gwcs_simple_imaging_units": (
+            (coord.SkyCoord(27, 90, unit="deg"), 27),
+            (coord.SkyCoord(34.7, -45.7, unit="deg"), -45.7),
+        ),
         "gwcs_with_frames_strings": ("value", "value", "value"),
         "gwcs_high_level_pixel": (
+            (coord.SkyCoord(27, 90, unit="deg"), 27),
+            (coord.SkyCoord(34.7, -45.7, unit="deg"), -45.7),
+        ),
+        "gwcs_3spectral_orders": (
+            (coord.SkyCoord(27, 90, unit="deg"), 27),
+            (coord.SkyCoord(34.7, -45.7, unit="deg"), -45.7),
+            (coord.SpectralCoord(3, unit="m"), 3),
+        ),
+        "gwcs_spec_cel_time_4d": (
+            (coord.SpectralCoord(3, unit="m"), 3),
+            (coord.SkyCoord(34.7, -45.7, unit="deg"), -45.7),
+            (coord.SkyCoord(27, 90, unit="deg"), 27),
+            (time.Time("2020-01-01T00:00:03", format="isot", scale="utc"), 315532806.0),
+        ),
+        "gwcs_7d_complex_mapping": (
+            "value",
+            (coord.SkyCoord(34.7, -45.7, unit="deg"), -45.7),
+            (coord.SkyCoord(27, 90, unit="deg"), 27),
+            "value",
+            (coord.SpectralCoord(4, unit="m"), 4),
+            "value",
+            "value",
+        ),
+        "gwcs_with_pipeline_celestial": ("value", "value"),
+        "gwcs_romanisim": (
+            (coord.SkyCoord(27, 90, unit="deg"), 27),
+            (coord.SkyCoord(34.7, -45.7, unit="deg"), -45.7),
+        ),
+        "gwcs_2d_spatial_shift_reverse": ("value", "value"),
+        "gwcs_multi_stage": (
             (coord.SkyCoord(27, 90, unit="deg"), 27),
             (coord.SkyCoord(34.7, -45.7, unit="deg"), -45.7),
         ),
@@ -448,20 +627,54 @@ def wcs_component_object_classes(fixture_name, wcs_object):
             celestial_unit = (u.arcsec, u.arcsec)
         case _:
             celestial_unit = (u.deg, u.deg)
+
+    match fixture_name:
+        case (
+            "gwcs_2d_spatial_shift"
+            | "gwcs_2d_spatial_reordered"
+            | "gwcs_2d_shift_scale"
+            | "gwcs_2d_shift_scale_quantity"
+            | "gwcs_simple_imaging"
+            | "gwcs_simple_imaging_units"
+            | "gwcs_high_level_pixel"
+            | "gwcs_romanisim"
+        ):
+            frame = wcs_object.output_frame.reference_frame
+        case (
+            "gwcs_3d_spatial_wave"
+            | "gwcs_3d_identity_units"
+            | "gwcs_4d_identity_units"
+            | "gwcs_3d_galactic_spectral"
+            | "gwcs_3spectral_orders"
+            | "gwcs_7d_complex_mapping"
+        ):
+            frame = wcs_object.output_frame.frames[0].reference_frame
+        case "gwcs_spec_cel_time_4d":
+            frame = wcs_object.output_frame.frames[1].reference_frame
+        case _:
+            frame = None
     celestial = (
         coord.SkyCoord,
         (),
         {
-            "frame": wcs_object.output_frame.frames[0].reference_frame
-            if isinstance(wcs_object.output_frame, cf.CompositeFrame)
-            else wcs_object.output_frame.reference_frame,
+            "frame": frame,
             "unit": celestial_unit,
         },
     )
     match fixture_name:
-        case "gwcs_1d_freq" | "gwcs_3d_galactic_spectral" | "gwcs_1d_freq_quantity":
+        case (
+            "gwcs_1d_freq"
+            | "gwcs_1d_spectral"
+            | "gwcs_3d_galactic_spectral"
+            | "gwcs_1d_freq_quantity"
+        ):
             spectral_unit = u.Hz
-        case "gwcs_3d_spatial_wave":
+        case (
+            "gwcs_3d_spatial_wave"
+            | "gwcs_3spectral_orders"
+            | "gwcs_spec_cel_time_4d"
+            | "gwcs_7d_complex_mapping"
+        ):
             spectral_unit = u.m
         case _:
             spectral_unit = u.nm
@@ -479,6 +692,7 @@ def wcs_component_object_classes(fixture_name, wcs_object):
             "SPATIAL1": (u.Quantity, (), {"unit": u.km}),
         },
         "gwcs_1d_freq": {"spectral": spectral},
+        "gwcs_1d_spectral": {"spectral": spectral},
         "gwcs_3d_spatial_wave": {
             "celestial": celestial,
             "spectral": spectral,
@@ -521,12 +735,52 @@ def wcs_component_object_classes(fixture_name, wcs_object):
             "UNKNOWN1": (u.Quantity, (), {"unit": None}),
         },
         "gwcs_simple_imaging": {"celestial": celestial},
+        "gwcs_simple_imaging_units": {"celestial": celestial},
         "gwcs_with_frames_strings": {
             "UNKNOWN": (u.Quantity, (), {"unit": None}),
             "UNKNOWN1": (u.Quantity, (), {"unit": None}),
             "UNKNOWN2": (u.Quantity, (), {"unit": None}),
         },
         "gwcs_high_level_pixel": {"celestial": celestial},
+        "gwcs_3spectral_orders": {
+            "celestial": celestial,
+            "spectral": spectral,
+        },
+        "gwcs_spec_cel_time_4d": {
+            "spectral": spectral,
+            "celestial": celestial,
+            "temporal": (
+                time.Time,
+                (),
+                {
+                    "format": "isot",
+                    "in_subfmt": "*",
+                    "location": None,
+                    "out_subfmt": "*",
+                    "precision": 3,
+                    "scale": "utc",
+                    "unit": u.s,
+                },
+            ),
+        },
+        "gwcs_7d_complex_mapping": {
+            "TIME": (u.Quantity, (), {"unit": u.s}),
+            "celestial": celestial,
+            "spectral": spectral,
+            "SPATIAL1": (u.Quantity, (), {"unit": u.m}),
+            "SPATIAL2": (u.Quantity, (), {"unit": u.m}),
+            "TIME3": (u.Quantity, (), {"unit": u.s}),
+        },
+        "gwcs_with_pipeline_celestial": {
+            "CUSTOM": (u.Quantity, (), {"unit": u.arcsec}),
+            "CUSTOM1": (u.Quantity, (), {"unit": u.arcsec}),
+        },
+        "gwcs_romanisim": {"celestial": celestial},
+        "gwcs_2d_spatial_shift_reverse": {
+            "SPATIAL": (u.Quantity, (), {"unit": u.pixel}),
+            "SPATIAL1": (u.Quantity, (), {"unit": u.pixel}),
+        },
+        "gwcs_multi_stage": {"celestial": celestial},
     }[fixture_name]
 
 
@@ -559,6 +813,7 @@ def wcs_names(fixture_name):
         "gwcs_2d_spatial_reordered": (("x", "y"), ("lat", "lon")),
         "gwcs_2d_quantity_shift": (("x", "y"), ("", "")),
         "gwcs_1d_freq": (("",), ("",)),
+        "gwcs_1d_spectral": (("",), ("Frequency",)),
         "gwcs_3d_spatial_wave": (("x", "y", "z"), ("lon", "lat", "lambda")),
         "gwcs_3d_identity_units": (
             ("x", "y", "z"),
@@ -579,8 +834,22 @@ def wcs_names(fixture_name):
         "gwcs_simple_2d": (("x", "y"), ("x", "y")),
         "gwcs_empty_output_2d": (("", ""), ("", "")),
         "gwcs_simple_imaging": (("x", "y"), ("lon", "lat")),
+        "gwcs_simple_imaging_units": (("x", "y"), ("lon", "lat")),
         "gwcs_with_frames_strings": (("", "", "", ""), ("", "", "")),
         "gwcs_high_level_pixel": (("lon", "lat"), ("lon", "lat")),
+        "gwcs_3spectral_orders": (("x", "y"), ("lon", "lat", "lambda")),
+        "gwcs_spec_cel_time_4d": (
+            ("", "", "", ""),
+            ("lambda", "lat", "lon", "isot(utc; None"),
+        ),
+        "gwcs_7d_complex_mapping": (
+            ("", "", "", "", "", ""),
+            ("t", "lat", "lon", "x", "lambda", "y", "tau"),
+        ),
+        "gwcs_with_pipeline_celestial": (("", ""), ("", "")),
+        "gwcs_romanisim": (("x", "y"), ("lon", "lat")),
+        "gwcs_2d_spatial_shift_reverse": (("lon", "lat"), ("x", "y")),
+        "gwcs_multi_stage": (("",), ("ra", "dec")),
     }[fixture_name]
 
 

@@ -107,7 +107,10 @@ class TestPixToWorld:
         self, fixture_name, wcs_object: WCS, pixel, world_high, level, request
     ):
         """Test the high-level wrapper with pixel_to_world."""
-        if fixture_name == "gwcs_high_level_pixel" and level == "high":
+        if (
+            fixture_name in ("gwcs_high_level_pixel", "gwcs_2d_spatial_shift_reverse")
+            and level == "high"
+        ):
             msg = (
                 "The `astropy.wcs` wrapper does not support wcs that are not"
                 " purely pixel in the input_frame."
@@ -137,7 +140,10 @@ class TestPixToWorld:
         self, fixture_name, wcs_object: WCS, array_index, world_high, level, request
     ):
         """Test the high-level wrapper with array_index_to_world."""
-        if fixture_name == "gwcs_high_level_pixel" and level == "high":
+        if (
+            fixture_name in ("gwcs_high_level_pixel", "gwcs_2d_spatial_shift_reverse")
+            and level == "high"
+        ):
             msg = (
                 "The `astropy.wcs` wrapper does not support wcs that are not"
                 " purely pixel in the input_frame."
