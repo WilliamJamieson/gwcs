@@ -107,6 +107,13 @@ def pixel_to_quantity(wcs_object, pixel):
         return wcs_object.input_frame.add_units(pixel)
 
 
+@pytest.fixture
+def pixel_quantity(wcs_object, pixel_low):
+    """Convert pixel coordinates to world coordinates as quantities."""
+
+    return pixel_to_quantity(wcs_object, pixel_low)
+
+
 def pixel_to_high_level(wcs_object, pixel, correct_1d=True):
     """Convert pixel coordinates to high-level world coordinates."""
     return wcs_object.input_frame.to_high_level_coordinates(
@@ -122,9 +129,9 @@ def pixel_high(wcs_object, pixel_low):
 
 
 @pytest.fixture
-def pixel(wcs_object, pixel_low, pixel_high, level):
+def pixel(pixel_low, pixel_quantity, pixel_high, level):
     if level == "quantity":
-        return pixel_to_quantity(wcs_object, pixel_low)
+        return pixel_quantity
 
     if level == "high":
         return pixel_high
@@ -220,6 +227,13 @@ def world_to_quantity(wcs_object, world):
         return wcs_object.output_frame.add_units(world)
 
 
+@pytest.fixture
+def world_quantity(wcs_object, world_low):
+    """Convert world coordinates to world coordinates as quantities."""
+
+    return world_to_quantity(wcs_object, world_low)
+
+
 def world_to_high_level(wcs_object, world, correct_1d=True):
     """Convert world coordinates to high-level world coordinates."""
     return wcs_object.output_frame.to_high_level_coordinates(
@@ -235,9 +249,9 @@ def world_high(wcs_object, world_low):
 
 
 @pytest.fixture
-def world(wcs_object, world_low, world_high, level):
+def world(world_low, world_quantity, world_high, level):
     if level == "quantity":
-        return world_to_quantity(wcs_object, world_low)
+        return world_quantity
 
     if level == "high":
         return world_high
@@ -306,6 +320,14 @@ def check_is_high_level(frame: CoordinateFrameProtocol, output):
         )
     else:
         assert isinstance(output, u.Quantity) or frame.is_high_level(*(output,))
+
+
+def is_quantity(output):
+    """Check we get exactly Quantities"""
+    if isinstance(output, tuple | list):
+        return all(type(p) is u.Quantity for p in output)
+
+    return type(output) is u.Quantity
 
 
 def empty_frame_warning_context(frame: CoordinateFrameProtocol, inputs):
