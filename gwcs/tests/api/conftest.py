@@ -36,9 +36,7 @@ fixture_names = (
     "gwcs_high_level_pixel",
     "gwcs_3spectral_orders",
     "gwcs_spec_cel_time_4d",
-    # This fixture exposes a bug in the world object classes and world object
-    #    components
-    # "gwcs_7d_complex_mapping",
+    "gwcs_7d_complex_mapping",
     "gwcs_with_pipeline_celestial",
     "gwcs_romanisim",
     "gwcs_2d_spatial_shift_reverse",
@@ -347,12 +345,18 @@ def rtol(fixture_name):
     """
     gwcs_simple_imaging's inverse is not exact, so we need a looser tolerance for it.
     """
-    return (
-        0.1
-        if fixture_name
-        in ("gwcs_simple_imaging", "gwcs_simple_imaging_units", "gwcs_spec_cel_time_4d")
-        else 1e-07
-    )
+
+    match fixture_name:
+        case (
+            "gwcs_simple_imaging"
+            | "gwcs_simple_imaging_units"
+            | "gwcs_spec_cel_time_4d"
+        ):
+            return 0.1
+        case "gwcs_7d_complex_mapping":
+            return 1e-2
+        case _:
+            return 1e-07
 
 
 def check_is_low_level(frame: CoordinateFrameProtocol, output):

@@ -324,12 +324,14 @@ class CoordinateFrameProtocol(Protocol):
                 )
                 for arg, c in zip(args, world_axis_object_classes.values(), strict=True)
             ]
-            msg = (
-                "Invalid types were passed, got "
-                f"({', '.join(t[0] for t in types)}), but expected "
-                f"({', '.join(t[1] for t in types)})."
-            )
-            raise TypeError(msg)
+            if any(t[0] != t[1] for t in types):
+                msg = (
+                    "Invalid types were passed, got "
+                    f"({', '.join(t[0] for t in types)}), but expected "
+                    f"({', '.join(t[1] for t in types)})."
+                )
+                raise TypeError(msg)
+            return True
 
         return False
 
