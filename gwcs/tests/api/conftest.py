@@ -1,4 +1,5 @@
 from contextlib import nullcontext
+from inspect import getmembers
 
 import numpy as np
 import pytest
@@ -14,35 +15,13 @@ from gwcs.coordinate_frames import (
 )
 from gwcs.wcs import WCS
 
-fixture_names = (
-    "gwcs_2d_spatial_shift",
-    "gwcs_2d_spatial_reordered",
-    "gwcs_2d_quantity_shift",
-    "gwcs_1d_freq",
-    "gwcs_1d_spectral",
-    "gwcs_3d_spatial_wave",
-    "gwcs_3d_identity_units",
-    "gwcs_4d_identity_units",
-    "gwcs_stokes_lookup",
-    "gwcs_3d_galactic_spectral",
-    "gwcs_2d_shift_scale",
-    "gwcs_2d_shift_scale_quantity",
-    "gwcs_1d_freq_quantity",
-    "gwcs_simple_2d",
-    "gwcs_empty_output_2d",
-    "gwcs_simple_imaging",
-    "gwcs_simple_imaging_units",
-    "gwcs_with_frames_strings",
-    "gwcs_high_level_pixel",
-    "gwcs_3spectral_orders",
-    "gwcs_spec_cel_time_4d",
-    "gwcs_7d_complex_mapping",
-    "gwcs_with_pipeline_celestial",
-    "gwcs_romanisim",
-    "gwcs_2d_spatial_shift_reverse",
-    # This fixture exposes a bug in the from_high_level_coordinates method of the
-    #     Frame class
-    "gwcs_multi_stage",
+# We need to relative import the example fixtures so we can iterate over them
+from .. import example_fixtures  # noqa: TID252
+
+fixture_names = tuple(
+    name
+    for name, _ in getmembers(example_fixtures)
+    if name.startswith("gwcs_") and not name.startswith("gwcs_cube")
 )
 
 
