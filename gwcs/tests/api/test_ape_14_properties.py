@@ -764,11 +764,11 @@ def wcs_component_object_classes(fixture_name, wcs_object):
             ),
         },
         "gwcs_7d_complex_mapping": {
-            "TIME": (u.Quantity, (), {"unit": u.s}),
+            "TIME2": (u.Quantity, (), {"unit": u.s}),
             "celestial": celestial,
             "spectral": spectral,
+            "SPATIAL": (u.Quantity, (), {"unit": u.m}),
             "SPATIAL1": (u.Quantity, (), {"unit": u.m}),
-            "SPATIAL2": (u.Quantity, (), {"unit": u.m}),
             "TIME3": (u.Quantity, (), {"unit": u.s}),
         },
         "gwcs_with_pipeline_celestial": {
@@ -792,6 +792,7 @@ def test_world_axis_object_classes(
     """
     waoc = wcs_object.world_axis_object_classes
     assert set(waoc.keys()) == set(wcs_component_names)
+    assert set(waoc.keys()) == set(wcs_component_object_classes.keys())
 
     for component_name, component in waoc.items():
         assert isinstance(component, tuple)

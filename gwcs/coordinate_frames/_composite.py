@@ -137,4 +137,11 @@ class CompositeFrame(CoordinateFrame):
 
     @property
     def world_axis_object_classes(self) -> WorldAxisObjectClasses:
-        return dict(self._wao_renamed_classes_iter)
+        base = dict(self._wao_renamed_classes_iter)
+
+        waocs = {}
+        for component in self.world_axis_object_components:
+            if component.name not in waocs:
+                waocs[component.name] = base[component.name]
+
+        return waocs

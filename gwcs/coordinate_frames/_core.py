@@ -160,7 +160,9 @@ class CoordinateFrame(CoordinateFrameProtocol):
             f"{at}{i}" if i != 0 else at: WorldAxisObjectClass(
                 u.Quantity, (), {"unit": unit}
             )
-            for i, (at, unit) in enumerate(zip(self.axes_type, self.unit, strict=False))
+            for i, (at, unit) in enumerate(
+                zip(self._prop.axes_type, self._prop.unit, strict=False)
+            )
         }
 
     @property
