@@ -114,7 +114,12 @@ def pixel_to_quantity(wcs_object, pixel):
 
 @pytest.fixture
 def pixel_quantity(wcs_object, pixel_low):
-    """Convert pixel coordinates to world coordinates as quantities."""
+    """
+    Convert pixel coordinates to world coordinates as quantities.
+
+    Note that if the input frame is an EmptyFrame, this will
+    just return the low-level pixel coordinates as is.
+    """
 
     return pixel_to_quantity(wcs_object, pixel_low)
 
@@ -128,13 +133,28 @@ def pixel_to_high_level(wcs_object, pixel, correct_1d=True):
 
 @pytest.fixture
 def pixel_high(wcs_object, pixel_low):
-    """Convert pixel coordinates to high-level world coordinates."""
+    """
+    Convert pixel coordinates to high-level world coordinates.
+
+    Note that this will always return either a quantity or
+    a high-level object like SkyCoord. In the empty frame
+    case, we get a Quantity with dimensionless units.
+    """
 
     return pixel_to_high_level(wcs_object, pixel_low, correct_1d=False)
 
 
 @pytest.fixture
 def pixel(pixel_low, pixel_quantity, pixel_high, level):
+    """
+    Return pixel coordinates at each level
+
+    Note that
+    - "low" always results in an array or simple scalar.
+    - "quantity" is usually a Quantity, but if the input frame
+        is an EmptyFrame, it will just be the low-level pixel coordinates
+    - "high" is either a high-level object like a SkyCoord or a Quantity.
+    """
     if level == "quantity":
         return pixel_quantity
 
@@ -249,7 +269,12 @@ def world_to_quantity(wcs_object, world):
 
 @pytest.fixture
 def world_quantity(wcs_object, world_low):
-    """Convert world coordinates to world coordinates as quantities."""
+    """
+    Convert world coordinates to world coordinates as quantities.
+
+    Note that if the output frame is an EmptyFrame, this will
+    just return the low-level world coordinates as is.
+    """
 
     return world_to_quantity(wcs_object, world_low)
 
@@ -263,13 +288,28 @@ def world_to_high_level(wcs_object, world, correct_1d=True):
 
 @pytest.fixture
 def world_high(wcs_object, world_low):
-    """Convert world coordinates to high-level world coordinates."""
+    """
+    Convert world coordinates to high-level world coordinates.
+
+    Note that this will always return either a quantity or
+    a high-level object like SkyCoord. In the empty frame
+    case, we get a Quantity with dimensionless units.
+    """
 
     return world_to_high_level(wcs_object, world_low, correct_1d=False)
 
 
 @pytest.fixture
 def world(world_low, world_quantity, world_high, level):
+    """
+    Return world coordinates at each level
+
+    Note that
+    - "low" always results in an array or simple scalar.
+    - "quantity" is usually a Quantity, but if the output frame
+        is an EmptyFrame, it will just be the low-level world coordinates
+    - "high" is either a high-level object like a SkyCoord or a Quantity.
+    """
     if level == "quantity":
         return world_quantity
 
@@ -353,12 +393,29 @@ def check_is_high_level(frame: CoordinateFrameProtocol, output):
         assert isinstance(output, u.Quantity) or frame.is_high_level(*(output,))
 
 
+def check_is_gwcs_high_level(frame: CoordinateFrameProtocol, output):
+    if isinstance(output, tuple | list):
+        assert frame.is_high_level(*output)
+    else:
+        assert frame.is_high_level(output)
+
+
 def is_quantity(output):
     """Check we get exactly Quantities"""
     if isinstance(output, tuple | list):
         return all(type(p) is u.Quantity for p in output)
 
     return type(output) is u.Quantity
+
+
+def is_dimensionless_quantity(output):
+    """Check we get exactly dimensionless Quantities"""
+    assert is_quantity(output)
+
+    if not isinstance(output, tuple | list):
+        output = (output,)
+
+    return all(p.unit == u.dimensionless_unscaled for p in output)
 
 
 def empty_frame_warning_context(frame: CoordinateFrameProtocol, inputs):
