@@ -231,18 +231,10 @@ class CoordinateFrameProtocol(Protocol):
         """
         return False
 
-    def add_units(
-        self, arrays: tuple[LowLevelInput, ...] | LowLevelInput
-    ) -> tuple[LowLevelInput, ...]:
+    def add_units(self, *arrays: LowLevelInput) -> tuple[LowLevelInput, ...]:
         """
         Add units to the arrays
         """
-        # Handle the case where we have a single axis input which maybe passed as a
-        #    scalar rather than a tuple of length 1.
-        if self.naxes == 1 and (np.isscalar(arrays) or isinstance(arrays, u.Quantity)):
-            return (
-                arrays if self.unit[0] is None else u.Quantity(arrays, self.unit[0]),
-            )
 
         return tuple(
             # Add units to the array if there is a unit for the axis, otherwise
@@ -260,9 +252,7 @@ class CoordinateFrameProtocol(Protocol):
             for array, unit in zip_longest(arrays, self.unit)
         )
 
-    def remove_units(
-        self, arrays: tuple[LowLevelInput, ...] | LowLevelInput
-    ) -> tuple[LowLevelArray, ...]:
+    def remove_units(self, *arrays: LowLevelInput) -> tuple[LowLevelArray, ...]:
         """
         Remove units from the input arrays
         """
@@ -280,7 +270,7 @@ class CoordinateFrameProtocol(Protocol):
             #    through and hope for the best.
             # Now we have an array with the correct units, so we can safely strip
             #    the units off by accessing the .value (magnitude) of the attribute.
-            for array in self.add_units(arrays)
+            for array in self.add_units(*arrays)
         )
 
     def is_high_level(self, *args) -> bool:
@@ -355,7 +345,7 @@ class CoordinateFrameProtocol(Protocol):
         """
         # We allow Quantity-like objects here which values_to_high_level_objects
         # does not.
-        values = self.remove_units(values)
+        values = self.remove_units(*values)
 
         if not all(isinstance(v, Number) or type(v) is np.ndarray for v in values):
             msg = "All values should be a scalar number or a numpy array."
