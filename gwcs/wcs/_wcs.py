@@ -111,7 +111,7 @@ class _UnitHandler:
 
     def __init__(
         self,
-        inputs: tuple[LowLevelInput, ...],
+        *inputs: LowLevelInput,
         transform: Model,
         frame: CoordinateFrameProtocol,
         is_high_level: bool,
@@ -164,7 +164,7 @@ class _UnitHandler:
         #    output -> add units
         #             (we convert the output to the correct units if necessary and
         elif input_is_quantity and transform_uses_quantity:
-            self.args = frame.add_units(inputs)
+            self.args = frame.add_units(*inputs)
             self._add_units = True
 
         # Case 3: no input units, but transform needs units
@@ -176,7 +176,7 @@ class _UnitHandler:
         #             (we convert the output to the correct units if necessary and
         #              then remove them giving numerical values as output)
         elif not input_is_quantity and transform_uses_quantity:
-            self.args = frame.add_units(inputs)
+            self.args = frame.add_units(*inputs)
             self._add_units = False
 
         # Case 4: input has units, but transform does not use them
@@ -189,7 +189,7 @@ class _UnitHandler:
         # This is the only other case:
         #   input_is_quantity and not transform_uses_quantity
         else:
-            self.args = frame.remove_units(inputs)
+            self.args = frame.remove_units(*inputs)
             self._add_units = True
 
     def _handle_output_type(
@@ -201,10 +201,10 @@ class _UnitHandler:
 
         # If the input had units return units
         if self._add_units:
-            return frame.add_units(outputs)
+            return frame.add_units(*outputs)
 
         # If the input had no units, return unitless values
-        return frame.remove_units(outputs)
+        return frame.remove_units(*outputs)
 
     def handle_output(
         self,
@@ -228,7 +228,7 @@ class _UnitHandler:
         tuple of low level inputs or high level objects
             The handled outputs.
         """
-        if frame.naxes == 1:
+        if not isinstance(outputs, tuple):
             outputs = (outputs,)
 
         outputs = self._handle_output_type(*outputs, frame=frame)
@@ -310,7 +310,12 @@ class WCS(Pipeline, WCSAPIMixin):
         #   after each call to it.
         transform = self.forward_transform
 
-        unit_handler = _UnitHandler(args, transform, self.input_frame, force_high_level)
+        unit_handler = _UnitHandler(
+            *args,
+            transform=transform,
+            frame=self.input_frame,
+            is_high_level=force_high_level,
+        )
 
         result = transform(
             *unit_handler.args,
@@ -464,7 +469,10 @@ class WCS(Pipeline, WCSAPIMixin):
             transform = None
 
         unit_handler = _UnitHandler(
-            args, transform, self.output_frame, force_high_level
+            *args,
+            transform=transform,
+            frame=self.output_frame,
+            is_high_level=force_high_level,
         )
 
         inputs = unit_handler.args
@@ -551,7 +559,7 @@ class WCS(Pipeline, WCSAPIMixin):
             world_arrays = self.output_frame.to_high_level_coordinates(
                 *world_arrays, correct_1d=False
             )
-        return world_arrays
+        return tuple(world_arrays)
 
     def out_of_bounds(self, pixel_arrays, fill_value=np.nan):
         if np.isscalar(pixel_arrays) or self.input_frame.naxes == 1:
@@ -570,6 +578,8 @@ class WCS(Pipeline, WCSAPIMixin):
                     pixel_arrays[idim] = pix_
         if self.input_frame.naxes == 1:
             pixel_arrays = pixel_arrays[0]
+        else:
+            pixel_arrays = tuple(pixel_arrays)
         return pixel_arrays
 
     def numerical_inverse(
@@ -815,7 +825,7 @@ class WCS(Pipeline, WCSAPIMixin):
 
         """  # noqa: E501
         return self._numerical_inverse(
-            *self.output_frame.remove_units(args),
+            *self.output_frame.remove_units(*args),
             tolerance=tolerance,
             maxiter=maxiter,
             adaptive=adaptive,
@@ -1360,7 +1370,7 @@ class WCS(Pipeline, WCSAPIMixin):
                 bb = np.asarray([b.value for b in bb]) * bb[0].unit
             vertices = (bb,)
         elif all_spatial:
-            vertices = _order_clockwise([self.input_frame.remove_units(b) for b in bb])
+            vertices = _order_clockwise([self.input_frame.remove_units(*b) for b in bb])
         else:
             vertices = np.array(list(itertools.product(*bb))).T  # type: ignore[assignment]
 
@@ -1722,7 +1732,7 @@ class WCS(Pipeline, WCSAPIMixin):
 
         first_bound = bounding_box[0][0]
         if isinstance(first_bound, u.Quantity):
-            bounding_box = [self.input_frame.remove_units(bb) for bb in bounding_box]
+            bounding_box = [self.input_frame.remove_units(*bb) for bb in bounding_box]
         bb_center = np.mean(bounding_box, axis=1)
 
         fixi_dict = {
@@ -1775,7 +1785,7 @@ class WCS(Pipeline, WCSAPIMixin):
         # standard sampling:
         crpix_ = [crpix1, crpix2]
         if isinstance(crpix1, u.Quantity):
-            crpix_ = self.input_frame.remove_units(crpix_)
+            crpix_ = self.input_frame.remove_units(*crpix_)
         u_grid, v_grid = make_sampling_grid(
             npoints, tuple(bounding_box[k] for k in input_axes), crpix=crpix_
         )

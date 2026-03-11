@@ -101,7 +101,7 @@ def array_index_low(pixel_low):
     return pixel_low[::-1]
 
 
-def pixel_to_quantity(wcs_object, pixel):
+def pixel_to_quantity(wcs_object, *pixel):
     """Convert pixel coordinates to world coordinates as quantities."""
 
     with (
@@ -109,7 +109,7 @@ def pixel_to_quantity(wcs_object, pixel):
         if isinstance(wcs_object.input_frame, EmptyFrame)
         else nullcontext()
     ):
-        return wcs_object.input_frame.add_units(pixel)
+        return wcs_object.input_frame.add_units(*pixel)
 
 
 @pytest.fixture
@@ -121,10 +121,10 @@ def pixel_quantity(wcs_object, pixel_low):
     just return the low-level pixel coordinates as is.
     """
 
-    return pixel_to_quantity(wcs_object, pixel_low)
+    return pixel_to_quantity(wcs_object, *pixel_low)
 
 
-def pixel_to_high_level(wcs_object, pixel, correct_1d=True):
+def pixel_to_high_level(wcs_object: WCS, *pixel, correct_1d=True):
     """Convert pixel coordinates to high-level world coordinates."""
     return wcs_object.input_frame.to_high_level_coordinates(
         *pixel, correct_1d=correct_1d
@@ -141,7 +141,7 @@ def pixel_high(wcs_object, pixel_low):
     case, we get a Quantity with dimensionless units.
     """
 
-    return pixel_to_high_level(wcs_object, pixel_low, correct_1d=False)
+    return pixel_to_high_level(wcs_object, *pixel_low, correct_1d=False)
 
 
 @pytest.fixture
@@ -178,7 +178,7 @@ def pixel_to_low_level(wcs_object: WCS, pixel):
         return wcs_object.input_frame.from_high_level_coordinates(*pixel)
 
     # Remove units just in case
-    pixel = wcs_object.input_frame.remove_units(pixel)
+    pixel = wcs_object.input_frame.remove_units(*pixel)
 
     if remove_tuple:
         return pixel[0]
@@ -256,7 +256,7 @@ def world_low(world_scalar, dimension):
     return tuple(np.ones((3, 4)) * arg for arg in world_scalar)
 
 
-def world_to_quantity(wcs_object, world):
+def world_to_quantity(wcs_object, *world):
     """Convert world coordinates to world coordinates as quantities."""
 
     with (
@@ -264,7 +264,7 @@ def world_to_quantity(wcs_object, world):
         if isinstance(wcs_object.output_frame, EmptyFrame)
         else nullcontext()
     ):
-        return wcs_object.output_frame.add_units(world)
+        return wcs_object.output_frame.add_units(*world)
 
 
 @pytest.fixture
@@ -276,7 +276,7 @@ def world_quantity(wcs_object, world_low):
     just return the low-level world coordinates as is.
     """
 
-    return world_to_quantity(wcs_object, world_low)
+    return world_to_quantity(wcs_object, *world_low)
 
 
 def world_to_high_level(wcs_object, world, correct_1d=True):
@@ -332,7 +332,7 @@ def world_to_low_level(wcs_object: WCS, world):
     if wcs_object.output_frame.is_high_level(*world):
         world = wcs_object.output_frame.from_high_level_coordinates(*world)
     else:
-        world = wcs_object.output_frame.remove_units(world)
+        world = wcs_object.output_frame.remove_units(*world)
 
     if remove_tuple:
         return world[0]
