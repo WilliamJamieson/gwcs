@@ -5,7 +5,7 @@ from astropy import coordinates as coord
 from astropy import units as u
 
 from ._axis import AxisType
-from ._base import AstropyBuiltInFrame, WorldAxisObjectClass, WorldAxisObjectComponent
+from ._base import WorldAxisObjectClass, WorldAxisObjectComponent
 from ._core import CoordinateFrame
 
 __all__ = ["SpectralFrame"]
@@ -34,7 +34,7 @@ class SpectralFrame(CoordinateFrame):
     def __init__(
         self,
         axes_order: tuple[int] = (0,),
-        reference_frame: AstropyBuiltInFrame | None = None,
+        reference_frame: coord.SpectralCoord | None = None,
         unit: tuple[u.Unit] | None = None,
         axes_names: tuple[str] | None = None,
         name: str | None = None,

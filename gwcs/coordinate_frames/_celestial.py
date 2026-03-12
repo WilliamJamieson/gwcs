@@ -2,7 +2,12 @@ from astropy import coordinates as coord
 from astropy import units as u
 
 from ._axis import AxisType
-from ._base import AstropyBuiltInFrame, WorldAxisObjectClass, WorldAxisObjectComponent
+from ._base import (
+    AstropyBuiltInFrame,
+    LowLevelArray,
+    WorldAxisObjectClass,
+    WorldAxisObjectComponent,
+)
 from ._core import CoordinateFrame
 
 __all__ = ["CelestialFrame"]
@@ -38,7 +43,7 @@ class CelestialFrame(CoordinateFrame):
     def __init__(
         self,
         axes_order: tuple[int, ...] | None = None,
-        reference_frame: AstropyBuiltInFrame | None = None,
+        reference_frame: coord.SkyCoord | None = None,
         unit: tuple[u.Unit, ...] | None = None,
         axes_names: tuple[str, ...] | None = None,
         name: str | None = None,
@@ -126,7 +131,9 @@ class CelestialFrame(CoordinateFrame):
             ),
         ]
 
-    def from_high_level_coordinates(self, *high_level_coords):
+    def from_high_level_coordinates(
+        self, *high_level_coords: coord.SkyCoord
+    ) -> tuple[LowLevelArray, ...]:
         if self.reference_frame is None:
             msg = (
                 "Cannot convert high-level to low-level coordinates without a "
