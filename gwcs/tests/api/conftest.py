@@ -124,11 +124,9 @@ def pixel_quantity(wcs_object, pixel_low):
     return pixel_to_quantity(wcs_object, *pixel_low)
 
 
-def pixel_to_high_level(wcs_object: WCS, *pixel, correct_1d=True):
+def pixel_to_high_level(wcs_object: WCS, *pixel):
     """Convert pixel coordinates to high-level world coordinates."""
-    return wcs_object.input_frame.to_high_level_coordinates(
-        *pixel, correct_1d=correct_1d
-    )
+    return wcs_object.input_frame.to_high_level_coordinates(*pixel)
 
 
 @pytest.fixture
@@ -141,7 +139,7 @@ def pixel_high(wcs_object, pixel_low):
     case, we get a Quantity with dimensionless units.
     """
 
-    return pixel_to_high_level(wcs_object, *pixel_low, correct_1d=False)
+    return pixel_to_high_level(wcs_object, *pixel_low)
 
 
 @pytest.fixture
@@ -279,11 +277,9 @@ def world_quantity(wcs_object, world_low):
     return world_to_quantity(wcs_object, *world_low)
 
 
-def world_to_high_level(wcs_object, world, correct_1d=True):
+def world_to_high_level(wcs_object, world):
     """Convert world coordinates to high-level world coordinates."""
-    return wcs_object.output_frame.to_high_level_coordinates(
-        *world, correct_1d=correct_1d
-    )
+    return wcs_object.output_frame.to_high_level_coordinates(*world)
 
 
 @pytest.fixture
@@ -296,7 +292,7 @@ def world_high(wcs_object, world_low):
     case, we get a Quantity with dimensionless units.
     """
 
-    return world_to_high_level(wcs_object, world_low, correct_1d=False)
+    return world_to_high_level(wcs_object, world_low)
 
 
 @pytest.fixture
