@@ -126,7 +126,7 @@ class CelestialFrame(CoordinateFrame):
             ),
         ]
 
-    def from_high_level_coordinates(self, *high_level_coords, correct_1d=True):
+    def from_high_level_coordinates(self, *high_level_coords):
         if self.reference_frame is None:
             msg = (
                 "Cannot convert high-level to low-level coordinates without a "
@@ -134,6 +134,4 @@ class CelestialFrame(CoordinateFrame):
             )
             raise RuntimeError(msg)
 
-        return super().from_high_level_coordinates(
-            *high_level_coords, correct_1d=correct_1d
-        )
+        return super().from_high_level_coordinates(*high_level_coords)

@@ -426,9 +426,7 @@ class WCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin, NativeAPIMixin):
         #   pixel "frame" doesn't have any real high-level objects, but in GWCS
         #   this is permissible.
         arrays = (
-            self.input_frame.from_high_level_coordinates(
-                *pixel_arrays, correct_1d=False
-            )
+            self.input_frame.from_high_level_coordinates(*pixel_arrays)
             if self.input_frame.is_high_level(*pixel_arrays)
             else pixel_arrays
         )
