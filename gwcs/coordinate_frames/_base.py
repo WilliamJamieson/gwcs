@@ -31,6 +31,7 @@ __all__ = [
 ]
 
 AstropyBuiltInFrame: TypeAlias = Time | _AstropyBaseCoordinateFrame
+ClassObject: TypeAlias = AstropyBuiltInFrame | u.Quantity
 LowLevelArray: TypeAlias = npt.NDArray[np.generic]
 LowLevelInput: TypeAlias = LowLevelArray | u.Quantity
 
@@ -65,7 +66,7 @@ class WorldAxisObjectClass(NamedTuple):
         this class.
     """
 
-    class_object: type | str
+    class_object: type[ClassObject] | str
     arguments: tuple[Any, ...]
     keyword_arguments: dict[str, Any]
 
@@ -80,7 +81,7 @@ class WorldAxisObjectClassConverter(NamedTuple):
         A callable that will convert the input values into the desired output
     """
 
-    class_object: type | str
+    class_object: type[ClassObject] | str
     arguments: tuple[Any, ...]
     keyword_arguments: dict[str, Any]
     converter: Callable[..., Any]
@@ -326,7 +327,9 @@ class CoordinateFrameProtocol(Protocol):
 
         return False
 
-    def to_high_level_coordinates(self, *values):
+    def to_high_level_coordinates(
+        self, *values: LowLevelInput
+    ) -> tuple[ClassObject, ...]:
         """
         Convert "values" to high level coordinate objects described by this frame.
 
@@ -354,7 +357,9 @@ class CoordinateFrameProtocol(Protocol):
 
         return tuple(values_to_high_level_objects(*values, low_level_wcs=self))
 
-    def from_high_level_coordinates(self, *high_level_coords):
+    def from_high_level_coordinates(
+        self, *high_level_coords: ClassObject
+    ) -> tuple[LowLevelArray, ...]:
         """
         Convert high level coordinate objects to "values" as described by this frame.
 
