@@ -480,12 +480,14 @@ class WCS(Pipeline, WCSAPIMixin):
             inputs = self.outside_footprint(inputs)
 
         if transform is not None:
-            akwargs = {k: v for k, v in kwargs.items() if k not in _ITER_INV_KWARGS}
+            transform_kwargs = {
+                k: v for k, v in kwargs.items() if k not in _ITER_INV_KWARGS
+            }
             result = transform(
                 *inputs,
                 with_bounding_box=with_bounding_box,
                 fill_value=fill_value,
-                **akwargs,
+                **transform_kwargs,
             )
         else:
             result = self._numerical_inverse(
@@ -513,22 +515,22 @@ class WCS(Pipeline, WCSAPIMixin):
                 *world_arrays, correct_1d=False
             )
 
-        for axtyp in axes_types:
-            ind = np.asarray(np.asarray(self.output_frame.axes_type) == axtyp)
+        for axis_type in axes_types:
+            ind = np.asarray(np.asarray(self.output_frame.axes_type) == axis_type)
 
-            for idim, (coordinate, phys) in enumerate(
+            for i_dim, (coordinate, phys) in enumerate(
                 zip(world_arrays, axes_phys_types, strict=False)
             ):
                 coord = _tofloat(coordinate)
                 if np.asarray(ind).sum() > 1:
-                    axis_range = footprint[:, idim]
+                    axis_range = footprint[:, i_dim]
                 else:
                     axis_range = footprint
                 min_ax = axis_range.min()
                 max_ax = axis_range.max()
 
                 if (
-                    axtyp == "SPATIAL"
+                    axis_type == "SPATIAL"
                     and str(phys).endswith((".ra", ".lon"))
                     and (max_ax - min_ax) > 180
                 ):
@@ -546,7 +548,7 @@ class WCS(Pipeline, WCSAPIMixin):
                     else:
                         coord_ = self._remove_quantity_frame(
                             world_arrays, self.output_frame
-                        )[idim]
+                        )[i_dim]
 
                     outside = (coord_ < min_ax) | (coord_ > max_ax)
                 if np.any(outside):
@@ -554,7 +556,7 @@ class WCS(Pipeline, WCSAPIMixin):
                         coord = np.nan
                     else:
                         coord[outside] = np.nan
-                    world_arrays[idim] = coord
+                    world_arrays[i_dim] = coord
         if not_numerical:
             world_arrays = self.output_frame.to_high_level_coordinates(
                 *world_arrays, correct_1d=False
@@ -567,15 +569,15 @@ class WCS(Pipeline, WCSAPIMixin):
 
         pixel_arrays = list(pixel_arrays)
         bbox = self.bounding_box
-        for idim, pix in enumerate(pixel_arrays):
-            outside = (pix < bbox[idim][0]) | (pix > bbox[idim][1])
+        for i_dim, pix in enumerate(pixel_arrays):
+            outside = (pix < bbox[i_dim][0]) | (pix > bbox[i_dim][1])
             if np.any(outside):
                 if np.isscalar(pix):
-                    pixel_arrays[idim] = np.nan
+                    pixel_arrays[i_dim] = np.nan
                 else:
-                    pix_ = pixel_arrays[idim].astype(float, copy=True)
+                    pix_ = pixel_arrays[i_dim].astype(float, copy=True)
                     pix_[outside] = np.nan
-                    pixel_arrays[idim] = pix_
+                    pixel_arrays[i_dim] = pix_
         if self.input_frame.naxes == 1:
             pixel_arrays = pixel_arrays[0]
         else:
@@ -799,11 +801,11 @@ class WCS(Pipeline, WCSAPIMixin):
         least for one input point.
 
         >>> # Now try to use some diverging data:
-        >>> divra, divdec = w([1, 300000, 3], [2, 1000000, 5], with_bounding_box=False)
-        >>> assert np.allclose(divra, [5.92762673, 148.21600848, 5.92750827])
-        >>> assert np.allclose(divdec, [-72.01339464, -7.80968079, -72.01334172])
+        >>> div_ra, div_dec = w([1, 300000, 3], [2, 1000000, 5], with_bounding_box=False)
+        >>> assert np.allclose(div_ra, [5.92762673, 148.21600848, 5.92750827])
+        >>> assert np.allclose(div_dec, [-72.01339464, -7.80968079, -72.01334172])
         >>> try:  # doctest: +SKIP
-        ...     x, y = w.numerical_inverse(divra, divdec, maxiter=20,
+        ...     x, y = w.numerical_inverse(div_ra, div_dec, maxiter=20,
         ...                                tolerance=1.0e-4, adaptive=True,
         ...                                detect_divergence=True,
         ...                                quiet=False)
@@ -878,17 +880,17 @@ class WCS(Pipeline, WCSAPIMixin):
                 x0 = np.mean(self.bounding_box, axis=-1)
 
         if arg_dim == 0:
-            argsi = args
+            args_i = args
 
             if nargs == 2 and self._approx_inverse is not None:
-                x0 = self._approx_inverse(*argsi)
+                x0 = self._approx_inverse(*args_i)
                 if not np.all(np.isfinite(x0)):
                     return [np.array(np.nan) for _ in range(nargs)]
 
             result = tuple(
                 self._vectorized_fixed_point(
                     x0,
-                    argsi,
+                    args_i,
                     tolerance=tolerance,
                     maxiter=maxiter,
                     adaptive=adaptive,
@@ -903,12 +905,12 @@ class WCS(Pipeline, WCSAPIMixin):
 
         else:
             arg_shape = args_shape[1:]
-            nelem = np.prod(arg_shape)
+            n_elements = np.prod(arg_shape)
 
-            args = np.reshape(args, (nargs, nelem))
+            args = np.reshape(args, (nargs, n_elements))
 
             if self._approx_inverse is None:
-                x0 = np.full((nelem, nargs), x0)
+                x0 = np.full((n_elements, nargs), x0)
             else:
                 x0 = np.array(self._approx_inverse(*args)).T
 
@@ -969,18 +971,18 @@ class WCS(Pipeline, WCSAPIMixin):
                 + (l1 - l3) * (np.sin(phi2) - np.sin(phi4))
             )
         )
-        inv_pscale = 1 / np.rad2deg(np.sqrt(area))
+        inv_p_scale = 1 / np.rad2deg(np.sqrt(area))
 
         # form equation:
         def f(x):
             w = np.array(self.__call__(*(x.T), with_bounding_box=False)).T
             dw = np.mod(np.subtract(w, world) - 180.0, 360.0) - 180.0
-            return np.add(inv_pscale * dw, x)
+            return np.add(inv_p_scale * dw, x)
 
-        def froot(x):
+        def f_root(x):
             return (
                 np.mod(
-                    np.subtract(self.__call__(*x, with_bounding_box=False), worldi)
+                    np.subtract(self.__call__(*x, with_bounding_box=False), world_i)
                     - 180.0,
                     360.0,
                 )
@@ -998,20 +1000,20 @@ class WCS(Pipeline, WCSAPIMixin):
             return corr
 
         # initial iteration:
-        dpix = correction(pix)
+        d_pix = correction(pix)
 
         # Update initial solution:
-        pix -= dpix
+        pix -= d_pix
 
         # Norm (L2) squared of the correction:
-        dn = np.sum(dpix * dpix, axis=1)
-        dnprev = dn.copy()  # if adaptive else dn
+        dn = np.sum(d_pix * d_pix, axis=1)
+        dn_prev = dn.copy()  # if adaptive else dn
         tol2 = tolerance**2
 
         # Prepare for iterative process
         k = 1
         ind = None
-        inddiv = None
+        ind_div = None
 
         # Turn off numpy runtime warnings for 'invalid' and 'over':
         old_invalid = np.geterr()["invalid"]
@@ -1025,39 +1027,39 @@ class WCS(Pipeline, WCSAPIMixin):
             # Fixed-point iterations:
             while np.nanmax(dn) >= tol2 and k < maxiter:
                 # Find correction to the previous solution:
-                dpix = correction(pix)
+                d_pix = correction(pix)
 
                 # Compute norm (L2) squared of the correction:
-                dn = np.sum(dpix * dpix, axis=1)
+                dn = np.sum(d_pix * d_pix, axis=1)
 
                 # Check for divergence (we do this in two stages
                 # to optimize performance for the most common
                 # scenario when successive approximations converge):
 
                 if detect_divergence:
-                    divergent = dn >= dnprev
+                    divergent = dn >= dn_prev
                     if np.any(divergent):
                         # Find solutions that have not yet converged:
-                        slowconv = dn >= tol2
-                        (inddiv,) = np.where(divergent & slowconv)
+                        slow_conv = dn >= tol2
+                        (ind_div,) = np.where(divergent & slow_conv)
 
-                        if inddiv.shape[0] > 0:
+                        if ind_div.shape[0] > 0:
                             # Update indices of elements that
                             # still need correction:
-                            conv = dn < dnprev
-                            iconv = np.where(conv)
+                            conv = dn < dn_prev
+                            i_conv = np.where(conv)
 
                             # Apply correction:
-                            dpixgood = dpix[iconv]
-                            pix[iconv] -= dpixgood
-                            dpix[iconv] = dpixgood
+                            dpix_good = d_pix[i_conv]
+                            pix[i_conv] -= dpix_good
+                            d_pix[i_conv] = dpix_good
 
                             # For the next iteration choose
                             # non-divergent points that have not yet
                             # converged to the requested accuracy:
-                            (ind,) = np.where(slowconv & conv)
+                            (ind,) = np.where(slow_conv & conv)
                             world = world[ind]
-                            dnprev[ind] = dn[ind]
+                            dn_prev[ind] = dn[ind]
                             k += 1
 
                             # Switch to adaptive iterations:
@@ -1065,10 +1067,10 @@ class WCS(Pipeline, WCSAPIMixin):
                             break
 
                     # Save current correction magnitudes for later:
-                    dnprev = dn
+                    dn_prev = dn
 
                 # Apply correction:
-                pix -= dpix
+                pix -= d_pix
                 k += 1
 
         # ############################################################
@@ -1082,45 +1084,45 @@ class WCS(Pipeline, WCSAPIMixin):
             # "Adaptive" fixed-point iterations:
             while ind.shape[0] > 0 and k < maxiter:
                 # Find correction to the previous solution:
-                dpixnew = correction(pix[ind])
+                dpix_new = correction(pix[ind])
 
                 # Compute norm (L2) of the correction:
-                dnnew = np.sum(np.square(dpixnew), axis=1)
+                dn_new = np.sum(np.square(dpix_new), axis=1)
 
                 # Bookkeeping of corrections:
-                dnprev[ind] = dn[ind].copy()
-                dn[ind] = dnnew
+                dn_prev[ind] = dn[ind].copy()
+                dn[ind] = dn_new
 
                 if detect_divergence:
                     # Find indices of pixels that are converging:
-                    conv = np.logical_or(dnnew < dnprev[ind], dnnew < tol2)
+                    conv = np.logical_or(dn_new < dn_prev[ind], dn_new < tol2)
                     if not np.all(conv):
-                        conv = np.ones_like(dnnew, dtype=bool)
-                    iconv = np.where(conv)
-                    iiconv = ind[iconv]
+                        conv = np.ones_like(dn_new, dtype=bool)
+                    i_conv = np.where(conv)
+                    ii_conv = ind[i_conv]
 
                     # Apply correction:
-                    dpixgood = dpixnew[iconv]
-                    pix[iiconv] -= dpixgood
-                    dpix[iiconv] = dpixgood
+                    dpix_good = dpix_new[i_conv]
+                    pix[ii_conv] -= dpix_good
+                    d_pix[ii_conv] = dpix_good
 
                     # Find indices of solutions that have not yet
                     # converged to the requested accuracy
                     # AND that do not diverge:
-                    (subind,) = np.where((dnnew >= tol2) & conv)
+                    (sub_ind,) = np.where((dn_new >= tol2) & conv)
 
                 else:
                     # Apply correction:
-                    pix[ind] -= dpixnew
-                    dpix[ind] = dpixnew
+                    pix[ind] -= dpix_new
+                    d_pix[ind] = dpix_new
 
                     # Find indices of solutions that have not yet
                     # converged to the requested accuracy:
-                    (subind,) = np.where(dnnew >= tol2)
+                    (sub_ind,) = np.where(dn_new >= tol2)
 
                 # Choose solutions that need more iterations:
-                ind = ind[subind]
-                world = world[subind]
+                ind = ind[sub_ind]
+                world = world[sub_ind]
 
                 k += 1
 
@@ -1133,21 +1135,21 @@ class WCS(Pipeline, WCSAPIMixin):
             np.all(np.isfinite(world0), axis=1)
         )
 
-        # When detect_divergence is False, dnprev is outdated
+        # When detect_divergence is False, dn_prev is outdated
         # (it is the norm of the very first correction).
         # Still better than nothing...
-        (inddiv,) = np.where(((dn >= tol2) & (dn >= dnprev)) | invalid)
-        if inddiv.shape[0] == 0:
-            inddiv = None
+        (ind_div,) = np.where(((dn >= tol2) & (dn >= dn_prev)) | invalid)
+        if ind_div.shape[0] == 0:
+            ind_div = None
 
         # If there are divergent points, attempt to find a solution using
         # scipy's 'hybr' method:
-        if detect_divergence and inddiv is not None and inddiv.size:
+        if detect_divergence and ind_div is not None and ind_div.size:
             bad = []
-            for idx in inddiv:
-                worldi = world0[idx]
+            for idx in ind_div:
+                world_i = world0[idx]
                 result = optimize.root(
-                    froot,
+                    f_root,
                     pix0[idx],
                     method="hybr",
                     tol=tolerance / (np.linalg.norm(pix0[idx]) + 1),
@@ -1160,12 +1162,12 @@ class WCS(Pipeline, WCSAPIMixin):
                 else:
                     bad.append(idx)
 
-            inddiv = np.array(bad, dtype=int) if bad else None
+            ind_div = np.array(bad, dtype=int) if bad else None
 
         # Identify points that did not converge within 'maxiter'
         # iterations:
         if k >= maxiter:
-            (ind,) = np.where((dn >= tol2) & (dn < dnprev) & (~invalid))
+            (ind,) = np.where((dn >= tol2) & (dn < dn_prev) & (~invalid))
             if ind.shape[0] == 0:
                 ind = None
         else:
@@ -1178,8 +1180,8 @@ class WCS(Pipeline, WCSAPIMixin):
         # #  RAISE EXCEPTION IF DIVERGING OR TOO SLOWLY CONVERGING  ##
         # #  DATA POINTS HAVE BEEN DETECTED:                        ##
         # ############################################################
-        if (ind is not None or inddiv is not None) and not quiet:
-            if inddiv is None:
+        if (ind is not None or ind_div is not None) and not quiet:
+            if ind_div is None:
                 msg = (
                     "'WCS.numerical_inverse' failed to "
                     f"converge to the requested accuracy after {k:d} "
@@ -1188,7 +1190,7 @@ class WCS(Pipeline, WCSAPIMixin):
                 raise NoConvergence(
                     msg,
                     best_solution=pix,
-                    accuracy=np.abs(dpix),
+                    accuracy=np.abs(d_pix),
                     niter=k,
                     slow_conv=ind,
                     divergent=None,
@@ -1202,10 +1204,10 @@ class WCS(Pipeline, WCSAPIMixin):
             raise NoConvergence(
                 msg,
                 best_solution=pix,
-                accuracy=np.abs(dpix),
+                accuracy=np.abs(d_pix),
                 niter=k,
                 slow_conv=ind,
-                divergent=inddiv,
+                divergent=ind_div,
             )
 
         if with_bounding_box and self.bounding_box is not None:
@@ -1385,15 +1387,15 @@ class WCS(Pipeline, WCSAPIMixin):
             return result.T
 
         if axis_type != "all":
-            axtyp_ind = (
+            axis_type_ind = (
                 np.array([AxisType.from_input(t) for t in self.output_frame.axes_type])
                 == axis_type
             )
-            if not axtyp_ind.any():
+            if not axis_type_ind.any():
                 msg = f'This WCS does not have axis of type "{axis_type}".'
                 raise ValueError(msg)
-            if len(axtyp_ind) > 1:
-                result = np.asarray([(r.min(), r.max()) for r in result[axtyp_ind]])
+            if len(axis_type_ind) > 1:
+                result = np.asarray([(r.min(), r.max()) for r in result[axis_type_ind]])
 
             if axis_type is AxisType.SPATIAL:
                 result = _order_clockwise(result)
@@ -1444,7 +1446,7 @@ class WCS(Pipeline, WCSAPIMixin):
         degree=None,
         max_inv_pix_error=0.25,
         inv_degree=None,
-        npoints=32,
+        n_points=32,
         crpix=None,
         projection="TAN",
         verbose=False,
@@ -1474,7 +1476,7 @@ class WCS(Pipeline, WCSAPIMixin):
         degree : int, iterable, None, optional
             Degree of the SIP polynomial. Default value `None` indicates that
             all allowed degree values (``[1...9]``) will be considered and
-            the lowest degree that meets accuracy requerements set by
+            the lowest degree that meets accuracy requirements set by
             ``max_pix_error`` will be returned. Alternatively, ``degree`` can be
             an iterable containing allowed values for the SIP polynomial degree.
             This option is similar to default `None` but it allows caller to
@@ -1491,7 +1493,7 @@ class WCS(Pipeline, WCSAPIMixin):
         inv_degree : int, iterable, None, optional
             Degree of the SIP polynomial. Default value `None` indicates that
             all allowed degree values (``[1...9]``) will be considered and
-            the lowest degree that meets accuracy requerements set by
+            the lowest degree that meets accuracy requirements set by
             ``max_pix_error`` will be returned. Alternatively, ``degree`` can be
             an iterable containing allowed values for the SIP polynomial degree.
             This option is similar to default `None` but it allows caller to
@@ -1500,7 +1502,7 @@ class WCS(Pipeline, WCSAPIMixin):
             to be fit to the WCS transformation. In this case
             ``max_inv_pixel_error`` is ignored.
 
-        npoints : int, optional
+        n_points : int, optional
             The number of points in each dimension to sample the bounding box
             for use in the SIP fit. Minimum number of points is 3.
 
@@ -1558,7 +1560,7 @@ class WCS(Pipeline, WCSAPIMixin):
             degree=degree,
             max_inv_pix_error=max_inv_pix_error,
             inv_degree=inv_degree,
-            npoints=npoints,
+            n_points=n_points,
             crpix=crpix,
             projection=projection,
             matrix_type="CD",
@@ -1574,7 +1576,7 @@ class WCS(Pipeline, WCSAPIMixin):
         degree,
         max_inv_pix_error,
         inv_degree,
-        npoints,
+        n_points,
         crpix,
         projection,
         matrix_type,
@@ -1660,8 +1662,8 @@ class WCS(Pipeline, WCSAPIMixin):
             msg = f"Unsupported 'matrix_type' value: {matrix_type!r}."
             raise ValueError(msg)
 
-        if npoints < 8:
-            msg = "Number of sampling points is too small. 'npoints' must be >= 8."
+        if n_points < 8:
+            msg = "Number of sampling points is too small. 'n_points' must be >= 8."
             raise ValueError(msg)
 
         if isinstance(projection, str):
@@ -1713,13 +1715,13 @@ class WCS(Pipeline, WCSAPIMixin):
             raise ValueError(msg)
 
         # Axis number for FITS axes.
-        # iax? - image axes; nlon, nlat - celestial axes:
+        # iax? - image axes; n_lon, n_lat - celestial axes:
         if keep_axis_position:
-            nlon = lon_axis + 1
-            nlat = lat_axis + 1
+            n_lon = lon_axis + 1
+            n_lat = lat_axis + 1
             iax1, iax2 = (i + 1 for i in input_axes)
         else:
-            nlon, nlat = (1, 2) if lon_axis < lat_axis else (2, 1)
+            n_lon, n_lat = (1, 2) if lon_axis < lat_axis else (2, 1)
             iax1 = 1
             iax2 = 2
 
@@ -1735,13 +1737,13 @@ class WCS(Pipeline, WCSAPIMixin):
             bounding_box = [self.input_frame.remove_units(*bb) for bb in bounding_box]
         bb_center = np.mean(bounding_box, axis=1)
 
-        fixi_dict = {
+        fix_i_dict = {
             k: bb_center[k] for k in set(range(self.pixel_n_dim)).difference(input_axes)
         }
 
         # Once that bug is fixed, the code below can be replaced with fix_inputs
         # statement commented out immediately above.
-        transform = fix_transform_inputs(self.forward_transform, fixi_dict)
+        transform = fix_transform_inputs(self.forward_transform, fix_i_dict)
 
         transform = transform | Mapping(
             (lon_axis, lat_axis), n_inputs=self.forward_transform.n_outputs
@@ -1775,7 +1777,7 @@ class WCS(Pipeline, WCSAPIMixin):
         # Now rotate to native system and deproject. Recall that transform
         # expects pixels in the original coordinate system, but the SIP
         # transform is relative to crpix coordinates, thus the initial shift.
-        ntransform = (
+        new_transform = (
             (Shift(crpix1) & Shift(crpix2))
             | transform
             | RotateCelestial2Native(lon, lat, pole)
@@ -1787,17 +1789,17 @@ class WCS(Pipeline, WCSAPIMixin):
         if isinstance(crpix1, u.Quantity):
             crpix_ = self.input_frame.remove_units(*crpix_)
         u_grid, v_grid = make_sampling_grid(
-            npoints, tuple(bounding_box[k] for k in input_axes), crpix=crpix_
+            n_points, tuple(bounding_box[k] for k in input_axes), crpix=crpix_
         )
         if isinstance(crpix1, u.Quantity):
             u_grid = u.Quantity(u_grid, crpix1.unit)
             v_grid = u.Quantity(v_grid, crpix2.unit)
 
-        undist_x, undist_y = ntransform(u_grid, v_grid)
+        un_dist_x, un_dist_y = new_transform(u_grid, v_grid)
 
         # Double sampling to check if sampling is sufficient.
         ud, vd = make_sampling_grid(
-            2 * npoints,
+            2 * n_points,
             tuple(bounding_box[k] for k in input_axes),
             crpix=crpix_,
         )
@@ -1805,7 +1807,7 @@ class WCS(Pipeline, WCSAPIMixin):
             ud = u.Quantity(ud, crpix1.unit)
             vd = u.Quantity(vd, crpix2.unit)
 
-        undist_xd, undist_yd = ntransform(ud, vd)
+        un_dist_xd, un_dist_yd = new_transform(ud, vd)
 
         input_0 = 0
         input_1 = 1
@@ -1815,57 +1817,61 @@ class WCS(Pipeline, WCSAPIMixin):
 
         # Determine approximate pixel scale in order to compute error threshold
         # from the specified pixel error. Computed at the center of the array.
-        x0, y0 = ntransform(input_0, input_0)
-        xx, xy = ntransform(input_1, input_0)
-        yx, yy = ntransform(input_0, input_1)
-        pixarea = np.abs((xx - x0) * (yy - y0) - (xy - y0) * (yx - x0))
-        plate_scale = np.sqrt(pixarea)
+        x0, y0 = new_transform(input_0, input_0)
+        xx, xy = new_transform(input_1, input_0)
+        yx, yy = new_transform(input_0, input_1)
+        pix_area = np.abs((xx - x0) * (yy - y0) - (xy - y0) * (yx - x0))
+        plate_scale = np.sqrt(pix_area)
 
         plate_scale = (
             plate_scale.value if isinstance(plate_scale, u.Quantity) else plate_scale
         )
         u_grid = u_grid.value if isinstance(u_grid, u.Quantity) else u_grid
         v_grid = v_grid.value if isinstance(v_grid, u.Quantity) else v_grid
-        undist_x = undist_x.value if isinstance(undist_x, u.Quantity) else undist_x
-        undist_y = undist_y.value if isinstance(undist_y, u.Quantity) else undist_y
+        un_dist_x = un_dist_x.value if isinstance(un_dist_x, u.Quantity) else un_dist_x
+        un_dist_y = un_dist_y.value if isinstance(un_dist_y, u.Quantity) else un_dist_y
         ud = ud.value if isinstance(ud, u.Quantity) else ud
         vd = vd.value if isinstance(vd, u.Quantity) else vd
-        undist_xd = undist_xd.value if isinstance(undist_xd, u.Quantity) else undist_xd
-        undist_yd = undist_yd.value if isinstance(undist_yd, u.Quantity) else undist_yd
+        un_dist_xd = (
+            un_dist_xd.value if isinstance(un_dist_xd, u.Quantity) else un_dist_xd
+        )
+        un_dist_yd = (
+            un_dist_yd.value if isinstance(un_dist_yd, u.Quantity) else un_dist_yd
+        )
 
         # The fitting section.
         if verbose:
             sys.stdout.write("\nFitting forward SIP ...")
-        fit_poly_x, fit_poly_y, max_resid = fit_2D_poly(
+        fit_poly_x, fit_poly_y, max_residual = fit_2D_poly(
             degree,
             max_pix_error,
             plate_scale,
             u_grid,
             v_grid,
-            undist_x,
-            undist_y,
+            un_dist_x,
+            un_dist_y,
             ud,
             vd,
-            undist_xd,
-            undist_yd,
+            un_dist_xd,
+            un_dist_yd,
             verbose=verbose,
         )
 
         # The following is necessary to put the fit into the SIP formalism.
-        cdmat, sip_poly_x, sip_poly_y = reform_poly_coefficients(fit_poly_x, fit_poly_y)
-        # cdmat = np.array([[fit_poly_x.c1_0.value, fit_poly_x.c0_1.value],
-        #                   [fit_poly_y.c1_0.value, fit_poly_y.c0_1.value]])
-        det = cdmat[0][0] * cdmat[1][1] - cdmat[0][1] * cdmat[1][0]
-        U = (cdmat[1][1] * undist_x - cdmat[0][1] * undist_y) / det
-        V = (-cdmat[1][0] * undist_x + cdmat[0][0] * undist_y) / det
-        detd = cdmat[0][0] * cdmat[1][1] - cdmat[0][1] * cdmat[1][0]
-        Ud = (cdmat[1][1] * undist_xd - cdmat[0][1] * undist_yd) / detd
-        Vd = (-cdmat[1][0] * undist_xd + cdmat[0][0] * undist_yd) / detd
+        cd_matrix, sip_poly_x, sip_poly_y = reform_poly_coefficients(
+            fit_poly_x, fit_poly_y
+        )
+        det = cd_matrix[0][0] * cd_matrix[1][1] - cd_matrix[0][1] * cd_matrix[1][0]
+        U = (cd_matrix[1][1] * un_dist_x - cd_matrix[0][1] * un_dist_y) / det
+        V = (-cd_matrix[1][0] * un_dist_x + cd_matrix[0][0] * un_dist_y) / det
+        det_d = cd_matrix[0][0] * cd_matrix[1][1] - cd_matrix[0][1] * cd_matrix[1][0]
+        Ud = (cd_matrix[1][1] * un_dist_xd - cd_matrix[0][1] * un_dist_yd) / det_d
+        Vd = (-cd_matrix[1][0] * un_dist_xd + cd_matrix[0][0] * un_dist_yd) / det_d
 
         if max_inv_pix_error:
             if verbose:
                 sys.stdout.write("\nFitting inverse SIP ...")
-            fit_inv_poly_u, fit_inv_poly_v, max_inv_resid = fit_2D_poly(
+            fit_inv_poly_u, fit_inv_poly_v, max_inv_residual = fit_2D_poly(
                 inv_degree,
                 max_inv_pix_error,
                 1,
@@ -1890,7 +1896,7 @@ class WCS(Pipeline, WCSAPIMixin):
             crpix1.value if isinstance(crpix1, u.Quantity) else crpix1 + 1,
             crpix2.value if isinstance(crpix2, u.Quantity) else crpix2 + 1,
         ]
-        w.wcs.pc = cdmat if nlon < nlat else cdmat[::-1]
+        w.wcs.pc = cd_matrix if n_lon < n_lat else cd_matrix[::-1]
         w.wcs.set()
         hdr = w.to_header(True)
 
@@ -1917,14 +1923,14 @@ class WCS(Pipeline, WCSAPIMixin):
             hdr["B_ORDER"] = fit_poly_x.degree
             store_2D_coefficients(hdr, sip_poly_x, "A")
             store_2D_coefficients(hdr, sip_poly_y, "B")
-            hdr["sipmxerr"] = (max_resid, "Max diff from GWCS (equiv pix).")
+            hdr["sipmxerr"] = (max_residual, "Max diff from GWCS (equiv pix).")
 
             if max_inv_pix_error:
                 hdr["AP_ORDER"] = fit_inv_poly_u.degree
                 hdr["BP_ORDER"] = fit_inv_poly_u.degree
-                store_2D_coefficients(hdr, fit_inv_poly_u, "AP", keeplinear=True)
-                store_2D_coefficients(hdr, fit_inv_poly_v, "BP", keeplinear=True)
-                hdr["sipiverr"] = (max_inv_resid, "Max diff for inverse (pixels)")
+                store_2D_coefficients(hdr, fit_inv_poly_u, "AP", keep_linear=True)
+                store_2D_coefficients(hdr, fit_inv_poly_v, "BP", keep_linear=True)
+                hdr["sipiverr"] = (max_inv_residual, "Max diff for inverse (pixels)")
 
         else:
             if matrix_type.startswith("PC"):
@@ -1958,14 +1964,14 @@ class WCS(Pipeline, WCSAPIMixin):
                 mat_kind = "CD"
                 del hdr["CDELT?"]
 
-            hdr["sipmxerr"] = (max_resid, "Max diff from GWCS (equiv pix).")
+            hdr["sipmxerr"] = (max_residual, "Max diff from GWCS (equiv pix).")
 
         # Construct CD matrix while remapping input axes.
         # We do not update comments to typical comments for CD matrix elements
         # (such as 'partial of second axis coordinate w.r.t. y'), because
         # when input frame has number of axes > 2, then imaging
         # axes arbitrary.
-        old_nlon, old_nlat = (1, 2) if nlon < nlat else (2, 1)
+        old_n_lon, old_n_lat = (1, 2) if n_lon < n_lat else (2, 1)
 
         # Remap input axes (CRPIX) and output axes-related parameters
         # (CRVAL, CUNIT, CTYPE, CD/PC). This has to be done in two steps to avoid
@@ -1979,16 +1985,16 @@ class WCS(Pipeline, WCSAPIMixin):
             axis_rename["CRPIX2"] = f"CRPIX{iax2}"
 
         # CP/PC matrix:
-        axis_rename[f"PC{old_nlon}_1"] = f"{mat_kind}{nlon}_{iax1}"
-        axis_rename[f"PC{old_nlon}_2"] = f"{mat_kind}{nlon}_{iax2}"
-        axis_rename[f"PC{old_nlat}_1"] = f"{mat_kind}{nlat}_{iax1}"
-        axis_rename[f"PC{old_nlat}_2"] = f"{mat_kind}{nlat}_{iax2}"
+        axis_rename[f"PC{old_n_lon}_1"] = f"{mat_kind}{n_lon}_{iax1}"
+        axis_rename[f"PC{old_n_lon}_2"] = f"{mat_kind}{n_lon}_{iax2}"
+        axis_rename[f"PC{old_n_lat}_1"] = f"{mat_kind}{n_lat}_{iax1}"
+        axis_rename[f"PC{old_n_lat}_2"] = f"{mat_kind}{n_lat}_{iax2}"
 
         # remap celestial axes keywords:
         for kwd in cel_kwd:
-            for iold, inew in [(1, nlon), (2, nlat)]:
-                if iold != inew:
-                    axis_rename[f"{kwd:s}{iold:d}"] = f"{kwd:s}{inew:d}"
+            for i_old, i_new in [(1, n_lon), (2, n_lat)]:
+                if i_old != i_new:
+                    axis_rename[f"{kwd:s}{i_old:d}"] = f"{kwd:s}{i_new:d}"
 
         # construct new header cards with remapped axes:
         new_cards = [
@@ -2006,20 +2012,20 @@ class WCS(Pipeline, WCSAPIMixin):
         # (by default, in PC formalism, diagonal matrix elements by default
         # are 0):
         if mat_kind == "PC":
-            if nlon not in [iax1, iax2]:
+            if n_lon not in [iax1, iax2]:
                 hdr.insert(
-                    f"{mat_kind}{nlon}_{iax2}",
+                    f"{mat_kind}{n_lon}_{iax2}",
                     (
-                        f"{mat_kind}{nlon}_{nlon}",
+                        f"{mat_kind}{n_lon}_{n_lon}",
                         0.0,
                         "Coordinate transformation matrix element",
                     ),
                 )
-            if nlat not in [iax1, iax2]:
+            if n_lat not in [iax1, iax2]:
                 hdr.insert(
-                    f"{mat_kind}{nlat}_{iax2}",
+                    f"{mat_kind}{n_lat}_{iax2}",
                     (
-                        f"{mat_kind}{nlat}_{nlat}",
+                        f"{mat_kind}{n_lat}_{n_lat}",
                         0.0,
                         "Coordinate transformation matrix element",
                     ),
@@ -2119,24 +2125,26 @@ class WCS(Pipeline, WCSAPIMixin):
                 and isinstance(frame, CelestialFrame)
             )
 
-            for axno in axis:
-                if axno not in frame.axes_order:
-                    frame = find_frame(axno)
+            for axis_no in axis:
+                if axis_no not in frame.axes_order:
+                    frame = find_frame(axis_no)
                     celestial = False  # Celestial axes must belong to the same frame
 
                 # index of the axis in this frame's
-                fidx = frame.axes_order.index(axno)
+                fix_index = frame.axes_order.index(axis_no)
 
                 axis_info = _WorldAxisInfo(
-                    axis=axno,
+                    axis=axis_no,
                     frame=frame,
-                    world_axis_order=self.output_frame.axes_order.index(axno),
-                    cunit=frame.unit[fidx].to_string("fits", fraction=True).upper(),
-                    ctype=get_ctype_from_ucd(self.world_axis_physical_types[axno]),
-                    input_axes=mapping[axno],
+                    world_axis_order=self.output_frame.axes_order.index(axis_no),
+                    cunit=frame.unit[fix_index]
+                    .to_string("fits", fraction=True)
+                    .upper(),
+                    ctype=get_ctype_from_ucd(self.world_axis_physical_types[axis_no]),
+                    input_axes=mapping[axis_no],
                 )
                 axis_info_group.append(axis_info)
-                input_axes.extend(mapping[axno])
+                input_axes.extend(mapping[axis_no])
 
             world_axes.extend(axis_info_group)
             if celestial:
@@ -2285,7 +2293,7 @@ class WCS(Pipeline, WCSAPIMixin):
         degree=None,
         max_inv_pix_error=0.25,
         inv_degree=None,
-        npoints=32,
+        n_points=32,
         crpix=None,
         projection="TAN",
         bin_ext_name="WCS-TABLE",
@@ -2329,7 +2337,7 @@ class WCS(Pipeline, WCSAPIMixin):
         degree : int, iterable, None, optional
             Degree of the SIP polynomial. Default value `None` indicates that
             all allowed degree values (``[1...9]``) will be considered and
-            the lowest degree that meets accuracy requerements set by
+            the lowest degree that meets accuracy requirements set by
             ``max_pix_error`` will be returned. Alternatively, ``degree`` can be
             an iterable containing allowed values for the SIP polynomial degree.
             This option is similar to default `None` but it allows caller to
@@ -2348,7 +2356,7 @@ class WCS(Pipeline, WCSAPIMixin):
         inv_degree : int, iterable, None, optional
             Degree of the SIP polynomial. Default value `None` indicates that
             all allowed degree values (``[1...9]``) will be considered and
-            the lowest degree that meets accuracy requerements set by
+            the lowest degree that meets accuracy requirements set by
             ``max_pix_error`` will be returned. Alternatively, ``degree`` can be
             an iterable containing allowed values for the SIP polynomial degree.
             This option is similar to default `None` but it allows caller to
@@ -2357,7 +2365,7 @@ class WCS(Pipeline, WCSAPIMixin):
             to be fit to the WCS transformation. In this case
             ``max_inv_pixel_error`` is ignored.
 
-        npoints : int, optional
+        n_points : int, optional
             The number of points in each dimension to sample the bounding box
             for use in the SIP fit. Minimum number of points is 3.
 
@@ -2489,7 +2497,7 @@ class WCS(Pipeline, WCSAPIMixin):
                 degree=degree,
                 max_inv_pix_error=max_inv_pix_error,
                 inv_degree=inv_degree,
-                npoints=npoints,
+                n_points=n_points,
                 crpix=crpix,
                 projection=projection,
                 matrix_type="PC-CDELT1",
@@ -2506,7 +2514,7 @@ class WCS(Pipeline, WCSAPIMixin):
         # now handle non-celestial axes using -TAB convention for each
         # separable axes group:
         hdulist = []
-        for extver0, world_axes_group in enumerate(world_axes_groups):
+        for ext_ver_0, world_axes_group in enumerate(world_axes_groups):
             # For each subset of separable axes call _to_fits_tab to
             # convert that group to a single Bin TableHDU with a
             # coordinate array for this group of axes:
@@ -2515,7 +2523,7 @@ class WCS(Pipeline, WCSAPIMixin):
                 world_axes_group=world_axes_group,
                 use_cd=use_cd,
                 bounding_box=bounding_box,
-                bin_ext=(bin_ext_name, extver0 + 1),
+                bin_ext=(bin_ext_name, ext_ver_0 + 1),
                 coord_col_name=coord_col_name,
                 sampling=sampling,
             )
@@ -2669,11 +2677,11 @@ class WCS(Pipeline, WCSAPIMixin):
         # Deal with non-degenerate axes and add NAXISi to the header:
         offset = hdr.index("NAXIS")
 
-        for iax in input_axes:
-            iiax = int(np.searchsorted(used_hdr_axes, iax))
+        for i_ax in input_axes:
+            ii_ax = int(np.searchsorted(used_hdr_axes, i_ax))
             hdr.insert(
-                iiax + offset + 1,
-                (f"NAXIS{iax + 1:d}", int(max(bounding_box[iiax])) + 1),
+                ii_ax + offset + 1,
+                (f"NAXIS{i_ax + 1:d}", int(max(bounding_box[ii_ax])) + 1),
             )
 
         # 1D grid coordinates:
@@ -2681,19 +2689,19 @@ class WCS(Pipeline, WCSAPIMixin):
         cdelt = []
         bb = [bounding_box[k] for k in input_axes]
         for (xmin, xmax), s in zip(bb, sampling, strict=False):
-            npix = max(2, 1 + int(np.ceil(abs((xmax - xmin) / s))))
-            gcrds.append(np.linspace(xmin, xmax, npix))
-            cdelt.append((npix - 1) / (xmax - xmin) if xmin != xmax else 1)
+            n_pix = max(2, 1 + int(np.ceil(abs((xmax - xmin) / s))))
+            gcrds.append(np.linspace(xmin, xmax, n_pix))
+            cdelt.append((n_pix - 1) / (xmax - xmin) if xmin != xmax else 1)
 
         # In the forward transformation, select only inputs and outputs
         # that we need given world_axes_group parameter:
         bb_center = np.mean(bounding_box, axis=1)
 
-        fixi_dict = {
+        fix_i_dict = {
             k: bb_center[k] for k in set(range(self.pixel_n_dim)).difference(input_axes)
         }
 
-        transform = fix_transform_inputs(self.forward_transform, fixi_dict)
+        transform = fix_transform_inputs(self.forward_transform, fix_i_dict)
         transform = transform | Mapping(
             world_axes_idx, n_inputs=self.forward_transform.n_outputs
         )
@@ -2718,7 +2726,7 @@ class WCS(Pipeline, WCSAPIMixin):
 
         for axis_info in world_axes_group:
             k = axis_info.axis
-            widx = world_axes_idx.index(k)
+            w_idx = world_axes_idx.index(k)
             k1 = k + 1
             ct = get_ctype_from_ucd(self.world_axis_physical_types[k])
             if len(ct) > 4:
@@ -2730,19 +2738,19 @@ class WCS(Pipeline, WCSAPIMixin):
             hdr[f"PS{k1:d}_0"] = bin_ext[0]
             hdr[f"PV{k1:d}_1"] = bin_ext[1]
             hdr[f"PS{k1:d}_1"] = coord_col_name
-            hdr[f"PV{k1:d}_3"] = widx + 1
+            hdr[f"PV{k1:d}_3"] = w_idx + 1
             hdr[f"CRVAL{k1:d}"] = 1
 
-            if widx < n_inputs:
-                m1 = input_axes[widx] + 1
-                hdr[f"CRPIX{m1:d}"] = gcrds[widx][0] + 1
+            if w_idx < n_inputs:
+                m1 = input_axes[w_idx] + 1
+                hdr[f"CRPIX{m1:d}"] = gcrds[w_idx][0] + 1
                 if use_cd:
-                    hdr[f"CD{k1:d}_{m1:d}"] = cdelt[widx]
+                    hdr[f"CD{k1:d}_{m1:d}"] = cdelt[w_idx]
                 else:
                     if k1 != m1:
                         hdr[f"PC{k1:d}_{k1:d}"] = 0.0
                     hdr[f"PC{k1:d}_{m1:d}"] = 1.0
-                    hdr[f"CDELT{k1:d}"] = cdelt[widx]
+                    hdr[f"CDELT{k1:d}"] = cdelt[w_idx]
             else:
                 m1 = degenerate_axis_start
                 degenerate_axis_start += 1
@@ -2771,7 +2779,7 @@ class WCS(Pipeline, WCSAPIMixin):
 
         return hdr, bin_table_hdu
 
-    def _calc_approx_inv(self, max_inv_pix_error=5, inv_degree=None, npoints=16):
+    def _calc_approx_inv(self, max_inv_pix_error=5, inv_degree=None, n_points=16):
         """
         Compute polynomial fit for the inverse transformation to be used as
         initial approximation/guess for the iterative solution.
@@ -2814,7 +2822,7 @@ class WCS(Pipeline, WCSAPIMixin):
         if sky2pix_proj.__name__.startswith("Pix2Sky"):
             sky2pix_proj = sky2pix_proj.inverse
         lon_pole = _compute_lon_pole((crval1, crval2), sky2pix_proj)
-        ntransform = (
+        new_transform = (
             (Shift(crpix[0]) & Shift(crpix[1]))
             | self.forward_transform
             | RotateCelestial2Native(crval1, crval2, lon_pole)
@@ -2822,23 +2830,23 @@ class WCS(Pipeline, WCSAPIMixin):
         )
 
         # standard sampling:
-        u, v = make_sampling_grid(npoints, self.bounding_box, crpix=crpix)
-        undist_x, undist_y = ntransform(u, v)
+        u, v = make_sampling_grid(n_points, self.bounding_box, crpix=crpix)
+        un_dist_x, un_dist_y = new_transform(u, v)
 
         # Double sampling to check if sampling is sufficient.
-        ud, vd = make_sampling_grid(2 * npoints, self.bounding_box, crpix=crpix)
-        undist_xd, undist_yd = ntransform(ud, vd)
+        ud, vd = make_sampling_grid(2 * n_points, self.bounding_box, crpix=crpix)
+        un_dist_xd, un_dist_yd = new_transform(ud, vd)
 
-        fit_inv_poly_u, fit_inv_poly_v, max_inv_resid = fit_2D_poly(
+        fit_inv_poly_u, fit_inv_poly_v, max_inv_residual = fit_2D_poly(
             None,
             max_inv_pix_error,
             1,
-            undist_x,
-            undist_y,
+            un_dist_x,
+            un_dist_y,
             u,
             v,
-            undist_xd,
-            undist_yd,
+            un_dist_xd,
+            un_dist_yd,
             ud,
             vd,
             verbose=True,

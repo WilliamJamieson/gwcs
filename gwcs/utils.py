@@ -12,8 +12,7 @@ import astropy.units as u
 import numpy as np
 from astropy import coordinates as coords
 from astropy.io import fits
-from astropy.modeling import core, projections
-from astropy.modeling import models as astmodels
+from astropy.modeling import core, models, projections
 from astropy.wcs import Celprm
 
 # these ctype values do not include yzLN and yzLT pairs
@@ -26,7 +25,7 @@ sky_pairs = {
     # "spec": specsystems
 }
 
-radesys = ["ICRS", "FK5", "FK4", "FK4-NO-E", "GAPPT", "GALACTIC"]
+ra_dec_sys = ["ICRS", "FK5", "FK4", "FK4-NO-E", "GAPPT", "GALACTIC"]
 
 
 class UnsupportedTransformError(Exception):
@@ -269,23 +268,23 @@ def get_axes(header):
     sky_inmap = []
     spec_inmap = []
     unknown = []
-    skysystems = np.array(list(sky_pairs.values())).flatten()
+    sky_systems = np.array(list(sky_pairs.values())).flatten()
     for ax in ctype:
         ind = ctype.index(ax)
         if ax in specsystems:
             spec_inmap.append(ind)
-        elif ax in skysystems:
+        elif ax in sky_systems:
             sky_inmap.append(ind)
         else:
             unknown.append(ind)
 
     if sky_inmap:
-        _is_skysys_consistent(ctype, sky_inmap)
+        _is_sky_sys_consistent(ctype, sky_inmap)
 
     return sky_inmap, spec_inmap, unknown
 
 
-def _is_skysys_consistent(ctype, sky_inmap):
+def _is_sky_sys_consistent(ctype, sky_inmap):
     """Determine if the sky axes in CTYPE match to form a standard celestial system."""
 
     for item in sky_pairs.values():
@@ -397,10 +396,10 @@ def fitswcs_linear(header):
         crpix = wcs_info["CRPIX"]
 
     # if wcsaxes == 2:
-    rotation = astmodels.AffineTransformation2D(matrix=pc, name="pc_matrix")
+    rotation = models.AffineTransformation2D(matrix=pc, name="pc_matrix")
 
     translation_models = [
-        astmodels.Shift(-(shift - 1), name="crpix" + str(i + 1))
+        models.Shift(-(shift - 1), name="crpix" + str(i + 1))
         for i, shift in enumerate(crpix)
     ]
     translation = functools.reduce(lambda x, y: x & y, translation_models)
@@ -408,7 +407,7 @@ def fitswcs_linear(header):
     if not wcs_info["has_cd"]:
         # Do not compute scaling since CDELT* = 1 if CD is present.
         scaling_models = [
-            astmodels.Scale(scale, name="cdelt" + str(i + 1))
+            models.Scale(scale, name="cdelt" + str(i + 1))
             for i, scale in enumerate(cdelt)
         ]
 
@@ -445,9 +444,9 @@ def fitswcs_nonlinear(header):
     # Create the sky rotation transform
     sky_axes, _, _ = get_axes(wcs_info)
     if sky_axes:
-        phip, lonp = (wcs_info["CRVAL"][i] for i in sky_axes)
-        thetap = _compute_lon_pole((phip, lonp), projection)
-        n2c = astmodels.RotateNative2Celestial(phip, lonp, thetap, name="crval")
+        phi_p, lon_p = (wcs_info["CRVAL"][i] for i in sky_axes)
+        theta_p = _compute_lon_pole((phi_p, lon_p), projection)
+        n2c = models.RotateNative2Celestial(phi_p, lon_p, theta_p, name="crval")
         transforms.append(n2c)
     if transforms:
         return functools.reduce(core._model_oper("|"), transforms)
@@ -469,14 +468,14 @@ def create_projection_transform(projcode):
         Projection transform.
     """
 
-    projklassname = f"Pix2Sky_{projcode}"
+    proj_class_name = f"Pix2Sky_{projcode}"
     try:
-        projklass = getattr(projections, projklassname)
+        proj_class = getattr(projections, proj_class_name)
     except AttributeError as err:
         raise UnsupportedProjectionError(projcode) from err
 
-    projparams = {}
-    return projklass(**projparams)
+    proj_params = {}
+    return proj_class(**proj_params)
 
 
 # ToDo: Should this be deprecated?

@@ -109,9 +109,9 @@ class TestSelectorConverter:
         assert_selector_roundtrip(mask, tmp_path, lazy_load=lazy_load)
 
     def test_LabelMapperDict(self, tmp_path, lazy_load):
-        dmapper = create_scalar_mapper()
+        d_mapper = create_scalar_mapper()
         sel = selector.LabelMapperDict(
-            ("x", "y"), dmapper, inputs_mapping=Mapping((0,), n_inputs=2), atol=1e-3
+            ("x", "y"), d_mapper, inputs_mapping=Mapping((0,), n_inputs=2), atol=1e-3
         )
         assert_selector_roundtrip(sel, tmp_path, lazy_load=lazy_load)
 
@@ -133,10 +133,10 @@ class TestSelectorConverter:
                 [15.56, 18.09],
             ]
         )
-        rmapper = {}
+        r_mapper = {}
         for k, v in zip(keys, m, strict=False):
-            rmapper[tuple(k)] = v
+            r_mapper[tuple(k)] = v
         sel = selector.LabelMapperRange(
-            ("x", "y"), rmapper, inputs_mapping=Mapping((0,), n_inputs=2)
+            ("x", "y"), r_mapper, inputs_mapping=Mapping((0,), n_inputs=2)
         )
         assert_selector_roundtrip(sel, tmp_path, lazy_load=lazy_load)

@@ -36,7 +36,7 @@ def test_coordinate_frame_api():
     forward = m.Linear1D(slope=0.1 * u.deg / u.pix, intercept=0 * u.deg)
 
     output_frame = cf.CoordinateFrame(
-        1, "SPATIAL", (0,), unit=(u.deg,), name="sepframe"
+        1, "SPATIAL", (0,), unit=(u.deg,), name="sep_frame"
     )
     input_frame = cf.CoordinateFrame(1, "PIXEL", (0,), unit=(u.pix,))
 

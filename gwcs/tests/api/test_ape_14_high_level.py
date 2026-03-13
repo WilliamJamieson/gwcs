@@ -125,10 +125,10 @@ class TestPixToWorld:
         if isinstance(world, tuple | list) and len(world) == 1:
             world = world[0]
 
-        hlvl = HighLevelWCSWrapper(wcs_object)
+        high_level = HighLevelWCSWrapper(wcs_object)
 
         with empty_frame_warning_context(wcs_object.output_frame, pixel):
-            pixel_to_world = hlvl.pixel_to_world(*pixel)
+            pixel_to_world = high_level.pixel_to_world(*pixel)
 
         # This should always be a high-level world coordinate
         check_is_high_level(wcs_object.output_frame, pixel_to_world)
@@ -158,10 +158,10 @@ class TestPixToWorld:
         if isinstance(world, tuple | list) and len(world) == 1:
             world = world[0]
 
-        hlvl = HighLevelWCSWrapper(wcs_object)
+        high_level = HighLevelWCSWrapper(wcs_object)
 
         with empty_frame_warning_context(wcs_object.output_frame, array_index):
-            array_index_to_world = hlvl.array_index_to_world(*array_index)
+            array_index_to_world = high_level.array_index_to_world(*array_index)
 
         # This should always be a high-level world coordinate
         check_is_high_level(wcs_object.output_frame, array_index_to_world)
@@ -214,7 +214,7 @@ class TestWorldToPixel:
         with empty_frame_warning_context(wcs_object.input_frame, world):
             native_world_to_pixel = wcs_object.invert(*world, force_high_level=True)
 
-        # Since force_hign_level=True this should always be a high_level pixel
+        # Since force_high_level=True this should always be a high_level pixel
         #    coordinate
         check_is_high_level(wcs_object.input_frame, native_world_to_pixel)
 
@@ -286,7 +286,7 @@ class TestWorldToPixel:
         with empty_frame_warning_context(wcs_object.input_frame, world):
             native_world_to_pixel = wcs_object.invert(*world, force_high_level=True)
 
-        # Since force_hign_level=True this should always be a high_level array_index
+        # Since force_high_level=True this should always be a high_level array_index
         #    coordinate
         check_is_high_level(wcs_object.input_frame, native_world_to_pixel)
 
@@ -337,11 +337,11 @@ class TestWorldToPixel:
         if (dimension == "array") and len(pixel) == 1:
             pixel = pixel[0]
 
-        hlvl = HighLevelWCSWrapper(wcs_object)
+        high_level = HighLevelWCSWrapper(wcs_object)
 
         # Test that we cannot pass low-level world coordinates into this
         try:
-            world_to_pixel = hlvl.world_to_pixel(*world)
+            world_to_pixel = high_level.world_to_pixel(*world)
 
         # Any failure here should be because the world fixture is not identical
         #   to the high-level world fixture. In some cases, Quantities maybe
@@ -386,11 +386,11 @@ class TestWorldToPixel:
         if (dimension == "array") and len(array_index) == 1:
             array_index = array_index[0]
 
-        hlvl = HighLevelWCSWrapper(wcs_object)
+        high_level = HighLevelWCSWrapper(wcs_object)
 
         # Test that we cannot pass low-level world coordinates into this
         try:
-            world_to_array_index = hlvl.world_to_array_index(*world)
+            world_to_array_index = high_level.world_to_array_index(*world)
 
         # Any failure here should be because the world fixture is not identical
         #   to the high-level world fixture. In some cases, Quantities maybe
@@ -414,11 +414,11 @@ class TestWorldToPixel:
 
 
 def test_stokes_wrapper(gwcs_stokes_lookup):
-    hlvl = HighLevelWCSWrapper(gwcs_stokes_lookup)
+    high_level = HighLevelWCSWrapper(gwcs_stokes_lookup)
 
     pixel_input = [0, 1, 2, 3]
 
-    out = hlvl.pixel_to_world(pixel_input * u.pix)
+    out = high_level.pixel_to_world(pixel_input * u.pix)
 
     assert list(out) == ["I", "Q", "U", "V"]
 
@@ -429,7 +429,7 @@ def test_stokes_wrapper(gwcs_stokes_lookup):
         [0, 1, 2, 3],
     ]
 
-    out = hlvl.pixel_to_world(pixel_input * u.pix)
+    out = high_level.pixel_to_world(pixel_input * u.pix)
 
     expected = coord.StokesCoord(
         [
@@ -444,18 +444,18 @@ def test_stokes_wrapper(gwcs_stokes_lookup):
 
     pixel_input = [-1, 4]
 
-    out = hlvl.pixel_to_world(pixel_input * u.pix)
+    out = high_level.pixel_to_world(pixel_input * u.pix)
 
     assert np.isnan(out.value).all()
 
     pixel_input = [[-1, 4], [1, 2]]
 
-    out = hlvl.pixel_to_world(pixel_input * u.pix)
+    out = high_level.pixel_to_world(pixel_input * u.pix)
 
     assert np.isnan(out[0].value).all()
     assert (out[1] == ["Q", "U"]).all()
 
-    out = hlvl.pixel_to_world(1 * u.pix)
+    out = high_level.pixel_to_world(1 * u.pix)
 
     assert isinstance(out, coord.StokesCoord)
     assert out == "Q"

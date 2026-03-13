@@ -620,12 +620,12 @@ def test_world_axis_object_components(
     """
     Test the world_axis_object_components property returns the correct components.
     """
-    waoc = wcs_object.world_axis_object_components
-    assert isinstance(waoc, list)
-    assert len(waoc) == wcs_object.world_n_dim
+    world_axis_object_components = wcs_object.world_axis_object_components
+    assert isinstance(world_axis_object_components, list)
+    assert len(world_axis_object_components) == wcs_object.world_n_dim
 
     for component, component_name, component_position, component_property in zip(
-        waoc,
+        world_axis_object_components,
         wcs_component_names,
         wcs_component_positions,
         wcs_component_properties,
@@ -812,13 +812,15 @@ def test_world_axis_object_classes(
     wcs_object, wcs_component_names, wcs_component_object_classes
 ):
     """
-    Test the world_axis_object_classes property returns the correct dictionarly.
+    Test the world_axis_object_classes property returns the correct dictionary.
     """
-    waoc = wcs_object.world_axis_object_classes
-    assert set(waoc.keys()) == set(wcs_component_names)
-    assert set(waoc.keys()) == set(wcs_component_object_classes.keys())
+    world_axis_object_classes = wcs_object.world_axis_object_classes
+    assert set(world_axis_object_classes.keys()) == set(wcs_component_names)
+    assert set(world_axis_object_classes.keys()) == set(
+        wcs_component_object_classes.keys()
+    )
 
-    for component_name, component in waoc.items():
+    for component_name, component in world_axis_object_classes.items():
         assert isinstance(component, tuple)
         if component_name == "temporal":
             assert len(component) == 4

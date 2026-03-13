@@ -22,7 +22,7 @@ class CompositeFrame(CoordinateFrame):
     Parameters
     ----------
     frames : list
-        List of constituient frames.
+        List of constituent frames.
     name : str
         Name for this frame.
     """
@@ -70,7 +70,7 @@ class CompositeFrame(CoordinateFrame):
     @property
     def frames(self) -> list[CoordinateFrame]:
         """
-        The constituient frames that comprise this `CompositeFrame`.
+        The constituent frames that comprise this `CompositeFrame`.
         """
         return self._frames
 
@@ -139,9 +139,9 @@ class CompositeFrame(CoordinateFrame):
     def world_axis_object_classes(self) -> WorldAxisObjectClasses:
         base = dict(self._wao_renamed_classes_iter)
 
-        waocs = {}
+        world_axis_object_classes = {}
         for component in self.world_axis_object_components:
-            if component.name not in waocs:
-                waocs[component.name] = base[component.name]
+            if component.name not in world_axis_object_classes:
+                world_axis_object_classes[component.name] = base[component.name]
 
-        return waocs
+        return world_axis_object_classes

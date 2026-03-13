@@ -58,7 +58,7 @@ def test_spherical_cartesian_inverse():
 )
 def test_spherical_to_cartesian(testval, unit, wrap_at):
     s2c = geometry.SphericalToCartesian(wrap_lon_at=wrap_at)
-    ounit = 1 if unit == 1 else u.dimensionless_unscaled
+    out_unit = 1 if unit == 1 else u.dimensionless_unscaled
     lon, lat, expected = testval
 
     if wrap_at == 180:
@@ -67,7 +67,7 @@ def test_spherical_to_cartesian(testval, unit, wrap_at):
     xyz = s2c(lon * unit, lat * unit)
     if unit != 1:
         assert xyz[0].unit == u.dimensionless_unscaled
-    assert u.allclose(xyz, u.Quantity(expected, ounit), atol=1e-15 * ounit)
+    assert u.allclose(xyz, u.Quantity(expected, out_unit), atol=1e-15 * out_unit)
 
 
 @pytest.mark.parametrize(
@@ -81,10 +81,10 @@ def test_spherical_to_cartesian(testval, unit, wrap_at):
         )
     ),
 )
-def test_spher2cart_roundrip(lon, lat, unit, wrap_at):
+def test_spher2cart_roundtrip(lon, lat, unit, wrap_at):
     s2c = geometry.SphericalToCartesian(wrap_lon_at=wrap_at)
     c2s = geometry.CartesianToSpherical(wrap_lon_at=wrap_at)
-    ounit = 1 if unit == 1 else u.deg
+    out_unit = 1 if unit == 1 else u.deg
 
     if wrap_at == 180:
         lon = np.mod(lon - 180.0, 360.0) - 180.0
@@ -94,8 +94,8 @@ def test_spher2cart_roundrip(lon, lat, unit, wrap_at):
 
     assert u.allclose(
         c2s(*s2c(lon * unit, lat * unit)),
-        (lon * ounit, lat * ounit),
-        atol=1e-15 * ounit,
+        (lon * out_unit, lat * out_unit),
+        atol=1e-15 * out_unit,
     )
 
 
@@ -104,7 +104,7 @@ def test_cart2spher_at_pole(cart_to_spher):
 
 
 @pytest.mark.parametrize(
-    ("lonlat", "unit", "wrap_at"),
+    ("lon_lat", "unit", "wrap_at"),
     list(
         product(
             [
@@ -121,8 +121,8 @@ def test_cart2spher_at_pole(cart_to_spher):
         )
     ),
 )
-def test_spher2cart_roundrip_arr(lonlat, unit, wrap_at):
-    lon, lat = lonlat
+def test_spher2cart_roundtrip_arr(lon_lat, unit, wrap_at):
+    lon, lat = lon_lat
     s2c = geometry.SphericalToCartesian(wrap_lon_at=wrap_at)
     c2s = geometry.CartesianToSpherical(wrap_lon_at=wrap_at)
 
@@ -134,16 +134,16 @@ def test_spher2cart_roundrip_arr(lonlat, unit, wrap_at):
 
     atol = 1e-15
     if unit is None:
-        olon = lon
-        olat = lat
+        out_lon = lon
+        out_lat = lat
     else:
-        olon = lon * u.deg
-        olat = lat * u.deg
+        out_lon = lon * u.deg
+        out_lat = lat * u.deg
         lon = lon * unit
         lat = lat * unit
         atol = atol * u.deg
 
-    assert u.allclose(c2s(*s2c(lon, lat)), (olon, olat), atol=atol)
+    assert u.allclose(c2s(*s2c(lon, lat)), (out_lon, out_lat), atol=atol)
 
 
 @pytest.mark.parametrize(("unit1", "unit2"), [(u.deg, 1), (1, u.deg)])
@@ -214,7 +214,7 @@ def test_cartesian_spherical_asdf(tmp_path):
     c2s = f["c2s"]
     s2c = f["s2c"]
 
-    pcoords = [
+    p_coords = [
         (45.0, -90.0),
         (45.0, -45.0),
         (45, 0.0),
@@ -227,7 +227,7 @@ def test_cartesian_spherical_asdf(tmp_path):
         (135.0, 90.0),
     ]
 
-    ncoords = [
+    n_coords = [
         (225.0, -90.0),
         (225.0, -45.0),
         (225.0, 0.0),
@@ -240,14 +240,14 @@ def test_cartesian_spherical_asdf(tmp_path):
         (315.0, 90.0),
     ]
 
-    for lon, lat in pcoords:
+    for lon, lat in p_coords:
         xyz = s2c(lon, lat)
         assert xyz == s2c0(lon, lat)
         lon2, lat2 = c2s(*xyz)
         assert lon2, lat2 == c2s0(*xyz)
         assert np.allclose((lon, lat), (lon2, lat2))
 
-    for lon, lat in ncoords:
+    for lon, lat in n_coords:
         xyz = s2c(lon, lat)
         assert xyz == s2c0(lon, lat)
         lon2, lat2 = c2s(*xyz)

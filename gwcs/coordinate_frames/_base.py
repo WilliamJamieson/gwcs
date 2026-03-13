@@ -339,7 +339,7 @@ class CoordinateFrameProtocol(Protocol):
         Parameters
         ----------
         values : `numbers.Number`, `numpy.ndarray`, or `~astropy.units.Quantity`
-            ``naxis`` number of coordinates as scalars or arrays.
+            ``naxes`` number of coordinates as scalars or arrays.
 
         Returns
         -------
@@ -374,7 +374,7 @@ class CoordinateFrameProtocol(Protocol):
         Returns
         -------
         values : `numbers.Number` or `numpy.ndarray`
-            ``naxis`` number of coordinates as scalars or arrays.
+            ``naxes`` number of coordinates as scalars or arrays.
         """
         return tuple(
             high_level_objects_to_values(*high_level_coords, low_level_wcs=self)

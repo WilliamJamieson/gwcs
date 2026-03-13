@@ -98,14 +98,14 @@ _FRAMES = (
     comp,
 )
 
-xscalar = 1
-yscalar = 2
-xarr = np.arange(5)
-yarr = np.arange(5)
+x_scalar = 1
+y_scalar = 2
+x_arr = np.arange(5)
+y_arr = np.arange(5)
 
-inputs2 = [(xscalar, yscalar), (xarr, yarr)]
-inputs1 = [xscalar, xarr]
-inputs3 = [(xscalar, yscalar, xscalar), (xarr, yarr, xarr)]
+inputs2 = [(x_scalar, y_scalar), (x_arr, y_arr)]
+inputs1 = [x_scalar, x_arr]
+inputs3 = [(x_scalar, y_scalar, x_scalar), (x_arr, y_arr, x_arr)]
 
 
 def test_units():
@@ -190,7 +190,7 @@ def test_coordinates_composite_order():
     assert u.allclose(result[1], 0 * u.m)
 
 
-def test_bare_baseframe():
+def test_bare_base_frame():
     # This is a regression test for the following call:
     frame = cf.CoordinateFrame(1, "SPATIAL", (0,), unit=(u.km,))
     quantity = coordinate_to_quantity(1 * u.m, frame=frame)
@@ -635,7 +635,7 @@ def test_composite_ordering():
 def test_CoordinateFrameProtocol():
     class MyFrame:
         naxes = 1
-        name = "myframe"
+        name = "my_frame"
         unit = (u.m,)
         axes_names = ("x",)
         axes_order = (0,)

@@ -33,11 +33,11 @@ class ToDirectionCosines(Model):
         self.outputs = ("cosa", "cosb", "cosc", "length")
 
     def evaluate(self, x, y, z):
-        vabs = np.sqrt(1.0 + x**2 + y**2)
-        cosa = x / vabs
-        cosb = y / vabs
-        cosc = 1.0 / vabs
-        return cosa, cosb, cosc, vabs
+        v_abs = np.sqrt(1.0 + x**2 + y**2)
+        cosa = x / v_abs
+        cosb = y / v_abs
+        cosc = 1.0 / v_abs
+        return cosa, cosb, cosc, v_abs
 
     def inverse(self):
         return FromDirectionCosines()
@@ -199,8 +199,8 @@ class CartesianToSpherical(Model):
         self._wrap_lon_at = wrap_angle
 
     def evaluate(self, x, y, z):
-        nquant = [isinstance(i, u.Quantity) for i in (x, y, z)].count(True)
-        if nquant in [1, 2]:
+        n_quant = [isinstance(i, u.Quantity) for i in (x, y, z)].count(True)
+        if n_quant in [1, 2]:
             msg = "All arguments must be of the same type (i.e., quantity or not)."
             raise TypeError(msg)
 
@@ -211,7 +211,10 @@ class CartesianToSpherical(Model):
 
         if self._wrap_lon_at != 180:
             lon = np.mod(
-                lon, 360.0 * u.deg if nquant else 360.0, where=np.isfinite(lon), out=lon
+                lon,
+                360.0 * u.deg if n_quant else 360.0,
+                where=np.isfinite(lon),
+                out=lon,
             )
 
         return lon, lat

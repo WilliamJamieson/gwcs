@@ -60,7 +60,7 @@ class Region:
         Parameters
         ----------
         mask : ndarray
-            An array with the shape of the mask to be uised in
+            An array with the shape of the mask to be used in
             `~gwcs.selector.RegionsSelector`.
 
         Returns
@@ -208,10 +208,10 @@ class Polygon(Region):
         y = np.min(list(self._GET.keys()))
 
         AET = []
-        scline = self._scan_line_range[-1]
+        sc_line = self._scan_line_range[-1]
 
-        while y <= scline:
-            if y < scline:
+        while y <= sc_line:
+            if y < sc_line:
                 AET = self.update_AET(y, AET)
 
             if self._bbox[2] <= 0:
@@ -228,17 +228,17 @@ class Polygon(Region):
                 for e in AET
                 if e is not None
             ]
-            xnew = np.sort(x)
+            x_new = np.sort(x)
             ysh = y + self._shifty
 
             if ysh < 0 or ysh >= ny:
                 y += 1
                 continue
 
-            for i, j in zip(xnew[::2], xnew[1::2], strict=False):
-                xstart = max(0, i + self._shiftx)
-                xend = min(j + self._shiftx, nx - 1)
-                data[ysh][xstart : xend + 1] = self._rid
+            for i, j in zip(x_new[::2], x_new[1::2], strict=False):
+                x_start = max(0, i + self._shiftx)
+                x_end = min(j + self._shiftx, nx - 1)
+                data[ysh][x_start : x_end + 1] = self._rid
 
             y += 1
 
@@ -339,13 +339,13 @@ class Edge:
         if self._start is None:
             entry = None
         else:
-            earr = np.asarray([self._start, self._stop])
-            if np.diff(earr[:, 1]).item() == 0:
+            e_arr = np.asarray([self._start, self._stop])
+            if np.diff(e_arr[:, 1]).item() == 0:
                 return None
             entry = [
                 self._ymax,
                 self._yminx,
-                (np.diff(earr[:, 0]) / np.diff(earr[:, 1])).item(),
+                (np.diff(e_arr[:, 0]) / np.diff(e_arr[:, 1])).item(),
                 None,
             ]
         return entry

@@ -12,7 +12,7 @@ from numpy.testing import assert_allclose, assert_equal
 
 from gwcs import WCS, region, selector
 from gwcs import coordinate_frames as cf
-from gwcs import utils as gwutils
+from gwcs.utils import RegionError
 
 
 def test_LabelMapperArray_from_vertices_int():
@@ -118,12 +118,12 @@ def create_range_mapper():
         ]
     )
 
-    rmapper = {}
+    r_mapper = {}
     for k, v in zip(keys, m, strict=False):
-        rmapper[tuple(k)] = v
+        r_mapper[tuple(k)] = v
 
     return selector.LabelMapperRange(
-        ("x", "y"), rmapper, inputs_mapping=models.Mapping((0,), n_inputs=2)
+        ("x", "y"), r_mapper, inputs_mapping=models.Mapping((0,), n_inputs=2)
     )
 
 
@@ -138,14 +138,14 @@ def create_scalar_mapper():
 
 
 def test_LabelMapperDict():
-    dmapper = create_scalar_mapper()
+    d_mapper = create_scalar_mapper()
     sel = selector.LabelMapperDict(
         ("x", "y"),
-        dmapper,
+        d_mapper,
         atol=10**-3,
         inputs_mapping=models.Mapping((0,), n_inputs=2),
     )
-    assert sel(-1.9580, 2) == dmapper[-1.95805483](-1.95805483, 2)
+    assert sel(-1.9580, 2) == d_mapper[-1.95805483](-1.95805483, 2)
 
     with pytest.raises(TypeError):
         selector.LabelMapperDict(
@@ -219,7 +219,7 @@ def test_RegionsSelector():
     assert_allclose(reg_selector(8, 2), sel[2](8, 2))
 
     # test set_input
-    with pytest.raises(gwutils.RegionError):
+    with pytest.raises(RegionError):
         reg_selector.set_input(3)
 
     transform = reg_selector.set_input(2)
@@ -227,14 +227,14 @@ def test_RegionsSelector():
     assert_allclose(transform(1, 1), sel[2](1, 1))
 
     # test inverse
-    rsinv = reg_selector.inverse
+    rs_inv = reg_selector.inverse
     # The label_mapper arrays should be the same
-    assert_equal(reg_selector.label_mapper.mapper, rsinv.label_mapper.mapper)
+    assert_equal(reg_selector.label_mapper.mapper, rs_inv.label_mapper.mapper)
     # the transforms of the inverse ``RegionsSelector`` should be the inverse of the
     # transforms of the ``RegionsSelector`` model.
     x = np.linspace(-5, 5, 100)
-    assert_allclose(reg_selector.selector[1].inverse(x, x), rsinv.selector[1](x, x))
-    assert_allclose(reg_selector.selector[2].inverse(x, x), rsinv.selector[2](x, x))
+    assert_allclose(reg_selector.selector[1].inverse(x, x), rs_inv.selector[1](x, x))
+    assert_allclose(reg_selector.selector[2].inverse(x, x), rs_inv.selector[2](x, x))
 
     assert np.isnan(reg_selector(0, 0)).all()
     # Test setting ``undefined_transform_value`` to a non-default value.
@@ -252,17 +252,17 @@ def test_RegionsSelector():
     assert out == (-100, -100)
 
 
-def test_overalpping_ranges():
+def test_overlapping_ranges():
     """
     Initializing a ``LabelMapperRange`` with overlapping ranges should raise an error.
     """
     keys = np.array([[4.88, 5.75], [5.64, 6.5], [6.67, 7.47]])
-    rmapper = {}
+    r_mapper = {}
     for key in keys:
-        rmapper[tuple(key)] = models.Const1D(4)
+        r_mapper[tuple(key)] = models.Const1D(4)
 
     with pytest.raises(ValueError):  # noqa: PT011
-        selector.LabelMapperRange(("x", "y"), rmapper, inputs_mapping=((0,)))
+        selector.LabelMapperRange(("x", "y"), r_mapper, inputs_mapping=((0,)))
 
 
 def test_outside_range():

@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from astropy import coordinates as coord
 from astropy import units as u
-from astropy import wcs as astwcs
+from astropy import wcs as astropy_wcs
 from astropy.io import fits
 from astropy.modeling import bind_compound_bounding_box, models, projections
 from astropy.modeling.bounding_box import ModelBoundingBox
@@ -122,11 +122,11 @@ def test_insert_frame():
     """Test inserting a frame into an existing pipeline"""
     w = wcs.WCS(pipe[:])
     original_result = w(1, 2)
-    mnew = models.Shift(1) & models.Shift(1)
+    m_new = models.Shift(1) & models.Shift(1)
     new_frame = cf.Frame2D(name="new")
 
     # Insert at the beginning
-    w.insert_frame(new_frame, mnew, w.input_frame)
+    w.insert_frame(new_frame, m_new, w.input_frame)
     assert_allclose(w(0, 1), original_result)
 
     tr = w.get_transform("detector", w.output_frame)
@@ -135,9 +135,9 @@ def test_insert_frame():
     # Insert at the end
     w = wcs.WCS(pipe[:])
     with pytest.raises(ValueError, match=r"New coordinate frame.*"):
-        w.insert_frame("not a frame", mnew, new_frame)
+        w.insert_frame("not a frame", m_new, new_frame)
 
-    w.insert_frame("icrs", mnew, new_frame)
+    w.insert_frame("icrs", m_new, new_frame)
     assert_allclose([x - 1 for x in w(1, 2)], original_result)
 
     tr = w.get_transform("detector", "icrs")
@@ -145,7 +145,7 @@ def test_insert_frame():
 
     # Force error by trying same operation
     with pytest.raises(ValueError, match=r".*both frames.*"):
-        w.insert_frame("icrs", mnew, new_frame)
+        w.insert_frame("icrs", m_new, new_frame)
 
 
 def test_set_transform():
@@ -450,51 +450,51 @@ def test_grid_from_compound_bounding_box():
 def test_wcs_from_points():
     rng = np.random.default_rng(0)
     hdr = fits.Header.fromtextfile(data_path / "acs.hdr", endcard=False)
-    with pytest.warns(astwcs.FITSFixedWarning) as caught_warnings:
+    with pytest.warns(astropy_wcs.FITSFixedWarning) as caught_warnings:
         # this raises a warning unimportant for this testing the pix2world
         #   FITSFixedWarning(u'The WCS transformation has more axes (2) than
         #        the image it is associated with (0)')
         #   FITSFixedWarning: 'datfix' made the change
         #       'Set MJD-OBS to 53436.000000 from DATE-OBS'. [astropy.wcs.wcs]
-        w = astwcs.WCS(hdr)
+        w = astropy_wcs.WCS(hdr)
     assert len(caught_warnings) == 2
     y, x = np.mgrid[:2046:20j, :4023:10j]
     ra, dec = w.wcs_pix2world(x, y, 1)
     fiducial = coord.SkyCoord(ra.mean() * u.deg, dec.mean() * u.deg, frame="icrs")
     world_coords = coord.SkyCoord(ra, dec, unit=(u.deg, u.deg))
     w = wcs_from_points(xy=(x, y), world_coords=world_coords, proj_point=fiducial)
-    newra, newdec = w(x, y)
-    assert_allclose(newra, ra)
-    assert_allclose(newdec, dec)
+    new_ra, new_dec = w(x, y)
+    assert_allclose(new_ra, ra)
+    assert_allclose(new_dec, dec)
 
     w = wcs_from_points(xy=(x, y), world_coords=world_coords, proj_point="center")
-    newra, newdec = w(x, y)
-    assert_allclose(newra, ra)
-    assert_allclose(newdec, dec)
+    new_ra, new_dec = w(x, y)
+    assert_allclose(new_ra, ra)
+    assert_allclose(new_dec, dec)
 
     fiducial = fiducial.transform_to("galactic")
     w = wcs_from_points(xy=(x, y), world_coords=world_coords, proj_point=fiducial)
-    newra, newdec = w(x, y)
-    assert_allclose(newra, ra)
-    assert_allclose(newdec, dec)
+    new_ra, new_dec = w(x, y)
+    assert_allclose(new_ra, ra)
+    assert_allclose(new_dec, dec)
 
     n = rng.standard_normal(size=ra.shape)
-    nra = n * 10**-2
-    ndec = n * 10**-2
+    n_ra = n * 10**-2
+    n_dec = n * 10**-2
     w = wcs_from_points(
-        xy=(x + nra, y + ndec), world_coords=world_coords, proj_point=fiducial
+        xy=(x + n_ra, y + n_dec), world_coords=world_coords, proj_point=fiducial
     )
-    newra, newdec = w(x, y)
-    assert_allclose(newra, ra, atol=10**-6)
-    assert_allclose(newdec, dec, atol=10**-6)
+    new_ra, new_dec = w(x, y)
+    assert_allclose(new_ra, ra, atol=10**-6)
+    assert_allclose(new_dec, dec, atol=10**-6)
 
-    newra, newdec = w.pixel_to_world_values(x, y)
-    assert_allclose(newra, ra, atol=10**-6)
-    assert_allclose(newdec, dec, atol=10**-6)
+    new_ra, new_dec = w.pixel_to_world_values(x, y)
+    assert_allclose(new_ra, ra, atol=10**-6)
+    assert_allclose(new_dec, dec, atol=10**-6)
 
-    newsky = w.pixel_to_world(x, y)
-    assert_allclose(newsky.data.lon.deg, ra, atol=10**-6)
-    assert_allclose(newsky.data.lat.deg, dec, atol=10**-6)
+    new_sky = w.pixel_to_world(x, y)
+    assert_allclose(new_sky.data.lon.deg, ra, atol=10**-6)
+    assert_allclose(new_sky.data.lat.deg, dec, atol=10**-6)
 
 
 def test_grid_from_bounding_box_2():
@@ -681,13 +681,13 @@ def test_high_level_api():
 class TestImaging:
     def setup_class(self):
         hdr = fits.Header.fromtextfile(data_path / "acs.hdr", endcard=False)
-        with pytest.warns(astwcs.FITSFixedWarning) as caught_warnings:
+        with pytest.warns(astropy_wcs.FITSFixedWarning) as caught_warnings:
             # this raises a warning unimportant for this testing the pix2world
             #   FITSFixedWarning(u'The WCS transformation has more axes (2) than
             #        the image it is associated with (0)')
             #   FITSFixedWarning: 'datfix' made the change
             #       'Set MJD-OBS to 53436.000000 from DATE-OBS'. [astropy.wcs.wcs]
-            self.fitsw = astwcs.WCS(hdr)
+            self.fits_w = astropy_wcs.WCS(hdr)
         assert len(caught_warnings) == 2
         a_coeff = hdr["A_*"]
         a_order = a_coeff.pop("A_ORDER")
@@ -696,16 +696,18 @@ class TestImaging:
 
         crpix = [hdr["CRPIX1"], hdr["CRPIX2"]]
         distortion = models.SIP(
-            crpix, a_order, b_order, a_coeff, b_coeff, name="sip_distorion"
+            crpix, a_order, b_order, a_coeff, b_coeff, name="sip_distortion"
         ) + models.Identity(2)
 
-        cdmat = np.array([[hdr["CD1_1"], hdr["CD1_2"]], [hdr["CD2_1"], hdr["CD2_2"]]])
-        aff = models.AffineTransformation2D(matrix=cdmat, name="rotation")
+        cd_matrix = np.array(
+            [[hdr["CD1_1"], hdr["CD1_2"]], [hdr["CD2_1"], hdr["CD2_2"]]]
+        )
+        aff = models.AffineTransformation2D(matrix=cd_matrix, name="rotation")
 
-        offx = models.Shift(-hdr["CRPIX1"], name="x_translation")
-        offy = models.Shift(-hdr["CRPIX2"], name="y_translation")
+        off_x = models.Shift(-hdr["CRPIX1"], name="x_translation")
+        off_y = models.Shift(-hdr["CRPIX2"], name="y_translation")
 
-        wcslin = (offx & offy) | aff
+        wcs_lin = (off_x & off_y) | aff
 
         phi = hdr["CRVAL1"]
         lon = hdr["CRVAL2"]
@@ -716,7 +718,7 @@ class TestImaging:
         sky_cs = cf.CelestialFrame(reference_frame=coord.ICRS(), name="sky")
         det = cf.Frame2D(name="detector")
         focal = cf.Frame2D(name="focal")
-        wcs_forward = wcslin | tan | n2c
+        wcs_forward = wcs_lin | tan | n2c
         pipeline = [
             wcs.Step(det, distortion),
             wcs.Step(focal, wcs_forward),
@@ -730,22 +732,22 @@ class TestImaging:
         self.xv, self.yv = xv, yv
 
     def test_distortion(self):
-        sipx, sipy = self.fitsw.sip_pix2foc(self.xv, self.yv, 1)
-        sipx = np.array(sipx) + 2048
-        sipy = np.array(sipy) + 1024
+        sip_x, sip_y = self.fits_w.sip_pix2foc(self.xv, self.yv, 1)
+        sip_x = np.array(sip_x) + 2048
+        sip_y = np.array(sip_y) + 1024
         sip_coord = self.wcs.get_transform("detector", "focal")(self.xv, self.yv)
-        assert_allclose(sipx, sip_coord[0])
-        assert_allclose(sipy, sip_coord[1])
+        assert_allclose(sip_x, sip_coord[0])
+        assert_allclose(sip_y, sip_coord[1])
 
-    def test_wcslinear(self):
-        ra, dec = self.fitsw.wcs_pix2world(self.xv, self.yv, 1)
+    def test_wcs_linear(self):
+        ra, dec = self.fits_w.wcs_pix2world(self.xv, self.yv, 1)
         sky = self.wcs.get_transform("focal", "sky")(self.xv, self.yv)
         assert_allclose(ra, sky[0])
         assert_allclose(dec, sky[1])
 
     def test_forward(self):
         sky_coord = self.wcs(self.xv, self.yv)
-        ra, dec = self.fitsw.all_pix2world(self.xv, self.yv, 1)
+        ra, dec = self.fits_w.all_pix2world(self.xv, self.yv, 1)
         assert_allclose(sky_coord[0], ra)
         assert_allclose(sky_coord[1], dec)
 
@@ -761,7 +763,7 @@ class TestImaging:
     def test_footprint(self):
         bb = ((1, 4096), (1, 2048))
         footprint = self.wcs.footprint(bb)
-        fits_footprint = self.fitsw.calc_footprint(axes=(4096, 2048))
+        fits_footprint = self.fits_w.calc_footprint(axes=(4096, 2048))
         assert_allclose(footprint, fits_footprint)
 
     def test_inverse(self):
@@ -785,7 +787,7 @@ class TestImaging:
 
     def test_pixel_to_world(self):
         sky_coord = self.wcs.pixel_to_world(self.xv, self.yv)
-        ra, dec = self.fitsw.all_pix2world(self.xv, self.yv, 1)
+        ra, dec = self.fits_w.all_pix2world(self.xv, self.yv, 1)
         assert isinstance(sky_coord, coord.SkyCoord)
         assert_allclose(sky_coord.data.lon.value, ra)
         assert_allclose(sky_coord.data.lat.value, dec)
@@ -793,8 +795,8 @@ class TestImaging:
 
 def test_to_fits_sip():
     y, x = np.mgrid[:1024:10, :1024:10]
-    xflat = np.ravel(x[1:-1, 1:-1])
-    yflat = np.ravel(y[1:-1, 1:-1])
+    x_flat = np.ravel(x[1:-1, 1:-1])
+    y_flat = np.ravel(y[1:-1, 1:-1])
     fn = data_path / "miriwcs.asdf"
     with asdf.open(
         fn,
@@ -804,21 +806,23 @@ def test_to_fits_sip():
     ) as af:
         miriwcs = af.tree["wcs"]
     bounding_box = ((0, 1024), (0, 1024))
-    mirisip = miriwcs.to_fits_sip(bounding_box, max_inv_pix_error=0.1, verbose=True)
-    fitssip = astwcs.WCS(mirisip)
-    fitsvalx, fitsvaly = fitssip.all_pix2world(xflat + 1, yflat + 1, 1)
-    gwcsvalx, gwcsvaly = miriwcs(xflat, yflat)
-    assert_allclose(gwcsvalx, fitsvalx, atol=1e-10, rtol=0)
-    assert_allclose(gwcsvaly, fitsvaly, atol=1e-10, rtol=0)
-    fits_inverse_valx, fits_inverse_valy = fitssip.all_world2pix(fitsvalx, fitsvaly, 1)
-    assert_allclose(xflat, fits_inverse_valx - 1, atol=0.1, rtol=0)
-    assert_allclose(yflat, fits_inverse_valy - 1, atol=0.1, rtol=0)
+    miri_sip = miriwcs.to_fits_sip(bounding_box, max_inv_pix_error=0.1, verbose=True)
+    fits_sip = astropy_wcs.WCS(miri_sip)
+    fits_val_x, fits_val_y = fits_sip.all_pix2world(x_flat + 1, y_flat + 1, 1)
+    gwcs_val_x, gwcs_val_y = miriwcs(x_flat, y_flat)
+    assert_allclose(gwcs_val_x, fits_val_x, atol=1e-10, rtol=0)
+    assert_allclose(gwcs_val_y, fits_val_y, atol=1e-10, rtol=0)
+    fits_inverse_val_x, fits_inverse_val_y = fits_sip.all_world2pix(
+        fits_val_x, fits_val_y, 1
+    )
+    assert_allclose(x_flat, fits_inverse_val_x - 1, atol=0.1, rtol=0)
+    assert_allclose(y_flat, fits_inverse_val_y - 1, atol=0.1, rtol=0)
 
-    mirisip = miriwcs.to_fits_sip(bounding_box=None, max_inv_pix_error=0.1)
-    fitssip = astwcs.WCS(mirisip)
-    fitsvalx, fitsvaly = fitssip.all_pix2world(xflat + 1, yflat + 1, 1)
-    assert_allclose(gwcsvalx, fitsvalx, atol=4e-11, rtol=0)
-    assert_allclose(gwcsvaly, fitsvaly, atol=4e-11, rtol=0)
+    miri_sip = miriwcs.to_fits_sip(bounding_box=None, max_inv_pix_error=0.1)
+    fits_sip = astropy_wcs.WCS(miri_sip)
+    fits_val_x, fits_val_y = fits_sip.all_pix2world(x_flat + 1, y_flat + 1, 1)
+    assert_allclose(gwcs_val_x, fits_val_x, atol=4e-11, rtol=0)
+    assert_allclose(gwcs_val_y, fits_val_y, atol=4e-11, rtol=0)
 
     miriwcs.bounding_box = None
     with pytest.raises(ValueError):  # noqa: PT011
@@ -830,23 +834,23 @@ def test_to_fits_sip():
 )
 def test_to_fits_sip_pc_normalization(gwcs_simple_imaging_units, matrix_type):
     y, x = np.mgrid[:1024:10, :1024:10]
-    xflat = np.ravel(x[1:-1, 1:-1])
-    yflat = np.ravel(y[1:-1, 1:-1])
+    x_flat = np.ravel(x[1:-1, 1:-1])
+    y_flat = np.ravel(y[1:-1, 1:-1])
     bounding_box = ((0, 1024), (0, 1024))
 
     # create a simple imaging WCS without distortions:
-    cdmat = np.array([[1.29e-5, 5.95e-6], [5.02e-6, -1.26e-5]])
-    aff = models.AffineTransformation2D(matrix=cdmat, name="rotation")
+    cd_matrix = np.array([[1.29e-5, 5.95e-6], [5.02e-6, -1.26e-5]])
+    aff = models.AffineTransformation2D(matrix=cd_matrix, name="rotation")
 
-    offx = models.Shift(-501, name="x_translation")
-    offy = models.Shift(-501, name="y_translation")
+    off_x = models.Shift(-501, name="x_translation")
+    off_y = models.Shift(-501, name="y_translation")
 
-    wcslin = (offx & offy) | aff
+    wcs_lin = (off_x & off_y) | aff
 
     n2c = models.RotateNative2Celestial(5.63, -72.05, 180, name="sky_rotation")
     tan = models.Pix2Sky_TAN(name="tangent_projection")
 
-    wcs_forward = wcslin | tan | n2c
+    wcs_forward = wcs_lin | tan | n2c
 
     detector = cf.Frame2D(name="detector")
     sky_cs = cf.CelestialFrame(reference_frame=coord.ICRS(), name="sky")
@@ -867,23 +871,23 @@ def test_to_fits_sip_pc_normalization(gwcs_simple_imaging_units, matrix_type):
         degree=None,
         max_inv_pix_error=0.1,
         inv_degree=None,
-        npoints=32,
+        n_points=32,
         crpix=None,
         projection="TAN",
         matrix_type=matrix_type,
         verbose=True,
     )
-    fitssip = astwcs.WCS(fits_wcs)
+    fits_sip = astropy_wcs.WCS(fits_wcs)
 
-    fitsvalx, fitsvaly = fitssip.wcs_pix2world(xflat, yflat, 0)
-    inv_fitsvalx, inv_fitsvaly = fitssip.wcs_world2pix(fitsvalx, fitsvaly, 0)
-    gwcsvalx, gwcsvaly = wcs_lin(xflat, yflat)
+    fits_val_x, fits_val_y = fits_sip.wcs_pix2world(x_flat, y_flat, 0)
+    inv_fits_val_x, inv_fits_val_y = fits_sip.wcs_world2pix(fits_val_x, fits_val_y, 0)
+    gwcs_val_x, gwcs_val_y = wcs_lin(x_flat, y_flat)
 
-    assert_allclose(gwcsvalx, fitsvalx, atol=4e-11, rtol=0)
-    assert_allclose(gwcsvaly, fitsvaly, atol=4e-11, rtol=0)
+    assert_allclose(gwcs_val_x, fits_val_x, atol=4e-11, rtol=0)
+    assert_allclose(gwcs_val_y, fits_val_y, atol=4e-11, rtol=0)
 
-    assert_allclose(xflat, inv_fitsvalx, atol=5e-9, rtol=0)
-    assert_allclose(yflat, inv_fitsvaly, atol=5e-9, rtol=0)
+    assert_allclose(x_flat, inv_fits_val_x, atol=5e-9, rtol=0)
+    assert_allclose(y_flat, inv_fits_val_y, atol=5e-9, rtol=0)
 
 
 def test_to_fits_sip_composite_frame(
@@ -911,11 +915,11 @@ def test_to_fits_sip_composite_frame(
     assert fw_hdr["NAXIS1"] == 128
     assert fw_hdr["NAXIS2"] == 64
 
-    fw = astwcs.WCS(fw_hdr)
-    gskyval = w.pixel_to_world(1, 60, 55)[1]
-    fskyval = fw.all_pix2world(1, 60, 0)
-    fskyval = [float(fskyval[ra_axis - 1]), float(fskyval[dec_axis - 1])]
-    assert np.allclose([gskyval.ra.value, gskyval.dec.value], fskyval)
+    fw = astropy_wcs.WCS(fw_hdr)
+    g_sky_val = w.pixel_to_world(1, 60, 55)[1]
+    f_sky_val = fw.all_pix2world(1, 60, 0)
+    f_sky_val = [float(f_sky_val[ra_axis - 1]), float(f_sky_val[dec_axis - 1])]
+    assert np.allclose([g_sky_val.ra.value, g_sky_val.dec.value], f_sky_val)
 
 
 def test_to_fits_sip_composite_frame_galactic(gwcs_3d_galactic_spectral):
@@ -924,10 +928,10 @@ def test_to_fits_sip_composite_frame_galactic(gwcs_3d_galactic_spectral):
     fw_hdr = w.to_fits_sip()
     assert fw_hdr["CTYPE1"] == "GLAT-TAN"
 
-    fw = astwcs.WCS(fw_hdr)
-    gskyval = w.pixel_to_world(7, 8, 9)[0]
+    fw = astropy_wcs.WCS(fw_hdr)
+    g_sky_val = w.pixel_to_world(7, 8, 9)[0]
     assert np.allclose(
-        [gskyval.b.value, gskyval.l.value], fw.all_pix2world(7, 9, 0), atol=1e-3
+        [g_sky_val.b.value, g_sky_val.l.value], fw.all_pix2world(7, 9, 0), atol=1e-3
     )
 
 
@@ -967,14 +971,14 @@ def test_to_fits_sip_composite_frame_keep_axis(
     assert fw_hdr["WCSAXES"] == 2
 
     with pytest.warns(
-        astwcs.FITSFixedWarning, match="The WCS transformation has more axes"
+        astropy_wcs.FITSFixedWarning, match="The WCS transformation has more axes"
     ):
         # this raises a warning unimportant for this testing the pix2world
         #   FITSFixedWarning(u'The WCS transformation has more axes (3) than
         #        the image it is associated with (2)')
-        fw = astwcs.WCS(fw_hdr)
-    gskyval = w(1, 45, 55)[1:]
-    assert np.allclose(gskyval, fw.all_pix2world([[1, 45, 55]], 0)[0][1:])
+        fw = astropy_wcs.WCS(fw_hdr)
+    g_sky_val = w(1, 45, 55)[1:]
+    assert np.allclose(g_sky_val, fw.all_pix2world([[1, 45, 55]], 0)[0][1:])
 
 
 def test_to_fits_tab_no_bb(gwcs_3d_galactic_spectral):
@@ -994,11 +998,11 @@ def test_to_fits_tab_cube(gwcs_3d_galactic_spectral):
     # FITS WCS -TAB:
     hdr, bt = w.to_fits_tab()
     hdulist = fits.HDUList([fits.PrimaryHDU(np.ones(w.pixel_n_dim * (2,)), hdr), bt])
-    fits_wcs = astwcs.WCS(hdulist[0].header, hdulist)
+    fits_wcs = astropy_wcs.WCS(hdulist[0].header, hdulist)
 
     hdr, bt = w.to_fits_tab(bounding_box=w.bounding_box)
     hdulist = fits.HDUList([fits.PrimaryHDU(np.ones(w.pixel_n_dim * (2,)), hdr), bt])
-    fits_wcs_user_bb = astwcs.WCS(hdulist[0].header, hdulist)
+    fits_wcs_user_bb = astropy_wcs.WCS(hdulist[0].header, hdulist)
 
     # test points:
     (xmin, xmax), (ymin, ymax), (zmin, zmax) = w.bounding_box
@@ -1029,23 +1033,23 @@ def test_to_fits_tab_7d(gwcs_7d_complex_mapping):
     hdus = [fits.PrimaryHDU(np.zeros(w.array_shape), hdr)]
     hdus.extend(bt)
     hdulist = fits.HDUList(hdus)
-    fits_wcs = astwcs.WCS(hdulist[0].header, hdulist)
+    fits_wcs = astropy_wcs.WCS(hdulist[0].header, hdulist)
 
     # test points:
     rng = np.random.default_rng(1)
-    npts = 100
-    pts = np.zeros((len(w.bounding_box) + 1, npts))
+    n_pts = 100
+    pts = np.zeros((len(w.bounding_box) + 1, n_pts))
     for k in range(len(w.bounding_box)):
         xmin, xmax = w.bounding_box[k]
-        pts[k, :] = xmin + (xmax - xmin) * rng.random(npts)
+        pts[k, :] = xmin + (xmax - xmin) * rng.random(n_pts)
 
-    world_crds = w(*pts[:-1, :])
+    world_coords = w(*pts[:-1, :])
 
     # test forward transformation:
-    assert np.allclose(world_crds, fits_wcs.wcs_pix2world(*pts, 0))
+    assert np.allclose(world_coords, fits_wcs.wcs_pix2world(*pts, 0))
 
     # test round-tripping:
-    assert np.allclose(pts, fits_wcs.wcs_world2pix(*world_crds, 0))
+    assert np.allclose(pts, fits_wcs.wcs_world2pix(*world_coords, 0))
 
 
 def test_to_fits_mixed_4d(gwcs_spec_cel_time_4d):
@@ -1059,23 +1063,23 @@ def test_to_fits_mixed_4d(gwcs_spec_cel_time_4d):
     hdus = [fits.PrimaryHDU(np.zeros(w.array_shape), hdr)]
     hdus.extend(bt)
     hdulist = fits.HDUList(hdus)
-    fits_wcs = astwcs.WCS(hdulist[0].header, hdulist)
+    fits_wcs = astropy_wcs.WCS(hdulist[0].header, hdulist)
 
     # test points:
     rng = np.random.default_rng(1)
-    npts = 100
-    pts = np.zeros((len(w.bounding_box), npts))
+    n_pts = 100
+    pts = np.zeros((len(w.bounding_box), n_pts))
     for k in range(len(w.bounding_box)):
         xmin, xmax = w.bounding_box[k]
-        pts[k, :] = xmin + (xmax - xmin) * rng.random(npts)
+        pts[k, :] = xmin + (xmax - xmin) * rng.random(n_pts)
 
-    world_crds = w(*pts)
+    world_coords = w(*pts)
 
     # test forward transformation:
-    assert np.allclose(world_crds, fits_wcs.wcs_pix2world(*pts, 0))
+    assert np.allclose(world_coords, fits_wcs.wcs_pix2world(*pts, 0))
 
     # test round-tripping:
-    pts2 = np.array(fits_wcs.wcs_world2pix(*world_crds, 0))
+    pts2 = np.array(fits_wcs.wcs_world2pix(*world_coords, 0))
     assert np.allclose(pts, pts2, rtol=1e-5, atol=1e-5)
 
 
@@ -1107,7 +1111,7 @@ def test_to_fits_1D_round_trip(gwcs_1d_spectral):
     # FITS WCS -SIP (for celestial) and -TAB (for spectral):
     hdr, bt = w.to_fits()
     hdulist = fits.HDUList([fits.PrimaryHDU(np.ones(w.array_shape), hdr), bt[0]])
-    fits_wcs = astwcs.WCS(hdulist[0].header, hdulist)
+    fits_wcs = astropy_wcs.WCS(hdulist[0].header, hdulist)
 
     # test points:
     rng = np.random.default_rng(1)
@@ -1119,8 +1123,8 @@ def test_to_fits_1D_round_trip(gwcs_1d_spectral):
     assert np.allclose(w(x), wt, rtol=1e-6, atol=1e-7)
 
     # test inverse (round-trip):
-    xinv = fits_wcs.wcs_world2pix(wt[0], 0)[0]
-    assert np.allclose(x, xinv, rtol=1e-6, atol=1e-7)
+    x_inv = fits_wcs.wcs_world2pix(wt[0], 0)[0]
+    assert np.allclose(x, x_inv, rtol=1e-6, atol=1e-7)
 
 
 def test_to_fits_sip_tab_cube(axes_order, gwcs_cube_with_separable_spectral):
@@ -1134,7 +1138,7 @@ def test_to_fits_sip_tab_cube(axes_order, gwcs_cube_with_separable_spectral):
     hdus = [fits.PrimaryHDU(np.zeros(w.array_shape), hdr)]
     hdus.extend(bt)
     hdulist = fits.HDUList(hdus)
-    fits_wcs = astwcs.WCS(hdulist[0].header, hdulist)
+    fits_wcs = astropy_wcs.WCS(hdulist[0].header, hdulist)
 
     # test points:
     (xmin, xmax), (ymin, ymax), (zmin, zmax) = w.bounding_box
@@ -1143,13 +1147,13 @@ def test_to_fits_sip_tab_cube(axes_order, gwcs_cube_with_separable_spectral):
     y = ymin + (ymax - ymin) * rng.random(100)
     z = zmin + (zmax - zmin) * rng.random(100)
 
-    world_crds = w(x, y, z)
+    world_coords = w(x, y, z)
 
     # test forward transformation:
-    assert np.allclose(world_crds, fits_wcs.wcs_pix2world(x, y, z, 0))
+    assert np.allclose(world_coords, fits_wcs.wcs_pix2world(x, y, z, 0))
 
     # test round-tripping:
-    assert np.allclose((x, y, z), fits_wcs.wcs_world2pix(*world_crds, 0))
+    assert np.allclose((x, y, z), fits_wcs.wcs_world2pix(*world_coords, 0))
 
 
 def test_to_fits_tab_time_cube(gwcs_cube_with_separable_time):
@@ -1163,7 +1167,7 @@ def test_to_fits_tab_time_cube(gwcs_cube_with_separable_time):
     hdus = [fits.PrimaryHDU(np.zeros(w.array_shape), hdr)]
     hdus.extend(bt)
     hdulist = fits.HDUList(hdus)
-    fits_wcs = astwcs.WCS(hdulist[0].header, hdulist)
+    fits_wcs = astropy_wcs.WCS(hdulist[0].header, hdulist)
 
     assert np.allclose(hdulist[1].data["coordinates"].ravel(), np.arange(128))
 
@@ -1174,14 +1178,14 @@ def test_to_fits_tab_time_cube(gwcs_cube_with_separable_time):
     y = ymin + (ymax - ymin) * rng.random(5)
     z = zmin + (zmax - zmin) * rng.random(5)
 
-    world_crds = w(x, y, z)
+    world_coords = w(x, y, z)
 
     # test forward transformation:
-    assert np.allclose(world_crds, fits_wcs.wcs_pix2world(x, y, z, 0))
+    assert np.allclose(world_coords, fits_wcs.wcs_pix2world(x, y, z, 0))
 
     # test round-tripping:
     assert np.allclose(
-        (x, y, z), fits_wcs.wcs_world2pix(*world_crds, 0), rtol=1e-5, atol=1e-5
+        (x, y, z), fits_wcs.wcs_world2pix(*world_coords, 0), rtol=1e-5, atol=1e-5
     )
 
 
@@ -1200,7 +1204,7 @@ def test_to_fits_tab_miri_image():
     hdr, bt = w.to_fits_tab(sampling=0.5)
     hdulist = fits.HDUList([fits.PrimaryHDU(np.ones(w.pixel_n_dim * (2,)), hdr), bt])
 
-    fits_wcs = astwcs.WCS(hdulist[0].header, hdulist)
+    fits_wcs = astropy_wcs.WCS(hdulist[0].header, hdulist)
 
     # test points:
     (xmin, xmax), (ymin, ymax) = w.bounding_box
@@ -1226,12 +1230,12 @@ def test_to_fits_tab_miri_lrs():
     hdr, bt = w.to_fits(sampling=0.25)
     hdulist = fits.HDUList([fits.PrimaryHDU(np.ones(w.pixel_n_dim * (2,)), hdr), bt[0]])
     with pytest.warns(
-        astwcs.FITSFixedWarning, match="The WCS transformation has more axes"
+        astropy_wcs.FITSFixedWarning, match="The WCS transformation has more axes"
     ):
         # this raises a warning unimportant for this testing the pix2world
         #   FITSFixedWarning(u'The WCS transformation has more axes (3) than
         #        the image it is associated with (2)')
-        fits_wcs = astwcs.WCS(hdulist[0].header, hdulist)
+        fits_wcs = astropy_wcs.WCS(hdulist[0].header, hdulist)
 
     # test points:
     (xmin, xmax), (ymin, ymax) = w.bounding_box
@@ -1349,7 +1353,7 @@ def test_iter_inv():
         (np.nan, np.nan), w.numerical_inverse(*w(np.nan, 2)), equal_nan=True
     )
 
-    # don't detect devergence
+    # don't detect divergence
     xp, yp = w.numerical_inverse(
         *w(x, y),
         adaptive=True,
@@ -1470,12 +1474,12 @@ def test_sip_roundtrip():
     hdr["naxis1"] = nx
     hdr["naxis2"] = ny
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore", category=astwcs.FITSFixedWarning)
+        warnings.simplefilter("ignore", category=astropy_wcs.FITSFixedWarning)
         gw = _gwcs_from_hst_fits_wcs(hdr)
     hdr_back = gw.to_fits_sip(
         max_pix_error=1e-6,
         max_inv_pix_error=None,
-        npoints=64,
+        n_points=64,
         crpix=(hdr["crpix1"], hdr["crpix2"]),
     )
 
@@ -1500,8 +1504,8 @@ def test_spatial_spectral_stokes():
     """Converts a FITS WCS to GWCS and compares results."""
     hdr = fits.Header.fromfile(data_path / "stokes.txt")
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore", category=astwcs.FITSFixedWarning)
-        aw = astwcs.WCS(hdr)
+        warnings.simplefilter("ignore", category=astropy_wcs.FITSFixedWarning)
+        aw = astropy_wcs.WCS(hdr)
     crpix = aw.wcs.crpix
     crval = aw.wcs.crval
     cdelt = aw.wcs.cdelt
@@ -1692,17 +1696,17 @@ def test_split_frame_wcs():
         3, ["PIXEL"] * 3, axes_order=list(range(3)), unit=[u.pix] * 3
     )
 
-    iwcs = wcs.WCS(forward, input_frame, output_frame)
+    i_wcs = wcs.WCS(forward, input_frame, output_frame)
     input_pixel = [1 * u.pix, 1 * u.pix, 3 * u.pix]
-    output_world = iwcs.pixel_to_world_values(*input_pixel)
-    output_pixel = iwcs.world_to_pixel_values(*output_world)
+    output_world = i_wcs.pixel_to_world_values(*input_pixel)
+    output_pixel = i_wcs.world_to_pixel_values(*output_world)
     assert_allclose(output_pixel, u.Quantity(input_pixel).to_value(u.pix))
 
     expected_world = [20 * u.arcsec, 10 * u.nm, 45 * u.deg]
     for expected, output in zip(expected_world, output_world, strict=False):
         assert_allclose(output, expected.value)
 
-    world_obj = iwcs.pixel_to_world(*input_pixel)
+    world_obj = i_wcs.pixel_to_world(*input_pixel)
     assert isinstance(world_obj[0], coord.SkyCoord)
     assert isinstance(world_obj[1], coord.SpectralCoord)
 
@@ -1710,7 +1714,7 @@ def test_split_frame_wcs():
     assert u.allclose(world_obj[0].spherical.lon, expected_world[2])
     assert u.allclose(world_obj[1], expected_world[1])
 
-    obj_pixel = iwcs.world_to_pixel(*world_obj)
+    obj_pixel = i_wcs.world_to_pixel(*world_obj)
     assert_allclose(obj_pixel, u.Quantity(input_pixel).to_value(u.pix))
 
 
@@ -1729,23 +1733,23 @@ def test_reordered_celestial():
         2, ["PIXEL"] * 2, axes_order=list(range(2)), unit=[u.pix] * 2
     )
 
-    iwcs = wcs.WCS(spatial, input_frame, celestial_frame)
+    i_wcs = wcs.WCS(spatial, input_frame, celestial_frame)
 
     input_pixel = [1 * u.pix, 3 * u.pix]
-    output_world = iwcs.pixel_to_world_values(*input_pixel)
-    output_pixel = iwcs.world_to_pixel_values(*output_world)
+    output_world = i_wcs.pixel_to_world_values(*input_pixel)
+    output_pixel = i_wcs.world_to_pixel_values(*output_world)
     assert_allclose(output_pixel, u.Quantity(input_pixel).to_value(u.pix))
 
     expected_world = [45 * u.deg, 20 * u.arcsec]
     assert_allclose(output_world, [e.value for e in expected_world])
 
-    world_obj = iwcs.pixel_to_world(*input_pixel)
+    world_obj = i_wcs.pixel_to_world(*input_pixel)
     assert isinstance(world_obj, coord.SkyCoord)
 
     assert u.allclose(world_obj.spherical.lat, expected_world[0])
     assert u.allclose(world_obj.spherical.lon, expected_world[1])
 
-    obj_pixel = iwcs.world_to_pixel(world_obj)
+    obj_pixel = i_wcs.world_to_pixel(world_obj)
     assert_allclose(obj_pixel, u.Quantity(input_pixel).to_value(u.pix))
 
 
@@ -1754,11 +1758,11 @@ def test_quantities_in_pipeline_forward(gwcs_with_pipeline_celestial):
     This test checks that high level objects still work with a multi-stage
     pipeline when doing forward transforms.
     """
-    iwcs = gwcs_with_pipeline_celestial
+    i_wcs = gwcs_with_pipeline_celestial
 
     input_pixel = [1 * u.pix, 1 * u.pix]
 
-    output_world = iwcs(*input_pixel)
+    output_world = i_wcs(*input_pixel)
 
     assert output_world[0].unit == u.arcsec
     assert output_world[1].unit == u.arcsec
@@ -1766,7 +1770,7 @@ def test_quantities_in_pipeline_forward(gwcs_with_pipeline_celestial):
     assert u.allclose(output_world[1], 15 * u.deg + 2 * u.deg)
 
     # This should be in model units of the spatial model
-    intermediate_world = iwcs.transform(
+    intermediate_world = i_wcs.transform(
         "input",
         "celestial",
         *input_pixel,
@@ -1782,18 +1786,18 @@ def test_quantities_in_pipeline_backward(gwcs_with_pipeline_celestial):
     This test checks that high level objects still work with a multi-stage
     pipeline when doing backward transforms.
     """
-    iwcs = gwcs_with_pipeline_celestial
+    i_wcs = gwcs_with_pipeline_celestial
 
     input_world = [
         20 * u.arcsec + 1 * u.deg,
         15 * u.deg + 2 * u.deg,
     ]
-    pixel = iwcs.invert(*input_world)
+    pixel = i_wcs.invert(*input_world)
 
     assert all(isinstance(p, u.Quantity) for p in pixel)
     assert u.allclose(pixel, [1, 1] * u.pix)
 
-    intermediate_world = iwcs.transform(
+    intermediate_world = i_wcs.transform(
         "output",
         "celestial",
         *input_world,
@@ -1946,7 +1950,7 @@ def test_parameterless_transform():
 
 def test_fitswcs_imaging(fits_wcs_imaging_simple):
     """Test simple FITS type imaging WCS."""
-    gwcs, astwcs = fits_wcs_imaging_simple
+    gwcs, astropy_wcs = fits_wcs_imaging_simple
     forward_transform = gwcs.forward_transform
     crpix = forward_transform.crpix
     crval = forward_transform.crval
@@ -1957,7 +1961,7 @@ def test_fitswcs_imaging(fits_wcs_imaging_simple):
 
     # FITS CRPIX is set to crpix + 1 but we need to subtract one when calling
     # pixel_to_world, to pass 0 based coordinates.
-    ast_ra, ast_dec = astwcs.pixel_to_world_values(crpix[0], crpix[1])
+    ast_ra, ast_dec = astropy_wcs.pixel_to_world_values(crpix[0], crpix[1])
     assert_allclose((ast_ra, ast_dec), crval, atol=1e-14)
     assert_allclose(gwcs.invert(ra, dec), forward_transform.crpix)
 
@@ -1971,10 +1975,10 @@ def test_fitswcs_imaging(fits_wcs_imaging_simple):
 def test_fitswcs_transform(lon, lat):
     # test at the poles
     tan = projections.Pix2Sky_TAN()
-    fwcs = fitswcs.FITSImagingWCSTransform(tan, crval=(lon, lat))
-    assert_allclose(fwcs(0, 0), (lon, lat), atol=1e-14)
-    assert_allclose(fwcs(0, lat)[0], lon + 180, atol=1e-14)
-    assert_allclose(fwcs.inverse(lon, lat), (0, 0), atol=1e-14)
+    fits_wcs = fitswcs.FITSImagingWCSTransform(tan, crval=(lon, lat))
+    assert_allclose(fits_wcs(0, 0), (lon, lat), atol=1e-14)
+    assert_allclose(fits_wcs(0, lat)[0], lon + 180, atol=1e-14)
+    assert_allclose(fits_wcs.inverse(lon, lat), (0, 0), atol=1e-14)
 
 
 def test_non_coordinate_input():
@@ -2043,7 +2047,7 @@ def test_tabular_quantity_issues():
 def test_tabular_quantity_issues_equivalencies():
     """
     This checks that the uses_quantity lie of astropy models for Tabular1D
-    and Tabular2, when equivalenceis are set
+    and Tabular2, when equivalencies are set
     """
 
     in_frame = cf.CoordinateFrame(

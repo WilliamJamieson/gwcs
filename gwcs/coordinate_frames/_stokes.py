@@ -10,7 +10,7 @@ __all__ = ["StokesFrame"]
 
 class StokesFrame(CoordinateFrame):
     """
-    A coordinate frame for representing Stokes polarisation states.
+    A coordinate frame for representing Stokes polarization states.
 
     Parameters
     ----------
