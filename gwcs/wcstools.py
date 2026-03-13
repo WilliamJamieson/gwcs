@@ -66,7 +66,7 @@ def wcs_from_fiducial(
         represents a range of (low, high) values. The ``bounding_box`` is in the
         order of the axes, `~gwcs.coordinate_frames.CoordinateFrameProtocol.axes_order`.
         For two inputs and axes_order(0, 1) the bounding box is
-        ((xlow, xhigh), (ylow, yhigh)).
+        ((x_low, x_high), (y_low, y_high)).
     input_frame : ~gwcs.coordinate_frames.CoordinateFrameProtocol`
         The input coordinate frame.
     """
@@ -115,7 +115,7 @@ def wcs_from_fiducial(
         if len(bounding_box) != forward_transform.n_outputs:
             msg = (
                 "Expected the number of items in 'bounding_box' to be equal to the "
-                "number of outputs of the forawrd transform."
+                "number of outputs of the forward transform."
             )
             raise ValueError(msg)
         forward_transform.bounding_box = bounding_box[::-1]
@@ -405,8 +405,8 @@ def wcs_from_points(
 
     transform = distortion | projection.inverse | skyrot.inverse
 
-    skyframe = CelestialFrame(reference_frame=frame)
+    sky_frame = CelestialFrame(reference_frame=frame)
     detector = Frame2D(name="detector")
-    pipeline = [(detector, transform), (skyframe, None)]
+    pipeline = [(detector, transform), (sky_frame, None)]
 
     return WCS(pipeline)

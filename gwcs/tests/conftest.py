@@ -1,5 +1,5 @@
 """
-This file contains a set of pytest fixtures which are different gwcses for testing.
+This file contains a set of pytest fixtures which are different GWCSs for testing.
 """
 
 import pytest

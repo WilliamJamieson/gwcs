@@ -156,7 +156,7 @@ def _frame_factory():
         cf.SpectralFrame(name="freq", unit=(u.Hz,), axes_order=(2,)),
         cf.SpectralFrame(name="wave", unit=(u.m,), axes_order=(2,)),
         cf.StokesFrame(),
-        cf.StokesFrame(name="polarisation", axes_order=(3,)),
+        cf.StokesFrame(name="polarization", axes_order=(3,)),
         cf.TemporalFrame(time.Time("2011-01-01")),
         cf.TemporalFrame(time.Time("2011-01-01"), axes_order=(2,)),
         cf.Frame2D(),

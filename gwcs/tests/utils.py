@@ -38,14 +38,14 @@ def _gwcs_from_hst_fits_wcs(header, hdu=None):
     b[1, 0] = cd[1, 0]
     b[0, 1] = cd[1, 1]
 
-    polx = coeffs_to_poly(a, w.sip.a_order)
-    poly = coeffs_to_poly(b, w.sip.b_order)
+    pol_x = coeffs_to_poly(a, w.sip.a_order)
+    pol_y = coeffs_to_poly(b, w.sip.b_order)
 
     # construct GWCS:
     det2sky = (
         (Shift(-x0) & Shift(-y0))
         | Mapping((0, 1, 0, 1))
-        | (polx & poly)
+        | (pol_x & pol_y)
         | Pix2Sky_TAN()
         | RotateNative2Celestial(*w.wcs.crval, 180)
     )

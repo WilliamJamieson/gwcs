@@ -47,8 +47,8 @@ class FITSImagingWCSTransform(Model):
     >>> from gwcs import FITSImagingWCSTransform
     >>> from astropy.modeling.models import Pix2Sky_Gnomonic
     >>> tan = Pix2Sky_Gnomonic()
-    >>> fwcs = FITSImagingWCSTransform(tan, crpix=[10,10], crval=[5.36, -72.5])
-    >>> print(fwcs)
+    >>> fits_wcs = FITSImagingWCSTransform(tan, crpix=[10,10], crval=[5.36, -72.5])
+    >>> print(fits_wcs)
     Model: FITSImagingWCSTransform
     Inputs: ('x', 'y')
     Outputs: ('lon', 'lat')

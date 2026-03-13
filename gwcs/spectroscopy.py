@@ -274,7 +274,7 @@ class SellmeierZemax(Model):
     temperature : float
         Temperature of the material in ``u.Kelvin``.
     ref_temperature : float
-        Reference emperature of the glass in ``u.Kelvin``.
+        Reference temperature of the glass in ``u.Kelvin``.
     ref_pressure : float
         Reference pressure in ATM.
     pressure : float
@@ -366,7 +366,7 @@ class SellmeierZemax(Model):
         D0, D1, D2 = D_coef[0]
         E0, E1, lam_tk = E_coef[0]
 
-        nref = (
+        n_ref = (
             1.0
             + (
                 6432.8
@@ -376,27 +376,27 @@ class SellmeierZemax(Model):
             * 1e-8
         )
         # T should be in C, P should be in ATM
-        nair_obs = 1.0 + ((nref - 1.0) * pressure) / (1.0 + (temp - 15.0) * 3.4785e-3)
-        nair_ref = 1.0 + ((nref - 1.0) * ref_pressure) / (
+        nair_obs = 1.0 + ((n_ref - 1.0) * pressure) / (1.0 + (temp - 15.0) * 3.4785e-3)
+        nair_ref = 1.0 + ((n_ref - 1.0) * ref_pressure) / (
             1.0 + (ref_temp - 15) * 3.4785e-3
         )
 
         # Compute the relative index of the glass at Tref and Pref using
         # Sellmeier equation I.
-        lamrel = wavelength * nair_obs / nair_ref
-        nrel = SellmeierGlass.evaluate(lamrel, B_coef, C_coef)
+        lam_rel = wavelength * nair_obs / nair_ref
+        n_rel = SellmeierGlass.evaluate(lam_rel, B_coef, C_coef)
         # Convert the relative index of refraction at the reference temperature
         # and pressure to absolute.
-        nabs_ref = nrel * nair_ref
+        nabs_ref = n_rel * nair_ref
 
         # Compute the absolute index of the glass
-        delnabs = (0.5 * (nrel**2 - 1.0) / nrel) * (
+        del_n_abs = (0.5 * (n_rel**2 - 1.0) / n_rel) * (
             D0 * delta
             + D1 * delta**2
             + D2 * delta**3
-            + (E0 * delta + E1 * delta**2) / (lamrel**2 - lam_tk**2)
+            + (E0 * delta + E1 * delta**2) / (lam_rel**2 - lam_tk**2)
         )
-        nabs_obs = nabs_ref + delnabs
+        nabs_obs = nabs_ref + del_n_abs
 
         # Define the relative index at the system's operating T and P.
         return nabs_obs / nair_obs

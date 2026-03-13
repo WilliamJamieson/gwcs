@@ -134,16 +134,16 @@ def test_no_units_nd(wcsobj):
     _ = [assert_allclose(i, j) for i, j in zip(inp_new, inp, strict=True)]
 
     # Inputs are quantities; return quantities (except for pixels?)
-    inpq = [coup * un for coup, un in zip(inp, wcsobj.input_frame.unit, strict=True)]
-    result = wcsobj(*inpq)
+    in_pq = [coup * un for coup, un in zip(inp, wcsobj.input_frame.unit, strict=True)]
+    result = wcsobj(*in_pq)
     assert is_quantity(result)
     inp_new = wcsobj.invert(*result)
-    _ = [assert_allclose(i, j) for i, j in zip(inp_new, inpq, strict=True)]
+    _ = [assert_allclose(i, j) for i, j in zip(inp_new, in_pq, strict=True)]
 
     sky = wcsobj.pixel_to_world(*inp)
     if not np.iterable(sky):
         sky = (sky,)
-    assert u.allclose(inpq, wcsobj.invert(*sky))
+    assert u.allclose(in_pq, wcsobj.invert(*sky))
 
 
 @wcs_with_unit_1d
@@ -238,12 +238,12 @@ def test_transform_multistage_wcs(gwcs_with_pipeline_celestial):
     final_result = wcsobj.transform(frames[0], frames[-1], 1 * u.pix, 1 * u.pix)
     assert is_quantity(final_result)
     assert_allclose([r.value for r in final_result], wcsobj(1, 1))
-    interm_result = wcsobj.transform(frames[0], frames[1], 1 * u.pix, 1 * u.pix)
-    assert is_quantity(interm_result)
+    interim_result = wcsobj.transform(frames[0], frames[1], 1 * u.pix, 1 * u.pix)
+    assert is_quantity(interim_result)
     tr = wcsobj.get_transform(frames[0], frames[1])
-    assert_quantity_allclose(interm_result, tr(1 * u.pix, 1 * u.pix))
-    ninterm_result = wcsobj.transform(frames[0], frames[1], 1, 1)
-    assert_allclose([r.value for r in interm_result], ninterm_result)
+    assert_quantity_allclose(interim_result, tr(1 * u.pix, 1 * u.pix))
+    n_interim_result = wcsobj.transform(frames[0], frames[1], 1, 1)
+    assert_allclose([r.value for r in interim_result], n_interim_result)
 
 
 def test_reverse_wcs_direction(gwcs_2d_spatial_shift_reverse):
@@ -255,6 +255,6 @@ def test_reverse_wcs_direction(gwcs_2d_spatial_shift_reverse):
     )
 
 
-def test_transfrom_intermediate_1d(gwcs_multi_stage):
+def test_transform_intermediate_1d(gwcs_multi_stage):
     wcsobj = gwcs_multi_stage
     assert wcsobj.transform("detector", "intermediate", 1) == 11.0

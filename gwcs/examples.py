@@ -3,7 +3,7 @@ import numpy as np
 from astropy import coordinates as coord
 from astropy.modeling import models
 from astropy.time import Time
-from astropy.wcs import WCS as ASTWCS
+from astropy.wcs import WCS as AstropyWCS
 
 from . import coordinate_frames as cf
 from . import fitswcs, geometry, wcs
@@ -140,7 +140,7 @@ def gwcs_2d_shift_scale_quantity():
 
 def gwcs_3d_identity_units():
     """
-    A simple 1-1 gwcs that converts from pixels to arcseconds
+    A simple 1-1 gwcs that converts from pixels to arc seconds
     """
     identity = (
         models.Multiply(1 * u.arcsec / u.pixel)
@@ -176,7 +176,7 @@ def gwcs_3d_identity_units():
 
 def gwcs_4d_identity_units():
     """
-    A simple 1-1 gwcs that converts from pixels to arcseconds
+    A simple 1-1 gwcs that converts from pixels to arc seconds
     """
     identity = (
         models.Multiply(1 * u.arcsec / u.pixel)
@@ -364,14 +364,14 @@ def gwcs_3d_galactic_spectral():
         unit=(u.pix, u.pix, u.pix),
     )
 
-    owcs = wcs.WCS(
+    gwcs = wcs.WCS(
         forward_transform=transform, output_frame=frame, input_frame=detector_frame
     )
-    owcs.bounding_box = ((-1, 35), (-2, 45), (5, 50))
-    owcs.array_shape = (30, 20, 10)
-    owcs.pixel_shape = (10, 20, 30)
+    gwcs.bounding_box = ((-1, 35), (-2, 45), (5, 50))
+    gwcs.array_shape = (30, 20, 10)
+    gwcs.pixel_shape = (10, 20, 30)
 
-    return owcs
+    return gwcs
 
 
 def gwcs_1d_spectral():
@@ -386,15 +386,15 @@ def gwcs_1d_spectral():
         name="detector", naxes=1, axes_order=(0,), axes_type=("pixel",), unit=(u.pix,)
     )
 
-    owcs = wcs.WCS(
+    gwcs = wcs.WCS(
         forward_transform=wave_model,
         output_frame=wave_frame,
         input_frame=detector_frame,
     )
-    owcs.array_shape = (44,)
-    owcs.pixel_shape = (44,)
+    gwcs.array_shape = (44,)
+    gwcs.pixel_shape = (44,)
 
-    return owcs
+    return gwcs
 
 
 def gwcs_spec_cel_time_4d():
@@ -419,12 +419,12 @@ def gwcs_spec_cel_time_4d():
     crval = (5.63, -72.05)
     cd = [[1.291e-05, 5.9532e-06], [5.02215e-06, -1.2645e-05]]
     aff = models.AffineTransformation2D(matrix=cd, name="rotation")
-    offx = models.Shift(-crpix[0], name="x_translation")
-    offy = models.Shift(-crpix[1], name="y_translation")
-    wcslin = models.Mapping((1, 0)) | (offx & offy) | aff
+    off_x = models.Shift(-crpix[0], name="x_translation")
+    off_y = models.Shift(-crpix[1], name="y_translation")
+    wcs_lin = models.Mapping((1, 0)) | (off_x & off_y) | aff
     tan = models.Pix2Sky_TAN(name="tangent_projection")
     n2c = models.RotateNative2Celestial(*crval, 180, name="sky_rotation")
-    cel_model = wcslin | tan | n2c | models.Mapping((1, 0))
+    cel_model = wcs_lin | tan | n2c | models.Mapping((1, 0))
     icrs = cf.CelestialFrame(
         reference_frame=coord.ICRS(), name="sky", axes_order=(2, 1)
     )
@@ -474,10 +474,10 @@ def gwcs_cube_with_separable_spectral(axes_order):
     ]
 
     aff = models.AffineTransformation2D(matrix=cd, name="rotation")
-    offx = models.Shift(-crpix[0], name="x_translation")
-    offy = models.Shift(-crpix[1], name="y_translation")
+    off_x = models.Shift(-crpix[0], name="x_translation")
+    off_y = models.Shift(-crpix[1], name="y_translation")
 
-    wcslin = (offx & offy) | aff
+    wcs_lin = (off_x & off_y) | aff
     tan = models.Pix2Sky_TAN(name="tangent_projection")
     n2c = models.RotateNative2Celestial(*crval, 180, name="sky_rotation")
     icrs = cf.CelestialFrame(
@@ -495,7 +495,7 @@ def gwcs_cube_with_separable_spectral(axes_order):
         frames=[icrs, spec], name="TEST 3D FRAME WITH SPECTRAL AXIS"
     )
     wcs_forward = (
-        (wcslin & models.Identity(1))
+        (wcs_lin & models.Identity(1))
         | (tan & models.Identity(1))
         | (n2c & models.Identity(1))
         | models.Mapping(axes_order)
@@ -551,12 +551,12 @@ def gwcs_cube_with_separable_time(axes_order):
     crval = (5.63, -72.05)
     cd = [[1.291e-05, 5.9532e-06], [5.02215e-06, -1.2645e-05]]
     aff = models.AffineTransformation2D(matrix=cd, name="rotation")
-    offx = models.Shift(-crpix[0], name="x_translation")
-    offy = models.Shift(-crpix[1], name="y_translation")
-    wcslin = models.Mapping((1, 0)) | (offx & offy) | aff
+    off_x = models.Shift(-crpix[0], name="x_translation")
+    off_y = models.Shift(-crpix[1], name="y_translation")
+    wcs_lin = models.Mapping((1, 0)) | (off_x & off_y) | aff
     tan = models.Pix2Sky_TAN(name="tangent_projection")
     n2c = models.RotateNative2Celestial(*crval, 180, name="sky_rotation")
-    cel_model = wcslin | tan | n2c
+    cel_model = wcs_lin | tan | n2c
     icrs = cf.CelestialFrame(
         reference_frame=coord.ICRS(), name="sky", axes_order=cel_axes_order
     )
@@ -585,13 +585,13 @@ def gwcs_7d_complex_mapping():
         - includes one frame with 3 input and 4 output axes (1 degenerate),
           with separable world axes (3, 5) and (0, 6).
     """
-    offx = models.Shift(-64, name="x_translation")
-    offy = models.Shift(-32, name="y_translation")
+    off_x = models.Shift(-64, name="x_translation")
+    off_y = models.Shift(-32, name="y_translation")
     cd = np.array([[1.2906, 0.59532], [0.50222, -1.2645]])
     aff = models.AffineTransformation2D(matrix=1e-5 * cd, name="rotation")
     aff2 = models.AffineTransformation2D(matrix=cd, name="rotation2")
 
-    wcslin = (offx & offy) | aff
+    wcs_lin = (off_x & off_y) | aff
     tan = models.Pix2Sky_TAN(name="tangent_projection")
     n2c = models.RotateNative2Celestial(5.630568, -72.0546, 180, name="skyrot")
     icrs = cf.CelestialFrame(
@@ -600,7 +600,7 @@ def gwcs_7d_complex_mapping():
     spec = cf.SpectralFrame(
         name="wave", unit=[u.m], axes_order=(4,), axes_names=("lambda",)
     )
-    cmplx = cf.CoordinateFrame(
+    complex_ = cf.CoordinateFrame(
         name="complex",
         naxes=4,
         axes_order=(3, 5, 0, 6),
@@ -615,9 +615,9 @@ def gwcs_7d_complex_mapping():
         unit=(u.m, u.m, u.second, u.second),
     )
 
-    comp_frm = cf.CompositeFrame(frames=[icrs, spec, cmplx], name="TEST 7D")
+    comp_frm = cf.CompositeFrame(frames=[icrs, spec, complex_], name="TEST 7D")
     wcs_forward = (
-        (wcslin & models.Shift(-3.14) & models.Scale(2.7) & aff2)
+        (wcs_lin & models.Shift(-3.14) & models.Scale(2.7) & aff2)
         | (tan & models.Identity(1) & models.Identity(1) & models.Identity(2))
         | (n2c & models.Identity(1) & models.Identity(1) & models.Identity(2))
         | models.Mapping((3, 1, 0, 4, 2, 5, 3))
@@ -674,16 +674,16 @@ def gwcs_with_pipeline_celestial():
 
 
 def gwcs_romanisim():
-    targ_pos = coord.SkyCoord(ra=0 * u.deg, dec=0 * u.deg)
+    target_pos = coord.SkyCoord(ra=0 * u.deg, dec=0 * u.deg)
 
-    ra_ref = targ_pos.ra.to(u.deg).value
-    dec_ref = targ_pos.dec.to(u.deg).value
+    ra_ref = target_pos.ra.to(u.deg).value
+    dec_ref = target_pos.dec.to(u.deg).value
 
     # v2_ref, v3_ref are in arcsec, but RotationSequence3D wants degrees,
     # so start by scaling by 3600.
     rot = models.RotationSequence3D([0, 0, 0, dec_ref, -ra_ref], "zyxyz")
 
-    # V2V3 are in arcseconds, while SphericalToCartesian expects degrees,
+    # V2V3 are in arc seconds, while SphericalToCartesian expects degrees,
     # so again start by scaling by 3600
     tel2sky = (
         (models.Scale(1 / 3600) & models.Scale(1 / 3600))
@@ -691,7 +691,7 @@ def gwcs_romanisim():
         | rot
         | geometry.CartesianToSpherical(wrap_lon_at=360)
     )
-    tel2sky.name = "v23tosky"
+    tel2sky.name = "v23_to_sky"
 
     detector = cf.Frame2D(name="detector", axes_order=(0, 1), unit=(u.pix, u.pix))
     v2v3 = cf.Frame2D(
@@ -700,8 +700,8 @@ def gwcs_romanisim():
         axes_names=("v2", "v3"),
         unit=(u.arcsec, u.arcsec),
     )
-    v2v3vacorr = cf.Frame2D(
-        name="v2v3vacorr",
+    v2v3va_corr = cf.Frame2D(
+        name="v2v3va_corr",
         axes_order=(0, 1),
         axes_names=("v2", "v3"),
         unit=(u.arcsec, u.arcsec),
@@ -712,14 +712,14 @@ def gwcs_romanisim():
     zen2v2v3 = models.EulerAngleRotation(0, -90, 0, "xyz") | (
         models.Scale(3600) & models.Scale(3600)
     )
-    tanproj = models.Pix2Sky_Gnomonic()
+    tan_proj = models.Pix2Sky_Gnomonic()
     pix2tan = models.Scale(0.11 / 3600) & models.Scale(0.11 / 3600)
-    distortion = pix2tan | tanproj | zen2v2v3
+    distortion = pix2tan | tan_proj | zen2v2v3
 
     pipeline = [
         wcs.Step(detector, distortion),
         wcs.Step(v2v3, va_corr),
-        wcs.Step(v2v3vacorr, tel2sky),
+        wcs.Step(v2v3va_corr, tel2sky),
         wcs.Step(world, None),
     ]
 
@@ -728,7 +728,7 @@ def gwcs_romanisim():
 
 def fits_wcs_imaging_simple(params):
     """A simple FITS WCS imaging transform without distortion."""
-    # Check for several values of cravl2, including at the poles
+    # Check for several values of cravl, including at the poles
     lon, lat = params
     # First, generate a GWCS object
     detector = cf.Frame2D(name="detector", axes_order=(0, 1), unit=(u.pix, u.pix))
@@ -738,12 +738,12 @@ def fits_wcs_imaging_simple(params):
     projection = models.Pix2Sky_TAN()
     crval = [lon, lat]
     crpix = [5, 5]
-    fwcs = fitswcs.FITSImagingWCSTransform(projection, crpix=crpix, crval=crval)
-    pipeline = [wcs.Step(detector, fwcs), wcs.Step(world, None)]
+    fits_wcs = fitswcs.FITSImagingWCSTransform(projection, crpix=crpix, crval=crval)
+    pipeline = [wcs.Step(detector, fits_wcs), wcs.Step(world, None)]
     gw = wcs.WCS(pipeline)
 
     # Generate a FITSWCS object
-    w = ASTWCS(naxis=2)
+    w = AstropyWCS(naxis=2)
     w.wcs.ctype = ["RA---TAN", "DEC--TAN"]
     # Add 1 to CRPIX for FITS compatibility
     w.wcs.crpix = np.array(crpix) + 1

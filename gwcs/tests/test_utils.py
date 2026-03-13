@@ -11,8 +11,15 @@ from astropy.modeling import models
 from astropy.tests.helper import assert_quantity_allclose
 from numpy.testing import assert_allclose
 
-from gwcs import utils as gwutils
-from gwcs.utils import UnsupportedProjectionError
+from gwcs.utils import (
+    UnsupportedProjectionError,
+    _compute_lon_pole,
+    create_projection_transform,
+    get_axes,
+    get_projcode,
+    get_values,
+    make_fitswcs_transform,
+)
 
 from . import data
 
@@ -22,17 +29,17 @@ data_path = Path(data.__file__).parent.absolute()
 def test_wrong_projcode():
     ctype = {"CTYPE": ["RA---TAM", "DEC--TAM"]}
     with pytest.raises(UnsupportedProjectionError):
-        gwutils.get_projcode(ctype)
+        get_projcode(ctype)
 
 
 def test_wrong_projcode2():
     with pytest.raises(UnsupportedProjectionError):
-        gwutils.create_projection_transform("TAM")
+        create_projection_transform("TAM")
 
 
 def test_fits_transform():
     hdr = fits.Header.fromfile(data_path / "simple_wcs2.hdr")
-    gw1 = gwutils.make_fitswcs_transform(hdr)
+    gw1 = make_fitswcs_transform(hdr)
     w1 = fitswcs.WCS(hdr)
     assert_allclose(gw1(1, 2), w1.wcs_pix2world(1, 2, 0), atol=10**-8)
 
@@ -43,31 +50,21 @@ def test_lon_pole():
     azp = models.Pix2Sky_AZP(mu=-1.35, gamma=25.8458)
     sky_positive_lat = coord.SkyCoord(3 * u.deg, 1 * u.deg)
     sky_negative_lat = coord.SkyCoord(3 * u.deg, -1 * u.deg)
+    assert_quantity_allclose(_compute_lon_pole(sky_positive_lat, tan), 180 * u.deg)
+    assert_quantity_allclose(_compute_lon_pole(sky_negative_lat, tan), 180 * u.deg)
+    assert_quantity_allclose(_compute_lon_pole(sky_positive_lat, car), 0 * u.deg)
+    assert_quantity_allclose(_compute_lon_pole(sky_negative_lat, car), 180 * u.deg)
+    assert_quantity_allclose(_compute_lon_pole((0, 0.34 * u.rad), tan), 180 * u.deg)
     assert_quantity_allclose(
-        gwutils._compute_lon_pole(sky_positive_lat, tan), 180 * u.deg
+        _compute_lon_pole((1 * u.rad, 0.34 * u.rad), azp), 180 * u.deg
     )
-    assert_quantity_allclose(
-        gwutils._compute_lon_pole(sky_negative_lat, tan), 180 * u.deg
-    )
-    assert_quantity_allclose(
-        gwutils._compute_lon_pole(sky_positive_lat, car), 0 * u.deg
-    )
-    assert_quantity_allclose(
-        gwutils._compute_lon_pole(sky_negative_lat, car), 180 * u.deg
-    )
-    assert_quantity_allclose(
-        gwutils._compute_lon_pole((0, 0.34 * u.rad), tan), 180 * u.deg
-    )
-    assert_quantity_allclose(
-        gwutils._compute_lon_pole((1 * u.rad, 0.34 * u.rad), azp), 180 * u.deg
-    )
-    assert_allclose(gwutils._compute_lon_pole((1, -34), tan), 180)
-    assert_allclose(gwutils._compute_lon_pole((1, -90), tan), 180)
-    assert_allclose(gwutils._compute_lon_pole((1, 90), tan), 180)
+    assert_allclose(_compute_lon_pole((1, -34), tan), 180)
+    assert_allclose(_compute_lon_pole((1, -90), tan), 180)
+    assert_allclose(_compute_lon_pole((1, 90), tan), 180)
 
 
 def test_unknown_ctype():
-    wcsinfo = {
+    wcs_info = {
         "CDELT": np.array([3.61111098e-05, 3.61111098e-05, 2.49999994e-03]),
         "CRPIX": np.array([17.0, 16.0, 1.0]),
         "CRVAL": np.array([4.49999564e01, 1.72786731e-04, 4.84631542e00]),
@@ -77,7 +74,7 @@ def test_unknown_ctype():
         "WCSAXES": 3,
         "has_cd": False,
     }
-    transform = gwutils.make_fitswcs_transform(wcsinfo)
+    transform = make_fitswcs_transform(wcs_info)
     x = np.linspace(-5, 7, 10)
     y = np.linspace(-5, 7, 10)
     expected = (
@@ -116,13 +113,13 @@ def test_unknown_ctype():
 
 
 def test_get_axes():
-    wcsinfo = {"CTYPE": np.array(["MRSAL1A", "MRSBE1A", "WAVE"])}
-    cel, spec, other = gwutils.get_axes(wcsinfo)
+    wcs_info = {"CTYPE": np.array(["MRSAL1A", "MRSBE1A", "WAVE"])}
+    cel, spec, other = get_axes(wcs_info)
     assert not cel
     assert spec == [2]
     assert other == [0, 1]
-    wcsinfo = {"CTYPE": np.array(["RA---TAN", "WAVE", "DEC--TAN"])}
-    cel, spec, other = gwutils.get_axes(wcsinfo)
+    wcs_info = {"CTYPE": np.array(["RA---TAN", "WAVE", "DEC--TAN"])}
+    cel, spec, other = get_axes(wcs_info)
     assert cel == [0, 2]
     assert spec == [1]
     assert not other
@@ -131,8 +128,8 @@ def test_get_axes():
 def test_get_values():
     args = 2 * u.cm
     units = (u.m,)
-    res = gwutils.get_values(units, args)
+    res = get_values(units, args)
     assert res == [0.02]
 
-    res = gwutils.get_values(None, args)
+    res = get_values(None, args)
     assert res == [2]

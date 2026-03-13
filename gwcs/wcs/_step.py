@@ -123,7 +123,7 @@ class Step:
             stacklevel=2,
         )
         if ind not in (0, 1):
-            msg = "Allowed inices are 0 (frame) and 1 (transform)."
+            msg = "Allowed indices are 0 (frame) and 1 (transform)."
             raise IndexError(msg)
         if ind == 0:
             return self.frame

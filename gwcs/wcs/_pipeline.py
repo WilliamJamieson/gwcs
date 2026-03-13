@@ -650,7 +650,7 @@ class Pipeline:
         The order of the axes is
         `~gwcs.coordinate_frames.CoordinateFrameProtocol.axes_order`.
         For two inputs and axes_order(0, 1) the bounding box is
-        ((xlow, xhigh), (ylow, yhigh)).
+        ((x_low, x_high), (y_low, y_high)).
 
         Parameters
         ----------
@@ -678,14 +678,16 @@ class Pipeline:
             transform.bounding_box = bbox
 
     def attach_compound_bounding_box(
-        self, cbbox: dict[tuple[str, ...], tuple], selector_args: tuple[str, ...]
+        self,
+        compound_bounding_box: dict[tuple[str, ...], tuple],
+        selector_args: tuple[str, ...],
     ) -> None:
         """
         Attach a compound bounding box dictionary to the pipeline.
 
         Parameters
         ----------
-        cbbox
+        compound_bounding_box
             Dictionary of the bounding box tuples (F order) for each input set
                 keys: selector argument
                 values: bounding box tuple in F order
@@ -693,5 +695,8 @@ class Pipeline:
             Argument names to the model that are used to select the bounding box
         """
         self.bounding_box = CompoundBoundingBox.validate(
-            self.pipeline[0].transform, cbbox, selector_args=selector_args, order="F"
+            self.pipeline[0].transform,
+            compound_bounding_box,
+            selector_args=selector_args,
+            order="F",
         )

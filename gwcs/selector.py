@@ -135,7 +135,7 @@ import contextlib
 import warnings
 
 import numpy as np
-from astropy.modeling import models as astmodels
+from astropy.modeling import models
 from astropy.modeling.core import Model
 
 from . import region
@@ -717,9 +717,9 @@ class LabelMapper(_LabelMapper):
         self._n_inputs = len(inputs)
         self._outputs = tuple([f"x{ind}" for ind in list(range(mapper.n_outputs))])
         if isinstance(inputs_mapping, tuple):
-            inputs_mapping = astmodels.Mapping(inputs_mapping)
+            inputs_mapping = models.Mapping(inputs_mapping)
         elif inputs_mapping is not None and not isinstance(
-            inputs_mapping, astmodels.Mapping
+            inputs_mapping, models.Mapping
         ):
             msg = "inputs_mapping must be an instance of astropy.modeling.Mapping."
             raise TypeError(msg)

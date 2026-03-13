@@ -2,13 +2,13 @@ import sys
 import warnings
 
 import numpy as np
-import numpy.linalg as npla
 from astropy.modeling.models import (
     Const1D,
     Identity,
     Mapping,
     Polynomial2D,
 )
+from numpy import linalg as np_linalg
 from scipy import linalg
 
 from gwcs.wcstools import grid_from_bounding_box
@@ -22,7 +22,7 @@ __all__ = [
 ]
 
 
-def _poly_fit_lu(xin, yin, xout, yout, degree, coord_pow=None):
+def _poly_fit_lu(xin, yin, x_out, y_out, degree, coord_pow=None):
     # This function fits 2D polynomials to data by writing the normal system
     # of equations and solving it using LU-decomposition. In theory this
     # should be less stable than the SVD method used by numpy's lstsq or
@@ -43,17 +43,17 @@ def _poly_fit_lu(xin, yin, xout, yout, degree, coord_pow=None):
     if coord_pow is None:
         coord_pow = {}
 
-    nterms = len(powers)
+    n_terms = len(powers)
 
     flt_type = np.longdouble
 
     # allocate array for the coefficients of the system of equations (a*x=b):
-    a = np.empty((nterms, nterms), dtype=flt_type)
-    bx = np.empty(nterms, dtype=flt_type)
-    by = np.empty(nterms, dtype=flt_type)
+    a = np.empty((n_terms, n_terms), dtype=flt_type)
+    bx = np.empty(n_terms, dtype=flt_type)
+    by = np.empty(n_terms, dtype=flt_type)
 
-    xout = xout.ravel()
-    yout = yout.ravel()
+    x_out = x_out.ravel()
+    y_out = y_out.ravel()
 
     x = np.asarray(xin.ravel(), dtype=flt_type)
     y = np.asarray(yin.ravel(), dtype=flt_type)
@@ -61,7 +61,7 @@ def _poly_fit_lu(xin, yin, xout, yout, degree, coord_pow=None):
     # pseudo_vander - a reduced Vandermonde matrix for 2D polynomials
     # that has only terms x^i * y^j with powers i, j that satisfy:
     # 0 < i + j <= degree.
-    pseudo_vander = np.empty((x.size, nterms), dtype=float)
+    pseudo_vander = np.empty((x.size, n_terms), dtype=float)
 
     def pow2(p, q):
         # computes product of powers of coordinate arrays (x**p) * (y**q)
@@ -80,14 +80,14 @@ def _poly_fit_lu(xin, yin, xout, yout, degree, coord_pow=None):
         coord_pow[(p, q)] = arr
         return arr
 
-    for i in range(nterms):
+    for i in range(n_terms):
         pi, qi = powers[i]
         coord_pq = pow2(pi, qi)
         pseudo_vander[:, i] = coord_pq
-        bx[i] = np.sum(xout * coord_pq, dtype=flt_type)
-        by[i] = np.sum(yout * coord_pq, dtype=flt_type)
+        bx[i] = np.sum(x_out * coord_pq, dtype=flt_type)
+        by[i] = np.sum(y_out * coord_pq, dtype=flt_type)
 
-        for j in range(i, nterms):
+        for j in range(i, n_terms):
             pj, qj = powers[j]
             coord_pq = pow2(pi + pj, qi + qj)
             a[i, j] = np.sum(coord_pq, dtype=flt_type)
@@ -97,25 +97,25 @@ def _poly_fit_lu(xin, yin, xout, yout, degree, coord_pow=None):
         warnings.simplefilter("error", category=linalg.LinAlgWarning)
         try:
             lu_piv = linalg.lu_factor(a)
-            poly_coeff_x = linalg.lu_solve(lu_piv, bx).astype(float)
-            poly_coeff_y = linalg.lu_solve(lu_piv, by).astype(float)
+            poly_coefficients_x = linalg.lu_solve(lu_piv, bx).astype(float)
+            poly_coefficients_y = linalg.lu_solve(lu_piv, by).astype(float)
         except (ValueError, linalg.LinAlgWarning, np.linalg.LinAlgError) as e:
             msg = f"Failed to fit SIP. Reported error:\n{e.args[0]}"
             raise np.linalg.LinAlgError(msg) from e
 
-    if not np.all(np.isfinite([poly_coeff_x, poly_coeff_y])):
+    if not np.all(np.isfinite([poly_coefficients_x, poly_coefficients_y])):
         msg = "Failed to fit SIP. Computed coefficients are not finite."
         raise np.linalg.LinAlgError(msg)
 
     cond = np.linalg.cond(a.astype(float))
 
-    fitx = np.dot(pseudo_vander, poly_coeff_x)
-    fity = np.dot(pseudo_vander, poly_coeff_y)
+    fit_x = np.dot(pseudo_vander, poly_coefficients_x)
+    fit_y = np.dot(pseudo_vander, poly_coefficients_y)
 
-    dist = np.sqrt((xout - fitx) ** 2 + (yout - fity) ** 2)
-    max_resid = dist.max()
+    dist = np.sqrt((x_out - fit_x) ** 2 + (y_out - fit_y) ** 2)
+    max_residual = dist.max()
 
-    return poly_coeff_x, poly_coeff_y, max_resid, powers, cond
+    return poly_coefficients_x, poly_coefficients_y, max_residual, powers, cond
 
 
 def fit_2D_poly(
@@ -124,12 +124,12 @@ def fit_2D_poly(
     plate_scale,
     xin,
     yin,
-    xout,
-    yout,
-    xind,
-    yind,
-    xoutd,
-    youtd,
+    x_out,
+    y_out,
+    x_ind,
+    y_ind,
+    x_outd,
+    y_outd,
     verbose=False,
 ):
     """
@@ -138,10 +138,10 @@ def fit_2D_poly(
     """
     # The case of one pass with the specified polynomial degree
     if degree is None:
-        deglist = list(range(1, 10))
+        deg_list = list(range(1, 10))
     elif hasattr(degree, "__iter__"):
-        deglist = sorted(map(int, degree))
-        if deglist[0] < 1 or deglist[-1] > 9:
+        deg_list = sorted(map(int, degree))
+        if deg_list[0] < 1 or deg_list[-1] > 9:
             msg = "Allowed values for SIP degree are [1...9]"
             raise ValueError(msg)
     else:
@@ -149,9 +149,9 @@ def fit_2D_poly(
         if degree < 1 or degree > 9:
             msg = "Allowed values for SIP degree are [1...9]"
             raise ValueError(msg)
-        deglist = [degree]
+        deg_list = [degree]
 
-    single_degree = len(deglist) == 1
+    single_degree = len(deg_list) == 1
 
     fit_error = np.inf
     if verbose and not single_degree:
@@ -162,10 +162,10 @@ def fit_2D_poly(
 
     # Fit lowest degree SIP first.
     coord_pow = {}  # hold coordinate arrays powers for optimization purpose
-    for deg in deglist:
+    for deg in deg_list:
         try:
             cfx_i, cfy_i, fit_error_i, powers_i, cond = _poly_fit_lu(
-                xin, yin, xout, yout, degree=deg, coord_pow=coord_pow
+                xin, yin, x_out, y_out, degree=deg, coord_pow=coord_pow
             )
             if verbose and not single_degree:
                 sys.stdout.write(
@@ -218,16 +218,16 @@ def fit_2D_poly(
 
     if fit_error <= max_error or single_degree:
         # Check to see if double sampling meets error requirement.
-        max_resid = _compute_distance_residual(
-            xoutd, youtd, fit_poly_x(xind, yind), fit_poly_y(xind, yind)
+        max_residual = _compute_distance_residual(
+            x_outd, y_outd, fit_poly_x(x_ind, y_ind), fit_poly_y(x_ind, y_ind)
         )
         if verbose:
             sys.stdout.write(
                 "* Maximum residual, double sampled grid: "
-                f"{max_resid / plate_scale:.5g}"
+                f"{max_residual / plate_scale:.5g}"
             )
 
-        if max_resid > min(5.0 * fit_error, max_error):
+        if max_residual > min(5.0 * fit_error, max_error):
             warnings.warn(
                 "Double sampling check FAILED: Sampling may be too coarse for "
                 "the distortion model being fitted.",
@@ -237,7 +237,7 @@ def fit_2D_poly(
         # Residuals on the double-dense grid may be better estimates
         # of the accuracy of the fit. So we report the largest of
         # the residuals (on single- and double-sampled grid) as the fit error:
-        fit_error = max(max_resid, fit_error)
+        fit_error = max(max_residual, fit_error)
 
     if verbose:
         if single_degree:
@@ -251,18 +251,18 @@ def fit_2D_poly(
     return fit_poly_x, fit_poly_y, fit_error / plate_scale
 
 
-def make_sampling_grid(npoints, bounding_box, crpix):
-    step = np.subtract.reduce(bounding_box, axis=1) / (1.0 - npoints)
+def make_sampling_grid(n_points, bounding_box, crpix):
+    step = np.subtract.reduce(bounding_box, axis=1) / (1.0 - n_points)
     crpix = np.asanyarray(crpix)[:, None, None]
     x, y = grid_from_bounding_box(bounding_box, step=step, center=False) - crpix
     return x.flatten(), y.flatten()
 
 
-def _compute_distance_residual(undist_x, undist_y, fit_poly_x, fit_poly_y):
+def _compute_distance_residual(un_dist_x, un_dist_y, fit_poly_x, fit_poly_y):
     """
     Compute the distance residuals and return the rms and maximum values.
     """
-    dist = np.sqrt((undist_x - fit_poly_x) ** 2 + (undist_y - fit_poly_y) ** 2)
+    dist = np.sqrt((un_dist_x - fit_poly_x) ** 2 + (un_dist_y - fit_poly_y) ** 2)
     return dist.max()
 
 
@@ -287,8 +287,8 @@ def reform_poly_coefficients(fit_poly_x, fit_poly_y):
     sip_poly_y.c1_0 = 0
     sip_poly_y.c0_1 = 0
 
-    cdmat = ((c11, c12), (c21, c22))
-    invcdmat = npla.inv(np.array(cdmat))
+    cd_matrix = ((c11, c12), (c21, c22))
+    inv_cd_matrix = np_linalg.inv(np.array(cd_matrix))
     degree = fit_poly_x.degree
     # Now loop through all remaining coefficients
     for i in range(degree + 1):
@@ -296,23 +296,25 @@ def reform_poly_coefficients(fit_poly_x, fit_poly_y):
             if (i + j > 1) and (i + j < degree + 1):
                 old_x = getattr(fit_poly_x, f"c{i}_{j}").value
                 old_y = getattr(fit_poly_y, f"c{i}_{j}").value
-                newcoeff = np.dot(invcdmat, np.array([[old_x], [old_y]]))
-                setattr(sip_poly_x, f"c{i}_{j}", newcoeff[0, 0])
-                setattr(sip_poly_y, f"c{i}_{j}", newcoeff[1, 0])
+                new_coefficients = np.dot(inv_cd_matrix, np.array([[old_x], [old_y]]))
+                setattr(sip_poly_x, f"c{i}_{j}", new_coefficients[0, 0])
+                setattr(sip_poly_y, f"c{i}_{j}", new_coefficients[1, 0])
 
-    return cdmat, sip_poly_x, sip_poly_y
+    return cd_matrix, sip_poly_x, sip_poly_y
 
 
-def store_2D_coefficients(hdr, poly_model, coeff_prefix, keeplinear=False):
+def store_2D_coefficients(hdr, poly_model, coefficient_prefix, keep_linear=False):
     """
     Write the polynomial model coefficients to the header.
     """
-    mindeg = int(not keeplinear)
+    min_degree = int(not keep_linear)
     degree = poly_model.degree
     for i in range(degree + 1):
         for j in range(degree + 1):
-            if (i + j) > mindeg and (i + j < degree + 1):
-                hdr[f"{coeff_prefix}_{i}_{j}"] = getattr(poly_model, f"c{i}_{j}").value
+            if (i + j) > min_degree and (i + j < degree + 1):
+                hdr[f"{coefficient_prefix}_{i}_{j}"] = getattr(
+                    poly_model, f"c{i}_{j}"
+                ).value
 
 
 def fix_transform_inputs(transform, inputs):

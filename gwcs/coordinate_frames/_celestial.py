@@ -17,7 +17,7 @@ STANDARD_REFERENCE_FRAMES = [frame.upper() for frame in coord.builtin_frames.__a
 
 class CelestialFrame(CoordinateFrame):
     """
-    Representation of a Celesital coordinate system.
+    Representation of a celestial coordinate system.
 
     This class has a native order of longitude then latitude, meaning
     ``axes_names``, ``unit`` and ``axis_physical_types`` should be lon, lat
