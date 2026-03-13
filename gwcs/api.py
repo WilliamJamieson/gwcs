@@ -8,11 +8,13 @@ This module defines the abstract APIs for the GWCS Package:
 from __future__ import annotations
 
 import abc
+import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
 from astropy import units as u
 from astropy.modeling import separable
+from astropy.modeling.bounding_box import CompoundBoundingBox
 from astropy.wcs.wcsapi import BaseLowLevelWCS, HighLevelWCSMixin
 
 from gwcs import utils
@@ -20,7 +22,7 @@ from gwcs.coordinate_frames import LowLevelArray, LowLevelInput
 
 if TYPE_CHECKING:
     from astropy.modeling import Model
-    from astropy.modeling.bounding_box import CompoundBoundingBox, ModelBoundingBox
+    from astropy.modeling.bounding_box import ModelBoundingBox
 
     from gwcs.coordinate_frames import (
         CoordinateFrameProtocol,
@@ -330,17 +332,20 @@ class WCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin, NativeAPIMixin):
         if bounding_box is None:
             return None
 
-        if self.pixel_n_dim == 1 and len(bounding_box) == 2:
-            bounding_box = (bounding_box,)
+        if isinstance(bounding_box, CompoundBoundingBox):
+            msg = "Pixel_bounds are not supported by compound bounding boxes"
+            warnings.warn(msg, UserWarning, stacklevel=2)
+
+            return None
 
         # Iterate over the bounding box and convert from quantity if required.
-        bounding_box = list(bounding_box)
-        for i, bb_axes in enumerate(bounding_box):
-            bb = [lim.value if isinstance(lim, u.Quantity) else lim for lim in bb_axes]
-
-            bounding_box[i] = tuple(bb)
-
-        return tuple(bounding_box)
+        return tuple(
+            tuple(
+                lim.value if isinstance(lim, u.Quantity) else lim
+                for lim in bounding_box[index]
+            )
+            for index in range(len(bounding_box))
+        )
 
     @property
     def pixel_shape(self) -> tuple[int, ...] | None:
