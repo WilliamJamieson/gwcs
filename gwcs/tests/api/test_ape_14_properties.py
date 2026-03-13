@@ -9,6 +9,8 @@ from astropy import time
 from astropy import units as u
 from numpy.testing import assert_array_equal
 
+from gwcs.wcs import WCS
+
 RNG = np.random.default_rng(42)
 
 
@@ -104,6 +106,12 @@ def test_array_shape_and_pixel_shape(wcs_object, wcs_shape):
     wcs_object.pixel_shape = pixel_shape
     assert wcs_object.array_shape == pixel_shape[::-1]
 
+    bad_shape = tuple(RNG.integers(1020, 4096, size=wcs_object.pixel_n_dim + 1))
+    with pytest.raises(ValueError, match=r"The number of data axes,.*"):
+        wcs_object.pixel_shape = bad_shape
+
+    assert wcs_object.pixel_shape == pixel_shape
+
     # Fix for future tests
     wcs_object.array_shape = wcs_shape
 
@@ -152,11 +160,26 @@ def test_pixel_bounds(wcs_object, wcs_pixel_bounds):
     assert wcs_object.pixel_bounds == wcs_pixel_bounds
 
     bbox = tuple((-0.5, RNG.uniform(1020, 4096)) for _ in range(wcs_object.pixel_n_dim))
+    if wcs_object.pixel_n_dim == 1:
+        bbox = bbox[0]
 
     wcs_object.bounding_box = bbox
+    assert wcs_object.bounding_box is not None
+
     assert_array_equal(wcs_object.pixel_bounds, wcs_object.bounding_box)
     # Reset the bounding box or this will affect other tests
     wcs_object.bounding_box = wcs_pixel_bounds
+
+
+def test_pixel_bounds_error(gwcs_simple_2d: WCS):
+    cbb = {
+        1: (-0.5, RNG.uniform(1020, 4096)),
+        2: (0.5, RNG.uniform(1020, 4096)),
+    }
+    gwcs_simple_2d.attach_compound_bounding_box(cbb, [("x0",)])
+
+    with pytest.warns(UserWarning, match=r"Pixel_bounds are not supported by.*"):
+        assert gwcs_simple_2d.pixel_bounds is None
 
 
 @pytest.fixture
