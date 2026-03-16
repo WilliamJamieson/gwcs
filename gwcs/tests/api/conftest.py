@@ -17,6 +17,7 @@ fixture_names = (
     "gwcs_empty_output_2d",
     "gwcs_simple_imaging",
     "gwcs_with_frames_strings",
+    "gwcs_high_level_pixel",
 )
 
 

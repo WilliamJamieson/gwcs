@@ -33,6 +33,7 @@ def wcs_ndim(fixture_name):
         "gwcs_empty_output_2d": (2, 2),
         "gwcs_simple_imaging": (2, 2),
         "gwcs_with_frames_strings": (4, 3),
+        "gwcs_high_level_pixel": (2, 2),
     }[fixture_name]
 
 
@@ -65,6 +66,7 @@ def wcs_shape(fixture_name):
         "gwcs_empty_output_2d": None,
         "gwcs_simple_imaging": None,
         "gwcs_with_frames_strings": None,
+        "gwcs_high_level_pixel": None,
     }[fixture_name]
 
 
@@ -109,6 +111,7 @@ def wcs_pixel_bounds(fixture_name):
         "gwcs_empty_output_2d": None,
         "gwcs_simple_imaging": None,
         "gwcs_with_frames_strings": None,
+        "gwcs_high_level_pixel": None,
     }[fixture_name]
 
 
@@ -151,6 +154,7 @@ def wcs_types(fixture_name):
             "custom:UNDEFINED",
             "custom:UNDEFINED",
         ),
+        "gwcs_high_level_pixel": ("pos.eq.ra", "pos.eq.dec"),
     }[fixture_name]
 
 
@@ -178,6 +182,7 @@ def wcs_units(fixture_name):
         "gwcs_empty_output_2d": ("None", "None"),
         "gwcs_simple_imaging": ("deg", "deg"),
         "gwcs_with_frames_strings": ("None", "None", "None"),
+        "gwcs_high_level_pixel": ("deg", "deg"),
     }[fixture_name]
 
 
@@ -276,6 +281,12 @@ def wcs_axis_correlation_matrix(fixture_name):
                 [False, False, True, True],
             ]
         ),
+        "gwcs_high_level_pixel": np.array(
+            [
+                [True, False],
+                [False, True],
+            ]
+        ),
     }[fixture_name]
 
 
@@ -313,6 +324,7 @@ def wcs_component_names(fixture_name):
             "UNDEFINED1",
             "UNDEFINED2",
         ),
+        "gwcs_high_level_pixel": ("celestial", "celestial"),
     }[fixture_name]
 
 
@@ -335,6 +347,7 @@ def wcs_component_positions(fixture_name):
         "gwcs_empty_output_2d": (0, 0),
         "gwcs_simple_imaging": (0, 1),
         "gwcs_with_frames_strings": (0, 0, 0),
+        "gwcs_high_level_pixel": (0, 1),
     }[fixture_name]
 
 
@@ -389,6 +402,10 @@ def wcs_component_properties(fixture_name):
             (coord.SkyCoord(34.7, -45.7, unit="deg"), -45.7),
         ),
         "gwcs_with_frames_strings": ("value", "value", "value"),
+        "gwcs_high_level_pixel": (
+            (coord.SkyCoord(27, 90, unit="deg"), 27),
+            (coord.SkyCoord(34.7, -45.7, unit="deg"), -45.7),
+        ),
     }[fixture_name]
 
 
@@ -500,15 +517,16 @@ def wcs_component_object_classes(fixture_name, wcs_object):
             "SPATIAL1": (u.Quantity, (), {"unit": u.pixel}),
         },
         "gwcs_empty_output_2d": {
-            "UNDEFINED": ("None", (), {"unit": None}),
-            "UNDEFINED1": ("None", (), {"unit": None}),
+            "UNDEFINED": (u.Quantity, (), {"unit": None}),
+            "UNDEFINED1": (u.Quantity, (), {"unit": None}),
         },
         "gwcs_simple_imaging": {"celestial": celestial},
         "gwcs_with_frames_strings": {
-            "UNDEFINED": ("None", (), {"unit": None}),
-            "UNDEFINED1": ("None", (), {"unit": None}),
-            "UNDEFINED2": ("None", (), {"unit": None}),
+            "UNDEFINED": (u.Quantity, (), {"unit": None}),
+            "UNDEFINED1": (u.Quantity, (), {"unit": None}),
+            "UNDEFINED2": (u.Quantity, (), {"unit": None}),
         },
+        "gwcs_high_level_pixel": {"celestial": celestial},
     }[fixture_name]
 
 
@@ -562,6 +580,7 @@ def wcs_names(fixture_name):
         "gwcs_empty_output_2d": (("", ""), ("", "")),
         "gwcs_simple_imaging": (("x", "y"), ("lon", "lat")),
         "gwcs_with_frames_strings": (("", "", "", ""), ("", "", "")),
+        "gwcs_high_level_pixel": (("lon", "lat"), ("lon", "lat")),
     }[fixture_name]
 
 

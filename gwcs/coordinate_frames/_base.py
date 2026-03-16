@@ -222,6 +222,15 @@ class CoordinateFrameProtocol(Protocol):
         astropy.wcs.wcsapi.BaseLowLevelWCS.world_axis_object_components
         """
 
+    @property
+    def serialized_classes(self) -> bool:
+        """
+        This property is used by the low level WCS API in Astropy.
+
+        By providing it we can duck type as a low level WCS object.
+        """
+        return False
+
     def add_units(
         self, arrays: tuple[LowLevelInput, ...] | LowLevelInput
     ) -> tuple[LowLevelInput, ...]:

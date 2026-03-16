@@ -214,6 +214,10 @@ class WCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin, NativeAPIMixin):
         order, where for an image, ``x`` is the horizontal coordinate and ``y``
         is the vertical coordinate.
         """
+        if self.input_frame.is_high_level(*pixel_arrays):
+            msg = "High-Level inputs are not supported by the low-level API"
+            raise ValueError(msg)
+
         return self._remove_quantity_frame(
             self.evaluate(*pixel_arrays), self.output_frame
         )
@@ -244,6 +248,11 @@ class WCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin, NativeAPIMixin):
         be returned in the ``(x, y)`` order, where for an image, ``x`` is the
         horizontal coordinate and ``y`` is the vertical coordinate.
         """
+
+        if self.output_frame.is_high_level(*world_arrays):
+            msg = "High-Level inputs are not supported by the low-level API"
+            raise ValueError(msg)
+
         return self._remove_quantity_frame(self.invert(*world_arrays), self.input_frame)
 
     def world_to_array_index_values(

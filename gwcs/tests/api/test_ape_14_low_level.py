@@ -26,6 +26,7 @@ def pixels(fixture_name):
             | "gwcs_simple_2d"
             | "gwcs_empty_output_2d"
             | "gwcs_simple_imaging"
+            | "gwcs_high_level_pixel"
         ):
             return 1, 2
         case "gwcs_3d_spatial_wave" | "gwcs_3d_identity_units":
@@ -51,6 +52,7 @@ def world(fixture_name):  # noqa: PLR0911
             | "gwcs_2d_quantity_shift"
             | "gwcs_simple_2d"
             | "gwcs_empty_output_2d"
+            | "gwcs_high_level_pixel"
         ):
             return 2, 4
         case "gwcs_2d_spatial_reordered":
@@ -149,7 +151,28 @@ class TestPixToWorld:
             world = tuple(np.ones((3, 4)) * arg for arg in world)
 
         # Test that it matches the native API call
-        assert_allclose(wcs_object.pixel_to_world_values(*pixels), world)
+        assert_allclose(wcs_object.pixel_to_world_values(*pixels), wcs_object(*pixels))
+
+        # Check that the low-level API rejects high-level inputs.
+        high_level = wcs_object.input_frame.to_high_level_coordinates(
+            *pixels, correct_1d=False
+        )
+        # Technically, we support quantities as low-level inputs, so we need to allow
+        #    them to pass through
+        if all(type(hlo) is u.Quantity for hlo in high_level):
+            with (
+                pytest.warns(EmptyFrameUnitsWarning, match=r"EmptyFrame.*")
+                if isinstance(wcs_object.input_frame, EmptyFrame)
+                else nullcontext()
+            ):
+                assert_allclose(wcs_object.pixel_to_world_values(*high_level), world)
+        else:
+            with pytest.raises(ValueError, match=r"High-Level inputs.*"):
+                wcs_object.pixel_to_world_values(*high_level)
+
+        # Introduce units (gwcs only supported)
+        if with_units:
+            pixels = self._get_input_as_unit(wcs_object, pixels)
 
         # Check that this never returns a Quantity, even if the input is a Quantity
         pixel_to_world = wcs_object.pixel_to_world_values(*pixels)
@@ -159,7 +182,7 @@ class TestPixToWorld:
             assert not isinstance(pixel_to_world, u.Quantity)
 
         # Check that the values are correct
-        assert_allclose(pixel_to_world, wcs_object(*pixels))
+        assert_allclose(pixel_to_world, world)
 
     def test_array_index_to_world_values_array(
         self, wcs_object, pixels, world, with_units
@@ -177,6 +200,25 @@ class TestPixToWorld:
 
         # Test that it matches the native API call
         assert_allclose(wcs_object.array_index_to_world_values(*pixels[::-1]), world)
+
+        # Check that the low-level API rejects high-level inputs.
+        high_level = wcs_object.input_frame.to_high_level_coordinates(
+            *pixels[::-1], correct_1d=False
+        )
+        # Technically, we support quantities as low-level inputs, so we need to allow
+        #    them to pass through
+        if all(type(hlo) is u.Quantity for hlo in high_level):
+            with (
+                pytest.warns(EmptyFrameUnitsWarning, match=r"EmptyFrame.*")
+                if isinstance(wcs_object.input_frame, EmptyFrame)
+                else nullcontext()
+            ):
+                assert_allclose(
+                    wcs_object.array_index_to_world_values(*high_level), world
+                )
+        else:
+            with pytest.raises(ValueError, match=r"High-Level inputs.*"):
+                wcs_object.array_index_to_world_values(*high_level)
 
         # Introduce units (gwcs only supported)
         if with_units:
@@ -309,6 +351,23 @@ class TestWorldToPix:
             wcs_object.world_to_pixel_values(*world), wcs_object.invert(*world)
         )
 
+        # Check that the low-level API rejects high-level inputs.
+        high_level = wcs_object.output_frame.to_high_level_coordinates(
+            *world, correct_1d=False
+        )
+        # Technically, we support quantities as low-level inputs, so we need to allow
+        #    them to pass through
+        if all(type(hlo) is u.Quantity for hlo in high_level):
+            with (
+                pytest.warns(EmptyFrameUnitsWarning, match=r"EmptyFrame.*")
+                if isinstance(wcs_object.output_frame, EmptyFrame)
+                else nullcontext()
+            ):
+                assert_allclose(wcs_object.world_to_pixel_values(*high_level), pixels)
+        else:
+            with pytest.raises(ValueError, match=r"High-Level inputs.*"):
+                wcs_object.world_to_pixel_values(*high_level)
+
         # The gwcs_simple_imaging's inverse is not exact so we need to relax the
         #    tolerance for this test
         rtol = 0.1 if fixture_name == "gwcs_simple_imaging" else 1e-07
@@ -343,6 +402,7 @@ class TestWorldToPix:
 
         # Turn the input pixels and world into arrays
         pixels = tuple(np.ones((3, 4)) * arg for arg in pixels)[::-1]
+        # Note the reverse here
         if len(pixels) == 1:
             pixels = pixels[0]
 
@@ -359,6 +419,25 @@ class TestWorldToPix:
         if isinstance(output := wcs_object.world_to_array_index_values(*world), tuple):
             output = output[::-1]
         assert_allclose(output, wcs_object.invert(*world), rtol=rtol)
+
+        # Check that the low-level API rejects high-level inputs.
+        high_level = wcs_object.output_frame.to_high_level_coordinates(
+            *world, correct_1d=False
+        )
+        # Technically, we support quantities as low-level inputs, so we need to allow
+        #    them to pass through
+        if all(type(hlo) is u.Quantity for hlo in high_level):
+            with (
+                pytest.warns(EmptyFrameUnitsWarning, match=r"EmptyFrame.*")
+                if isinstance(wcs_object.output_frame, EmptyFrame)
+                else nullcontext()
+            ):
+                assert_allclose(
+                    wcs_object.world_to_array_index_values(*high_level), pixels
+                )
+        else:
+            with pytest.raises(ValueError, match=r"High-Level inputs.*"):
+                wcs_object.world_to_array_index_values(*high_level)
 
         # Introduce units (gwcs only supported)
         if with_units:

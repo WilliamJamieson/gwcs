@@ -202,15 +202,6 @@ class CoordinateFrame(CoordinateFrameProtocol):
         ]
 
     @property
-    def serialized_classes(self) -> bool:
-        """
-        This property is used by the low level WCS API in Astropy.
-
-        By providing it we can duck type as a low level WCS object.
-        """
-        return False
-
-    @property
     def raw_properties(self) -> FrameProperties:
         """The raw FrameProperties object for this frame."""
         return self._prop

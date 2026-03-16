@@ -187,3 +187,8 @@ def gwcs_2d_spatial_shift_reverse():
 @pytest.fixture
 def gwcs_multi_stage():
     return examples.gwcs_multi_stage()
+
+
+@pytest.fixture
+def gwcs_high_level_pixel():
+    return examples.gwcs_high_level_pixel()
