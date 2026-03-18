@@ -80,6 +80,7 @@ class TemporalFrame(CoordinateFrame):
         ) or isinstance(self.reference_frame.value, np.ndarray):
             return time.Time(dt, **kwargs)
 
+        # Todo: The else part of this branch is not covered.
         if not hasattr(dt, "unit"):
             dt = dt * unit
 

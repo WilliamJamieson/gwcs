@@ -92,19 +92,19 @@ class GratingEquationConverter(TransformConverterBase):
 
         groove_density = node["groove_density"]
         order = node["order"]
-        output = node["output"]
-        if output == "wavelength":
-            model = WavelengthFromGratingEquation(
-                groove_density=groove_density, spectral_order=order
-            )
-        elif output == "angle":
-            model = AnglesFromGratingEquation3D(
-                groove_density=groove_density, spectral_order=order
-            )
-        else:
-            msg = f"Can't create a GratingEquation model with output {output}"
-            raise ValueError(msg)
-        return model
+
+        match output := node.get("output"):
+            case "wavelength":
+                return WavelengthFromGratingEquation(
+                    groove_density=groove_density, spectral_order=order
+                )
+            case "angle":
+                return AnglesFromGratingEquation3D(
+                    groove_density=groove_density, spectral_order=order
+                )
+
+        msg = f"Can't create a GratingEquation model with output {output}"
+        raise ValueError(msg)
 
     def to_yaml_tree_transform(self, model, tag, ctx):
         from gwcs.spectroscopy import (
@@ -118,12 +118,18 @@ class GratingEquationConverter(TransformConverterBase):
             )
         else:
             groove_density = model.groove_density.value
+
         node = {"order": model.spectral_order.value, "groove_density": groove_density}
-        if isinstance(model, AnglesFromGratingEquation3D):
-            node["output"] = "angle"
-        elif isinstance(model, WavelengthFromGratingEquation):
-            node["output"] = "wavelength"
-        else:
-            msg = f"Can't serialize an instance of {model.__class__.__name__}"
-            raise TypeError(msg)
+
+        match model:
+            case AnglesFromGratingEquation3D():
+                node["output"] = "angle"
+
+            case WavelengthFromGratingEquation():
+                node["output"] = "wavelength"
+
+            case _:
+                msg = f"Can't serialize an instance of {model.__class__.__name__}"
+                raise TypeError(msg)
+
         return node

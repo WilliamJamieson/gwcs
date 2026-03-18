@@ -36,6 +36,7 @@ class LabelMapperConverter(TransformConverterBase):
                 "inputs_mapping must be an instanceof astropy.modeling.models.Mapping."
             )
             raise TypeError(msg)
+
         mapper = node["mapper"]
         atol = node.get("atol", 1e-8)
         no_label = node.get("no_label", np.nan)
@@ -44,23 +45,28 @@ class LabelMapperConverter(TransformConverterBase):
             if mapper.ndim != 2:
                 msg = "GWCS currently only supports 2D masks."
                 raise NotImplementedError(msg)
+
             if (inputs := node.get("inputs")) is None:
                 return LabelMapperArray(mapper, inputs_mapping)
+
             return LabelMapperArray(mapper, inputs_mapping, inputs=tuple(inputs))
+
         if isinstance(mapper, Model):
             inputs = node.get("inputs")
             return LabelMapper(
                 inputs, mapper, inputs_mapping=inputs_mapping, no_label=no_label
             )
-        inputs = node.get("inputs", None)
-        if inputs is not None:
-            inputs = tuple(inputs)
+
+        inputs = tuple(node["inputs"])
+
         labels = mapper.get("labels")
         transforms = mapper.get("models")
+
         if np.iterable(labels[0]):
             labels = [tuple(label) for label in labels]
             dict_mapper = dict(zip(labels, transforms, strict=False))
             return LabelMapperRange(inputs, dict_mapper, inputs_mapping)
+
         dict_mapper = dict(zip(labels, transforms, strict=False))
         return LabelMapperDict(inputs, dict_mapper, inputs_mapping, atol=atol)
 
@@ -77,27 +83,31 @@ class LabelMapperConverter(TransformConverterBase):
         if model.inputs_mapping is not None:
             node["inputs_mapping"] = model.inputs_mapping
 
-        if isinstance(model, LabelMapperArray):
-            node["mapper"] = model.mapper
-        elif isinstance(model, LabelMapper):
-            node["mapper"] = model.mapper
-            node["inputs"] = list(model.inputs)
-        elif isinstance(model, (LabelMapperDict, LabelMapperRange)):
-            if hasattr(model, "atol"):
-                node["atol"] = model.atol
-            mapper = OrderedDict()
-            labels = list(model.mapper)
+        match model:
+            case LabelMapperArray():
+                node["mapper"] = model.mapper
 
-            transforms = [model.mapper[k] for k in labels]
-            if np.iterable(labels[0]):
-                labels = [list(label) for label in labels]
-            mapper["labels"] = labels
-            mapper["models"] = transforms
-            node["mapper"] = mapper
-            node["inputs"] = list(model.inputs)
-        else:
-            msg = f"Unrecognized type of LabelMapper - {model}"
-            raise TypeError(msg)
+            case LabelMapper():
+                node["mapper"] = model.mapper
+                node["inputs"] = list(model.inputs)
+
+            case LabelMapperDict() | LabelMapperRange():
+                if hasattr(model, "atol"):
+                    node["atol"] = model.atol
+                mapper = OrderedDict()
+                labels = list(model.mapper)
+
+                transforms = [model.mapper[k] for k in labels]
+                if np.iterable(labels[0]):
+                    labels = [list(label) for label in labels]
+                mapper["labels"] = labels
+                mapper["models"] = transforms
+                node["mapper"] = mapper
+                node["inputs"] = list(model.inputs)
+
+            case _:
+                msg = f"Unrecognized type of LabelMapper - {model}"
+                raise TypeError(msg)
 
         return node
 

@@ -20,20 +20,28 @@ def _assert_frame_equal(a, b):
 
     assert type(a) is type(b)
 
-    if a is None:
-        return None
+    if a is None:  # pragma: no cover
+        return None  # pragma: no cover
 
-    if not _is_coordinate_frame(a):
-        return a == b
+    if not _is_coordinate_frame(a):  # pragma: no cover
+        return a == b  # pragma: no cover
 
     assert a.name == b.name  # nosec
     if not isinstance(a, cf.EmptyFrame) or (
         isinstance(a, cf.EmptyFrame) and a._naxes is not None
     ):
+        assert a.axes_type == b.axes_type
+        assert a.naxes == b.naxes
         assert a.axes_order == b.axes_order  # nosec
         assert a.axes_names == b.axes_names  # nosec
-        assert a.unit == b.unit  # nosec
         assert a.reference_frame == b.reference_frame  # nosec
+        assert a.unit == b.unit  # nosec
+        assert a.axis_physical_types == b.axis_physical_types
+    else:
+        # This is possible but when round tripping this should never happen
+        msg = "EmptyFrame does not have its naxes set"  # pragma: no cover
+        raise ValueError(msg)  # pragma: no cover
+
     return None
 
 
@@ -156,9 +164,11 @@ def _frame_factory():
         cf.SpectralFrame(name="freq", unit=(u.Hz,), axes_order=(2,)),
         cf.SpectralFrame(name="wave", unit=(u.m,), axes_order=(2,)),
         cf.StokesFrame(),
-        cf.StokesFrame(name="polarisation", axes_order=(3,)),
+        cf.StokesFrame(name="polarization", axes_order=(3,)),
+        cf.StokesFrame(axes_names=("foo",), axis_physical_types=("bar",)),
         cf.TemporalFrame(time.Time("2011-01-01")),
         cf.TemporalFrame(time.Time("2011-01-01"), axes_order=(2,)),
+        cf.TemporalFrame(time.Time("2011-01-01"), axes_names=("foo",)),
         cf.Frame2D(),
         cf.Frame2D(name="pixels"),
         cf.Frame2D(name="detector", axes_order=(1, 0)),
@@ -169,11 +179,13 @@ def _frame_factory():
             unit=(u.m, u.km),
             axes_names=("foo", "bar"),
         ),
+        cf.Frame2D(axes_type=("foo", "bar")),
         cf.CoordinateFrame(
             naxes=7,
             axes_type=((cf.AxisType.SPATIAL,) * 4) + ((cf.AxisType.PIXEL,) * 3),
             axes_order=tuple(range(7)),
         ),
+        cf.CoordinateFrame(naxes=0, axes_type=(), axes_order=()),
     ]
 
 
