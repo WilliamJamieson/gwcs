@@ -326,7 +326,7 @@ class CoordinateFrameProtocol(Protocol):
 
         return False
 
-    def to_high_level_coordinates(self, *values, correct_1d=True):
+    def to_high_level_coordinates(self, *values):
         """
         Convert "values" to high level coordinate objects described by this frame.
 
@@ -352,15 +352,9 @@ class CoordinateFrameProtocol(Protocol):
             msg = "All values should be a scalar number or a numpy array."
             raise TypeError(msg)
 
-        high_level = values_to_high_level_objects(*values, low_level_wcs=self)
-        if isinstance(high_level, list):
-            high_level = tuple(high_level)
+        return tuple(values_to_high_level_objects(*values, low_level_wcs=self))
 
-        if correct_1d and len(high_level) == 1:
-            high_level = high_level[0]
-        return high_level
-
-    def from_high_level_coordinates(self, *high_level_coords, correct_1d=True):
+    def from_high_level_coordinates(self, *high_level_coords):
         """
         Convert high level coordinate objects to "values" as described by this frame.
 
@@ -378,10 +372,9 @@ class CoordinateFrameProtocol(Protocol):
         values : `numbers.Number` or `numpy.ndarray`
             ``naxis`` number of coordinates as scalars or arrays.
         """
-        values = high_level_objects_to_values(*high_level_coords, low_level_wcs=self)
-        if correct_1d and self.naxes == 1:
-            values = values[0]
-        return values
+        return tuple(
+            high_level_objects_to_values(*high_level_coords, low_level_wcs=self)
+        )
 
 
 class BaseCoordinateFrame(CoordinateFrameProtocol):

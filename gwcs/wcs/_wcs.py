@@ -122,7 +122,7 @@ class _UnitHandler:
         # Handle the case where a HLO is passed into the Native API
         if frame.is_high_level(*inputs):
             self._is_high_level = True
-            inputs = frame.from_high_level_coordinates(*inputs, correct_1d=False)
+            inputs = frame.from_high_level_coordinates(*inputs)
 
         # Determine if the inputs are quantities
         input_is_quantity = any(isinstance(a, u.Quantity) for a in inputs)
@@ -199,7 +199,7 @@ class _UnitHandler:
     ) -> tuple[LowLevelInput, ...]:
         # Return a high level object if the input was a high level object
         if self._is_high_level:
-            return frame.to_high_level_coordinates(*outputs, correct_1d=False)  # type: ignore[no-any-return]
+            return frame.to_high_level_coordinates(*outputs)  # type: ignore[no-any-return]
 
         # If the input had units return units
         if self._add_units:

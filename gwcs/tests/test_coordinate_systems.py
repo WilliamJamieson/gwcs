@@ -119,14 +119,18 @@ def test_units():
 # These two functions fake the old methods on CoordinateFrame to reduce the
 # amount of refactoring that needed doing in these tests.
 def coordinates(*inputs, frame):
-    return frame.to_high_level_coordinates(*inputs)
+    coordinates = frame.to_high_level_coordinates(*inputs)
+    if len(coordinates) == 1:
+        return coordinates[0]
+
+    return coordinates
 
 
 def coordinate_to_quantity(*inputs, frame):
     results = frame.from_high_level_coordinates(*inputs)
-    if not isinstance(results, list):
-        results = [results]
-    return [r << unit for r, unit in zip(results, frame.unit, strict=False)]
+    if not isinstance(results, tuple):
+        results = (results,)
+    return tuple(r << unit for r, unit in zip(results, frame.unit, strict=False))
 
 
 @pytest.mark.parametrize("frame", _FRAMES)

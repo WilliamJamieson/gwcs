@@ -413,3 +413,23 @@ class WCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin, NativeAPIMixin):
         An iterable of strings describing the name for each world axis.
         """
         return self.output_frame.axes_names
+
+    def pixel_to_world(self, *pixel_arrays):
+        """
+        Convert pixel coordinates to world coordinates (represented by Astropy
+        objects). See ``pixel_to_world_values`` for pixel indexing and ordering
+        conventions.
+        """
+        # Need to convert any non-Quantity high-level inputs to low-level inputs
+        #   here because astropy.wcs does not do this because it assumes the
+        #   pixel "frame" doesn't have any real high-level objects, but in GWCS
+        #   this is permissible.
+        arrays = (
+            self.input_frame.from_high_level_coordinates(*pixel_arrays)
+            if self.input_frame.is_high_level(*pixel_arrays)
+            else pixel_arrays
+        )
+
+        if isinstance(output := super().pixel_to_world(*arrays), list):
+            return tuple(output)
+        return output
