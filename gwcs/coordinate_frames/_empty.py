@@ -140,9 +140,7 @@ class EmptyFrame(CoordinateFrameProtocol):
             for i, at in enumerate(self.axes_type)
         ]
 
-    def add_units(
-        self, arrays: tuple[LowLevelInput, ...] | LowLevelInput
-    ) -> tuple[LowLevelInput, ...]:
+    def add_units(self, *arrays: LowLevelInput) -> tuple[LowLevelInput, ...]:
         msg = (
             "EmptyFrame (string frame) does not have any unit information. "
             "Therefore, GWCS cannot ensure that units are being properly handled. "
@@ -152,20 +150,16 @@ class EmptyFrame(CoordinateFrameProtocol):
         )
         warnings.warn(msg, EmptyFrameUnitsWarning, stacklevel=2)
 
-        return super().add_units(arrays)
+        return super().add_units(*arrays)
 
-    def remove_units(
-        self, arrays: tuple[LowLevelInput, ...] | LowLevelInput
-    ) -> tuple[LowLevelInput, ...]:
+    def remove_units(self, *arrays: LowLevelInput) -> tuple[LowLevelInput, ...]:
         with warnings.catch_warnings():
             # Filter unit warning if there is no unit information to remove. This
             #   is because there is nothing for GWCS to be concerned about in this
             #   case and the only reason it is being triggered is that we attempt
             #   to add the unit information in order to force a unit conversion if
             #   needed.
-            if (self.naxes == 1 and not isinstance(arrays, u.Quantity)) or not any(
-                isinstance(arr, u.Quantity) for arr in arrays
-            ):
+            if not any(isinstance(arr, u.Quantity) for arr in arrays):
                 warnings.filterwarnings("ignore", category=EmptyFrameUnitsWarning)
 
-            return super().remove_units(arrays)
+            return super().remove_units(*arrays)

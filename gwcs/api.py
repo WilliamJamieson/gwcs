@@ -212,11 +212,12 @@ class WCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin, NativeAPIMixin):
         if frame.naxes == 1:
             result = (result,)
 
-        output = frame.remove_units(result)
+        output = frame.remove_units(*result)
 
         # If we only have one output axes, we shouldn't return a tuple.
         if frame.naxes == 1 and isinstance(output, tuple):
             return output[0]
+
         return output
 
     def pixel_to_world_values(

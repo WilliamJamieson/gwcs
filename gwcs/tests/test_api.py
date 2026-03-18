@@ -10,7 +10,6 @@ import pytest
 from astropy import coordinates as coord
 from astropy import time
 from astropy.wcs.wcsapi import HighLevelWCSWrapper
-from astropy.wcs.wcsapi.high_level_api import values_to_high_level_objects
 from numpy.testing import assert_allclose, assert_array_equal
 
 import gwcs
@@ -294,6 +293,10 @@ def _compare_frame_output(wc1, wc2):
         raise TypeError(msg)
 
 
+def _world_to_high_level(wcs_object, world):
+    return wcs_object.output_frame.to_high_level_coordinates(*world)
+
+
 @fixture_all_wcses
 def test_high_level_wrapper(wcsobj, request):
     hlvl = HighLevelWCSWrapper(wcsobj)
@@ -307,11 +310,22 @@ def test_high_level_wrapper(wcsobj, request):
     # Assert that both APE 14 API and GWCS give the same answer The APE 14 API
     # uses the mixin class and __call__ calls values_to_high_level_objects
     wc1 = hlvl.pixel_to_world(*pixel_input)
-    wc2 = wcsobj(*pixel_input)
-    results = wcsobj.output_frame.remove_units(wc2)
+    if isinstance(wc1, list):
+        wc1 = tuple(wc1)
 
-    wc2 = values_to_high_level_objects(*results, low_level_wcs=wcsobj)
-    if len(wc2) == 1:
+    wc2 = wcsobj(*pixel_input)
+    if isinstance(wc2, tuple):
+        results = wcsobj.output_frame.remove_units(*wc2)
+    else:
+        results = wcsobj.output_frame.remove_units(wc2)
+
+    wc2 = _world_to_high_level(wcsobj, results)
+    try:
+        length = len(wc2)
+    except TypeError:
+        length = 0
+
+    if length == 1:
         wc2 = wc2[0]
     assert type(wc1) is type(wc2)
 
@@ -328,7 +342,10 @@ def test_high_level_wrapper(wcsobj, request):
     pix_out1 = hlvl.world_to_pixel(*wc1)
     pix_out2 = wcsobj.invert(*wc1)
 
-    pix_out2 = wcsobj.input_frame.remove_units(pix_out2)
+    if isinstance(pix_out2, tuple):
+        pix_out2 = wcsobj.input_frame.remove_units(*pix_out2)
+    else:
+        pix_out2 = wcsobj.input_frame.remove_units(pix_out2)
 
     if not isinstance(pix_out2, list | tuple):
         pix_out2 = (pix_out2,)
