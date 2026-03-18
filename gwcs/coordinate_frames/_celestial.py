@@ -125,3 +125,15 @@ class CelestialFrame(CoordinateFrame):
                 "celestial", 1, lambda sc: sc.spherical.lat.to_value(self._prop.unit[1])
             ),
         ]
+
+    def from_high_level_coordinates(self, *high_level_coords, correct_1d=True):
+        if self.reference_frame is None:
+            msg = (
+                "Cannot convert high-level to low-level coordinates without a "
+                "reference frame."
+            )
+            raise RuntimeError(msg)
+
+        return super().from_high_level_coordinates(
+            *high_level_coords, correct_1d=correct_1d
+        )

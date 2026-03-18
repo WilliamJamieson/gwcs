@@ -88,10 +88,6 @@ class EmptyFrame(CoordinateFrameProtocol):
         """A custom name of this frame."""
         self._name = val
 
-    def _raise_error(self) -> None:
-        msg = "EmptyFrame does not have any information"
-        raise NotImplementedError(msg)
-
     @property
     def naxes(self) -> int:
         if self._naxes is None:
@@ -132,7 +128,7 @@ class EmptyFrame(CoordinateFrameProtocol):
     def world_axis_object_classes(self) -> WorldAxisObjectClasses:
         return {
             f"{at}{i}" if i != 0 else at: WorldAxisObjectClass(
-                "None", (), {"unit": unit}
+                u.Quantity, (), {"unit": unit}
             )
             for i, (at, unit) in enumerate(zip(self.axes_type, self.unit, strict=False))
         }
@@ -143,12 +139,6 @@ class EmptyFrame(CoordinateFrameProtocol):
             WorldAxisObjectComponent(f"{at}{i}" if i != 0 else at, 0, "value")
             for i, at in enumerate(self.axes_type)
         ]
-
-    def to_high_level_coordinates(self, *values):
-        self._raise_error()
-
-    def from_high_level_coordinates(self, *high_level_coords):
-        self._raise_error()
 
     def add_units(
         self, arrays: tuple[LowLevelInput, ...] | LowLevelInput

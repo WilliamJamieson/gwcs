@@ -160,7 +160,9 @@ class CoordinateFrame(CoordinateFrameProtocol):
             f"{at}{i}" if i != 0 else at: WorldAxisObjectClass(
                 u.Quantity, (), {"unit": unit}
             )
-            for i, (at, unit) in enumerate(zip(self.axes_type, self.unit, strict=False))
+            for i, (at, unit) in enumerate(
+                zip(self._prop.axes_type, self._prop.unit, strict=False)
+            )
         }
 
     @property
@@ -200,15 +202,6 @@ class CoordinateFrame(CoordinateFrameProtocol):
             WorldAxisObjectComponent(f"{at}{i}" if i != 0 else at, 0, "value")
             for i, at in enumerate(self._prop.axes_type)
         ]
-
-    @property
-    def serialized_classes(self) -> bool:
-        """
-        This property is used by the low level WCS API in Astropy.
-
-        By providing it we can duck type as a low level WCS object.
-        """
-        return False
 
     @property
     def raw_properties(self) -> FrameProperties:

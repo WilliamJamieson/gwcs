@@ -222,6 +222,15 @@ class CoordinateFrameProtocol(Protocol):
         astropy.wcs.wcsapi.BaseLowLevelWCS.world_axis_object_components
         """
 
+    @property
+    def serialized_classes(self) -> bool:
+        """
+        This property is used by the low level WCS API in Astropy.
+
+        By providing it we can duck type as a low level WCS object.
+        """
+        return False
+
     def add_units(
         self, arrays: tuple[LowLevelInput, ...] | LowLevelInput
     ) -> tuple[LowLevelInput, ...]:
@@ -315,12 +324,15 @@ class CoordinateFrameProtocol(Protocol):
                 )
                 for arg, c in zip(args, world_axis_object_classes.values(), strict=True)
             ]
-            msg = (
-                "Invalid types were passed, got "
-                f"({', '.join(t[0] for t in types)}), but expected "
-                f"({', '.join(t[1] for t in types)})."
-            )
-            raise TypeError(msg)
+            if any(t[0] != t[1] for t in types):
+                msg = (
+                    "Invalid types were passed, got "
+                    f"({', '.join(t[0] for t in types)}), but expected "
+                    f"({', '.join(t[1] for t in types)})."
+                )
+                raise TypeError(msg)
+
+            return True
 
         return False
 
@@ -351,6 +363,9 @@ class CoordinateFrameProtocol(Protocol):
             raise TypeError(msg)
 
         high_level = values_to_high_level_objects(*values, low_level_wcs=self)
+        if isinstance(high_level, list):
+            high_level = tuple(high_level)
+
         if correct_1d and len(high_level) == 1:
             high_level = high_level[0]
         return high_level

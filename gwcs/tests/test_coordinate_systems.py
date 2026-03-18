@@ -639,6 +639,7 @@ def test_CoordinateFrameProtocol():
         axis_physical_types = ("custom:x",)
         world_axis_object_classes = (u.Quantity,)
         world_axis_object_components = ("custom:x",)
+        serialized_classes = False
 
         def add_units(self, arrays):
             return arrays
