@@ -280,8 +280,9 @@ class _BasePipeline:
 _T = TypeVar("_T", bound=_BasePipeline)
 
 
+# Temporary solution for UP046 while other UP issues are being resolved
 @dataclass(frozen=True, slots=True)
-class DirectionalWCS(Generic[_T]):
+class DirectionalWCS(Generic[_T]):  # noqa: UP046
     """
     Dataclass to hold the WCS and the direction of the WCS's pipeline between
     two frames.

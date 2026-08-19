@@ -26,7 +26,8 @@ __all__ = ["IndexedStep", "Step"]
 #    in Python 3.11, so EmptyFrame causes an error to be raised if we attempt to
 #    check if it is a CoordinateFrameProtocol. In Python 3.12+, the check does not
 #    evaluate the properties of the object, so it does not cause an error.
-if sys.version_info >= (3, 12):
+# Temporary solution for UP036 while other UP issues are being resolved
+if sys.version_info >= (3, 12):  # noqa: UP036
 
     def _is_coordinate_frame(frame: str | CoordinateFrameProtocol) -> bool:
         return isinstance(frame, CoordinateFrameProtocol)

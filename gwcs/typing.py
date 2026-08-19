@@ -7,7 +7,7 @@ making them available for users and improving Sphinx documentation resolution.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TypeAlias, TypeVar, Union
+from typing import Union
 
 from astropy.coordinates import BaseCoordinateFrame
 from astropy.modeling import Model
@@ -35,24 +35,22 @@ __all__ = [
     "WorldAxisObjectClasses",
 ]
 
-_DtypeGeneric = TypeVar("_DtypeGeneric", bound=generic)
-
-AstropyBuiltInFrame: TypeAlias = Time | BaseCoordinateFrame
-LowLevelArray: TypeAlias = ndarray[tuple[int, ...], dtype[_DtypeGeneric]]
-LowLevelInput: TypeAlias = LowLevelArray | Quantity
+type AstropyBuiltInFrame = Time | BaseCoordinateFrame
+type LowLevelArray[Dtype: generic] = ndarray[tuple[int, ...], dtype[Dtype]]
+type LowLevelInput = LowLevelArray | Quantity
 
 
-WorldAxisObjectClasses: TypeAlias = (
+type WorldAxisObjectClasses = (
     dict[str, WorldAxisObjectClass]
     | dict[str, WorldAxisObjectClassConverter]
     | dict[str, WorldAxisObjectClass | WorldAxisObjectClassConverter]
 )
 
 
-AxesType: TypeAlias = tuple[AxisType | str, ...] | AxisType | str
+type AxesType = tuple[AxisType | str, ...] | AxisType | str
 
 
 # Type aliases due to the use of the `|` for type hints not working with Model
-Mdl: TypeAlias = Union[Model, None]  # noqa: UP007
-StepTuple: TypeAlias = tuple[CoordinateFrameProtocol, Mdl]
-ForwardTransform: TypeAlias = Union[Model, Sequence[Step | StepTuple] | _BasePipeline]  # noqa: UP007
+type Mdl = Union[Model, None]  # noqa: UP007
+type StepTuple = tuple[CoordinateFrameProtocol, Mdl]
+type ForwardTransform = Union[Model, Sequence[Step | StepTuple] | _BasePipeline]  # noqa: UP007
