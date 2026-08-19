@@ -180,6 +180,10 @@ typing_type_aliases = frozenset(
     )
 )
 
+# PEP 695 type parameters are local to their generic declarations and do not
+# have Python-domain documentation targets. Preserve their rendered text.
+local_type_parameters = frozenset({"Wcs"})
+
 # Type hints report the defining private submodule, e.g.
 # ``gwcs.coordinate_frames._base.WorldAxisObjectClass``.
 private_module = re.compile(r"\._\w+(?=\.)")
@@ -195,6 +199,11 @@ def resolve_missing_reference(app, env, node, contnode):
     """
     # Sphinx provides the unresolved target on the reference node.
     target = node.get("reftarget", "")
+
+    # Generic type parameters are not importable objects, so they cannot link
+    # to an API page; preserve their type-hint text without a cross-reference.
+    if target in local_type_parameters:
+        return contnode.deepcopy()
 
     # Private implementation details have no public documentation target.
     if target.rsplit(".", 1)[-1].startswith("_"):
