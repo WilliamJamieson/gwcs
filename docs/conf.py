@@ -166,21 +166,60 @@ unqualified_type_names = {
     "CompoundBoundingBox": "astropy.modeling.bounding_box.CompoundBoundingBox",
 }
 
+typing_type_aliases = frozenset(
+    f"gwcs.typing.{name}"
+    for name in (
+        "AstropyBuiltInFrame",
+        "AxesType",
+        "ForwardTransform",
+        "LowLevelArray",
+        "LowLevelInput",
+        "Mdl",
+        "StepTuple",
+        "WorldAxisObjectClasses",
+    )
+)
+
 # Type hints report the defining private submodule, e.g.
 # ``gwcs.coordinate_frames._base.WorldAxisObjectClass``.
 private_module = re.compile(r"\._\w+(?=\.)")
 
 
 def resolve_missing_reference(app, env, node, contnode):
+    """Resolve type references that Sphinx cannot find through its normal lookup.
+
+    Private names are rendered as plain text. Unqualified external types are
+    retried through intersphinx, PEP 695 aliases emitted as classes are retried
+    as Python ``type`` objects, and GWCS private-module paths are rewritten to
+    their public import paths before resolving them in the Python domain.
+    """
+    # Sphinx provides the unresolved target on the reference node.
     target = node.get("reftarget", "")
 
+    # Private implementation details have no public documentation target.
     if target.rsplit(".", 1)[-1].startswith("_"):
         return contnode.deepcopy()
 
+    # Resolve postponed, unqualified third-party annotations with intersphinx.
     if external := unqualified_type_names.get(target):
         node["reftarget"] = external
         return intersphinx_missing_reference(app, env, node, contnode)
 
+    # sphinx_autodoc_typehints labels PEP 695 aliases as classes; use their
+    # documented Python-domain type targets instead.
+    if target in typing_type_aliases and node["reftype"] == "class":
+        return env.get_domain("py").resolve_xref(
+            env,
+            node.get("refdoc"),
+            app.builder,
+            "type",
+            target,
+            node,
+            contnode,
+        )
+
+    # Replace a defining private GWCS module with its public re-export before
+    # retrying Python-domain resolution.
     public = private_module.sub("", target)
     if target.startswith("gwcs.") and public != target:
         node["reftarget"] = public
@@ -198,9 +237,19 @@ def resolve_missing_reference(app, env, node, contnode):
 
 
 def skip_excluded_inherited_members(*event_args):
+    """Exclude inherited ``str`` and Astropy ``Model`` members from autodoc.
+
+    The ``autodoc-skip-member`` event passes the candidate object as its fourth
+    positional argument. Its owner and wrapped implementation identify members
+    inherited from the two noisy base classes; returning ``True`` omits them,
+    while ``None`` leaves Sphinx's default decision unchanged.
+    """
+    # Extract the candidate object and normalize bound methods to functions.
     obj = event_args[3]
     owner = getattr(obj, "__objclass__", None)
     wrapped = getattr(obj, "__func__", obj)
+    # Suppress inherited string methods and Astropy Model members that do not
+    # describe the GWCS subclass's API.
     if (
         getattr(wrapped, "__qualname__", "").startswith("str.")
         or owner is str
@@ -212,34 +261,56 @@ def skip_excluded_inherited_members(*event_args):
     ):
         return True
 
+    # Defer all other members to Sphinx's standard inclusion rules.
     return None
 
 
 def setup(app):
+    """Register the custom autodoc and missing-reference event handlers."""
+    # Filter inherited implementation details while autodoc gathers members.
     app.connect("autodoc-skip-member", skip_excluded_inherited_members)
+    # Repair type-hint cross-references after normal resolution fails.
     app.connect("missing-reference", resolve_missing_reference)
 
 
 def is_property(modname, qualname, attr):
-    """Used by the autosummary class template to pick autoproperty vs autoattribute."""
+    """Return whether an autosummary class member is a property descriptor.
+
+    The class template uses this to choose ``autoproperty`` rather than
+    ``autoattribute``. Static lookup avoids triggering descriptors while the
+    class and requested member are inspected.
+    """
+    # Walk from the module to the nested class requested by the template.
     obj = importlib.import_module(modname)
     for part in qualname.split("."):
         obj = getattr(obj, part)
+    # Missing members are attributes rather than properties for template use.
     try:
         member = inspect.getattr_static(obj, attr)
     except AttributeError:
         return False
+    # Only descriptor instances declared as properties need autoproperty.
     return isinstance(member, property)
 
 
 def is_inherited_model_name(modname, qualname, attr):
+    """Return whether ``name`` is inherited from an Astropy modeling base class.
+
+    The autosummary template uses this to avoid documenting an inherited model
+    name as though it were declared by the current GWCS class. Members other
+    than ``name`` cannot match this special case.
+    """
+    # This workaround applies only to the inherited Model ``name`` attribute.
     if attr != "name":
         return False
 
+    # Walk from the module to the nested class requested by the template.
     obj = importlib.import_module(modname)
     for part in qualname.split("."):
         obj = getattr(obj, part)
 
+    # Report a match only when this class lacks ``name`` and an Astropy modeling
+    # base class supplies it.
     return "name" not in obj.__dict__ and any(
         "name" in base.__dict__ and base.__module__.startswith("astropy.modeling")
         for base in obj.__mro__[1:]
@@ -252,4 +323,5 @@ autosummary_ignore_module_all = False
 autosummary_context = {
     "is_inherited_model_name": is_inherited_model_name,
     "is_property": is_property,
+    "typing_type_aliases": typing_type_aliases,
 }
