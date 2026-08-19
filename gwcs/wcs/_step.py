@@ -1,16 +1,12 @@
 from __future__ import annotations
 
-import sys
 import warnings
 from copy import copy
-from inspect import getattr_static
 from typing import TYPE_CHECKING, NamedTuple, Self
 
 from astropy.modeling.core import Model
 
 from gwcs.coordinate_frames import (
-    BaseCoordinateFrame,
-    CoordinateFrame,
     CoordinateFrameProtocol,
     EmptyFrame,
 )
@@ -20,65 +16,6 @@ if TYPE_CHECKING:
     from gwcs.typing import Mdl
 
 __all__ = ["IndexedStep", "Step"]
-
-
-# Runtime checkable isinstance check evaluates the actual properties of the object
-#    in Python 3.11, so EmptyFrame causes an error to be raised if we attempt to
-#    check if it is a CoordinateFrameProtocol. In Python 3.12+, the check does not
-#    evaluate the properties of the object, so it does not cause an error.
-# Temporary solution for UP036 while other UP issues are being resolved
-if sys.version_info >= (3, 12):  # noqa: UP036
-
-    def _is_coordinate_frame(frame: str | CoordinateFrameProtocol) -> bool:
-        return isinstance(frame, CoordinateFrameProtocol)
-
-    def _is_legacy_coordinate_frame(
-        frame: str | CoordinateFrameProtocol | _LegacyCoordinateFrameProtocol,
-    ) -> bool:
-        return isinstance(frame, _LegacyCoordinateFrameProtocol) and not isinstance(
-            frame, CoordinateFrameProtocol
-        )
-else:
-
-    def _is_coordinate_frame(frame: str | CoordinateFrameProtocol) -> bool:
-        return isinstance(frame, BaseCoordinateFrame | CoordinateFrame | EmptyFrame)
-
-    def _has_legacy_coordinate_frame_interface(frame: object) -> bool:
-        """
-        Return `True` if ``frame`` looks like a legacy coordinate frame object.
-
-        This supports duck-typed frames implementing the historical coordinate
-        frame API without ``is_high_level``.
-        """
-
-        required_members = (
-            "naxes",
-            "name",
-            "unit",
-            "axes_names",
-            "axes_order",
-            "reference_frame",
-            "axes_type",
-            "axis_physical_types",
-            "world_axis_object_classes",
-            "world_axis_object_components",
-            "add_units",
-            "remove_units",
-            "to_high_level_coordinates",
-            "from_high_level_coordinates",
-        )
-
-        return all(
-            getattr_static(frame, member, None) is not None
-            for member in required_members
-        )
-
-    def _is_legacy_coordinate_frame(
-        frame: str | CoordinateFrameProtocol,
-    ) -> bool:
-        return _has_legacy_coordinate_frame_interface(frame) and not hasattr(
-            frame, "is_high_level"
-        )
 
 
 class Step:
@@ -99,11 +36,12 @@ class Step:
     ) -> None:
         # Allow for a string to be passed in for the frame but be turned into a
         # frame object
-        # This is correct type-wise, but the Python 3.11 bugfix causes a MyPy error
         self.frame = (
             frame
-            if _is_coordinate_frame(frame) or _is_legacy_coordinate_frame(frame)
-            else EmptyFrame.from_transform(frame, transform)  # type: ignore[assignment, arg-type]
+            if isinstance(
+                frame, (CoordinateFrameProtocol, _LegacyCoordinateFrameProtocol)
+            )
+            else EmptyFrame.from_transform(frame, transform)
         )
         self.transform = transform
 
@@ -113,7 +51,11 @@ class Step:
 
     @frame.setter
     def frame(self, val: CoordinateFrameProtocol) -> None:
-        if is_legacy := _is_legacy_coordinate_frame(val):
+        if not isinstance(val, CoordinateFrameProtocol):
+            if not isinstance(val, _LegacyCoordinateFrameProtocol):
+                msg = '"frame" should be an instance of CoordinateFrameProtocol.'
+                raise TypeError(msg)
+
             msg = (
                 "Coordinate frames that do not implement `is_high_level` are "
                 "deprecated. Please update your coordinate frame to add "
@@ -123,10 +65,6 @@ class Step:
             # Copy the value to avoid mutating the original object.
             val = copy(val)
             val.is_high_level = lambda *args: _is_high_level(val, *args)  # type: ignore[method-assign]
-
-        if not (_is_coordinate_frame(val) or is_legacy):
-            msg = '"frame" should be an instance of CoordinateFrameProtocol.'
-            raise TypeError(msg)
 
         self._frame = val
 
