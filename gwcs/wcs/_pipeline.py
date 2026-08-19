@@ -3,7 +3,7 @@ from __future__ import annotations
 import warnings
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Generic, Self, TypeVar, overload
+from typing import TYPE_CHECKING, Self, overload
 
 from astropy.modeling import Model
 from astropy.modeling.bounding_box import CompoundBoundingBox, ModelBoundingBox
@@ -277,12 +277,8 @@ class _BasePipeline:
         return direction.wcs.backward_transform
 
 
-_T = TypeVar("_T", bound=_BasePipeline)
-
-
-# Temporary solution for UP046 while other UP issues are being resolved
 @dataclass(frozen=True, slots=True)
-class DirectionalWCS(Generic[_T]):  # noqa: UP046
+class DirectionalWCS[Wcs: _BasePipeline]:
     """
     Dataclass to hold the WCS and the direction of the WCS's pipeline between
     two frames.
@@ -300,7 +296,7 @@ class DirectionalWCS(Generic[_T]):  # noqa: UP046
         or backward (to_frame to from_frame), False.
     """
 
-    wcs: _T
+    wcs: Wcs
     forward: bool
 
 
