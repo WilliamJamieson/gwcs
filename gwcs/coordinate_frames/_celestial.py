@@ -10,7 +10,13 @@ from ._base import WorldAxisObjectClass, WorldAxisObjectComponent
 from ._core import CoordinateFrame
 
 if TYPE_CHECKING:
-    from gwcs.typing import AstropyBuiltInFrame
+    from gwcs.typing import (
+        AstropyBuiltInFrame,
+        AxesOrder,
+        AxisNames,
+        AxisPhysicalTypes,
+        AxisUnits,
+    )
 
 __all__ = ["CelestialFrame"]
 
@@ -44,12 +50,12 @@ class CelestialFrame(CoordinateFrame):
 
     def __init__(  # noqa: PLR0917
         self,
-        axes_order: tuple[int, ...] | None = None,
+        axes_order: AxesOrder | None = None,
         reference_frame: AstropyBuiltInFrame | None = None,
-        unit: tuple[u.Unit, ...] | None = None,
-        axes_names: tuple[str, ...] | None = None,
+        unit: AxisUnits | None = None,
+        axes_names: AxisNames | None = None,
         name: str | None = None,
-        axis_physical_types: tuple[str | None, ...] | None = None,
+        axis_physical_types: AxisPhysicalTypes | None = None,
     ) -> None:
         if (
             reference_frame is not None
@@ -93,8 +99,8 @@ class CelestialFrame(CoordinateFrame):
     def _default_axis_physical_types_reference_frame(
         self,
         reference_frame: AstropyBuiltInFrame | None,
-        axes_names: tuple[str, ...] | None,
-    ) -> tuple[str, ...] | None:
+        axes_names: AxisNames | None,
+    ) -> AxisNames | None:
         if isinstance(reference_frame, coord.Galactic):
             return "pos.galactic.lon", "pos.galactic.lat"
 

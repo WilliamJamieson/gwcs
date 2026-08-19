@@ -1,9 +1,16 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from astropy import units as u
 from astropy.coordinates import StokesCoord
 
 from ._axis import AxisType
 from ._base import WorldAxisObjectClass, WorldAxisObjectComponent
 from ._core import CoordinateFrame
+
+if TYPE_CHECKING:
+    from gwcs.typing import AxisTypes
 
 __all__ = ["StokesFrame"]
 
@@ -37,9 +44,7 @@ class StokesFrame(CoordinateFrame):
             axis_physical_types=axis_physical_types,
         )
 
-    def _default_axis_physical_types(
-        self, axes_type: tuple[AxisType | str, ...]
-    ) -> tuple[str, ...]:
+    def _default_axis_physical_types(self, axes_type: AxisTypes) -> tuple[str, ...]:
         return ("phys.polarization.stokes",)
 
     @property

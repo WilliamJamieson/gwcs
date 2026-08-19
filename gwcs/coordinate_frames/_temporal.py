@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import contextlib
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from astropy import time
@@ -7,6 +10,9 @@ from astropy import units as u
 from ._axis import AxisType
 from ._base import WorldAxisObjectClassConverter, WorldAxisObjectComponent
 from ._core import CoordinateFrame
+
+if TYPE_CHECKING:
+    from gwcs.typing import AxisTypes, LowLevelArrayValue, LowLevelValue
 
 __all__ = ["TemporalFrame"]
 
@@ -40,7 +46,7 @@ class TemporalFrame(CoordinateFrame):
         axes_names: tuple[str] | None = None,
         name: str | None = None,
         axis_physical_types: tuple[str | None] | None = None,
-    ):
+    ) -> None:
         axes_names = (
             (
                 (
@@ -67,16 +73,20 @@ class TemporalFrame(CoordinateFrame):
             with contextlib.suppress(AttributeError):
                 self._attrs[a] = getattr(self.reference_frame, a)
 
-    def _default_axis_physical_types(
-        self, axes_type: tuple[AxisType | str, ...]
-    ) -> tuple[str, ...]:
+    def _default_axis_physical_types(self, axes_type: AxisTypes) -> tuple[str, ...]:
         return ("time",)
 
     @property
     def reference_frame(self) -> time.Time:
         return self._reference_frame
 
-    def _convert_to_time(self, dt, *, unit, **kwargs):
+    def _convert_to_time(
+        self,
+        dt: LowLevelValue | time.Time | time.TimeDelta,
+        *,
+        unit: u.Unit,
+        **kwargs: Any,
+    ) -> time.Time:
         if (
             not isinstance(dt, time.TimeDelta) and isinstance(dt, time.Time)
         ) or isinstance(self.reference_frame.value, np.ndarray):
@@ -103,7 +113,7 @@ class TemporalFrame(CoordinateFrame):
         if isinstance(self.reference_frame.value, np.ndarray):
             return [WorldAxisObjectComponent("temporal", 0, "value")]
 
-        def offset_from_time_and_reference(time):
-            return (time - self.reference_frame).sec
+        def offset_from_time_and_reference(time_value: time.Time) -> LowLevelArrayValue:
+            return (time_value - self.reference_frame).sec
 
         return [WorldAxisObjectComponent("temporal", 0, offset_from_time_and_reference)]

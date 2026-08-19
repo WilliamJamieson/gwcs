@@ -55,7 +55,10 @@ if TYPE_CHECKING:
         Degree,
         ForwardTransform,
         FrameLike,
+        HighLevelCoordinate,
+        HighLevelCoordinates,
         LowLevelArray,
+        LowLevelArrayOutputs,
         LowLevelArrayValue,
         LowLevelInput,
         LowLevelOutputs,
@@ -130,34 +133,50 @@ def _accepts_correct_1d(method: Callable[..., Any]) -> bool:
 
 
 def _from_high_level_coordinates(
-    frame: CoordinateFrameProtocol, *args: Any, correct_1d: bool = True
-) -> Any:
+    frame: CoordinateFrameProtocol,
+    *args: HighLevelCoordinate,
+    correct_1d: bool = True,
+) -> LowLevelArrayOutputs:
     """
     Helper to support legacy frames whose ``from_high_level_coordinates`` does
     not implement the ``correct_1d`` argument.
     """
     method = frame.from_high_level_coordinates
     if _accepts_correct_1d(method):
-        return method(*args, correct_1d=correct_1d)
+        return cast("LowLevelArrayOutputs", method(*args, correct_1d=correct_1d))
 
-    return correct_1d_output(method, pass_correct_1d=False)(
-        *args, correct_1d=correct_1d
+    result = method(*args)
+    if isinstance(result, (tuple, list)):
+        return cast(
+            "LowLevelArrayOutputs",
+            correct_1d_output(*result, correct_1d=correct_1d),
+        )
+    return cast(
+        "LowLevelArrayOutputs", correct_1d_output(result, correct_1d=correct_1d)
     )
 
 
 def _to_high_level_coordinates(
-    frame: CoordinateFrameProtocol, *args: Any, correct_1d: bool = True
-) -> Any:
+    frame: CoordinateFrameProtocol,
+    *args: LowLevelInput,
+    correct_1d: bool = True,
+) -> HighLevelCoordinates:
     """
     Helper to support legacy frames whose ``to_high_level_coordinates`` does
     not implement the ``correct_1d`` argument.
     """
     method = frame.to_high_level_coordinates
     if _accepts_correct_1d(method):
-        return method(*args, correct_1d=correct_1d)
+        return cast("HighLevelCoordinates", method(*args, correct_1d=correct_1d))
 
-    return correct_1d_output(method, pass_correct_1d=False)(
-        *args, correct_1d=correct_1d
+    result = method(*args)
+    if isinstance(result, (tuple, list)):
+        return cast(
+            "HighLevelCoordinates",
+            correct_1d_output(*result, correct_1d=correct_1d),
+        )
+    return cast(
+        "HighLevelCoordinates", correct_1d_output(result, correct_1d=correct_1d)
     )
 
 
@@ -194,24 +213,30 @@ class _UnitHandler:
 
     def __init__(
         self,
-        inputs: LowLevelOutputs,
+        inputs: tuple[LowLevelInput | HighLevelCoordinate, ...],
         transform: Model,
         frame: CoordinateFrameProtocol,
     ) -> None:
+        inputs_tuple = tuple(inputs)
+
         # Handle the case where a HLO is passed into the Native API
-        self._is_high_level = frame.is_high_level(*inputs)
+        self._is_high_level = frame.is_high_level(*inputs_tuple)
         if self._is_high_level:
-            inputs = _from_high_level_coordinates(frame, *inputs, correct_1d=False)
+            converted = _from_high_level_coordinates(
+                frame, *inputs_tuple, correct_1d=False
+            )
 
             # Legacy frames will probably have stripped the 1d to a value rather than
             #    keeping it as a tuple
-            if not isinstance(inputs, list | tuple):
-                inputs = (inputs,)
+            if not isinstance(converted, list | tuple):
+                inputs_tuple = (converted,)
+            else:
+                inputs_tuple = tuple(converted)
 
-            inputs = tuple(inputs)
+        normalized_inputs = cast("tuple[LowLevelInput, ...]", inputs_tuple)
 
         # Determine if the inputs are quantities
-        input_is_quantity = any(isinstance(a, u.Quantity) for a in inputs)
+        input_is_quantity = any(isinstance(a, u.Quantity) for a in normalized_inputs)
 
         # Determine if the transform uses quantities
         #   This complexity is due to the fact that Tabular models have a bug
@@ -251,7 +276,7 @@ class _UnitHandler:
         #            (we convert the output to the correct units if necessary and
         #             then remove them giving numerical values as output)
         if not input_is_quantity and not transform_uses_quantity:
-            self.args = inputs
+            self.args = normalized_inputs
             self._add_units = False
 
         # Case 2: The inputs have units and the transform supports units
@@ -260,7 +285,7 @@ class _UnitHandler:
         #    output -> add units
         #             (we add -- meaning convert -- units to the output values)
         elif input_is_quantity and transform_uses_quantity:
-            self.args = frame.add_units(inputs)
+            self.args = frame.add_units(normalized_inputs)
             self._add_units = True
 
         # Case 3: The input does not have units, but the transform supports units
@@ -272,7 +297,7 @@ class _UnitHandler:
         #             (we convert the output to the correct units if necessary and
         #              then remove them giving numerical values as output)
         elif not input_is_quantity and transform_uses_quantity:
-            self.args = frame.add_units(inputs)
+            self.args = frame.add_units(normalized_inputs)
             self._add_units = False
 
         # Case 4: The input has units, but the transform does not support units
@@ -285,15 +310,15 @@ class _UnitHandler:
         # This is the only other case:
         #   input_is_quantity and not transform_uses_quantity
         else:
-            self.args = frame.remove_units(inputs)
+            self.args = frame.remove_units(normalized_inputs)
             self._add_units = True
 
     def _handle_output_type(
         self, *outputs: LowLevelInput, frame: CoordinateFrameProtocol
-    ) -> tuple[LowLevelInput, ...]:
+    ) -> tuple[LowLevelInput | HighLevelCoordinate, ...]:
         # Return a high level object if the input was a high level object
         if self._is_high_level:
-            values: Any = _to_high_level_coordinates(frame, *outputs, correct_1d=False)
+            values = _to_high_level_coordinates(frame, *outputs, correct_1d=False)
 
             if not isinstance(values, list | tuple):
                 values = (values,)
@@ -311,7 +336,7 @@ class _UnitHandler:
         self,
         outputs: LowLevelOutputs,
         frame: CoordinateFrameProtocol,
-    ) -> LowLevelOutputs:
+    ) -> LowLevelOutputs | HighLevelCoordinates:
         """
         Handle the output of a transform by adding or removing units as needed
         and converting to high level objects if the input was high level.
@@ -386,18 +411,11 @@ class WCS(Pipeline, WCSAPIMixin):
         output_frame: OptionalFrameLike = None,
         name: str | None = None,
     ) -> None:
-        if isinstance(forward_transform, Model):
-            super().__init__(
-                forward_transform=forward_transform,
-                input_frame=cast("FrameLike", input_frame),
-                output_frame=cast("FrameLike", output_frame),
-            )
-        else:
-            super().__init__(
-                forward_transform=forward_transform,
-                input_frame=cast(Any, input_frame),
-                output_frame=cast(Any, output_frame),
-            )
+        super().__init__(
+            forward_transform=forward_transform,
+            input_frame=input_frame,
+            output_frame=output_frame,
+        )
 
         self._approx_inverse: Callable[..., Any] | None = None
         self._name = "" if name is None else name
@@ -405,11 +423,11 @@ class WCS(Pipeline, WCSAPIMixin):
 
     def evaluate(
         self,
-        *args: LowLevelInput,
+        *args: LowLevelInput | HighLevelCoordinate,
         with_bounding_box: bool = True,
         fill_value: Numeric = np.nan,
         **kwargs: Any,
-    ) -> LowLevelOutputs:
+    ) -> LowLevelOutputs | HighLevelCoordinates:
         # Call into variable as this involves computing the forward transform
         #   after each call to it.
         transform = self.forward_transform
@@ -427,11 +445,11 @@ class WCS(Pipeline, WCSAPIMixin):
 
     def __call__(
         self,
-        *args: LowLevelInput,
+        *args: LowLevelInput | HighLevelCoordinate,
         with_bounding_box: bool = True,
         fill_value: Numeric = np.nan,
         **kwargs: Any,
-    ) -> LowLevelOutputs:
+    ) -> LowLevelOutputs | HighLevelCoordinates:
         """
         Executes the forward transform.
 
@@ -454,7 +472,7 @@ class WCS(Pipeline, WCSAPIMixin):
 
     def in_image(
         self,
-        *args: LowLevelInput,
+        *args: LowLevelInput | HighLevelCoordinate,
         with_bounding_box: bool = True,
         fill_value: Numeric = np.nan,
         **kwargs: Any,
@@ -497,7 +515,7 @@ class WCS(Pipeline, WCSAPIMixin):
 
     def invert(
         self,
-        *args: LowLevelInput,
+        *args: LowLevelInput | HighLevelCoordinate,
         with_bounding_box: bool = True,
         fill_value: Numeric = np.nan,
         tolerance: float = 1e-5,
@@ -506,7 +524,7 @@ class WCS(Pipeline, WCSAPIMixin):
         detect_divergence: bool = True,
         quiet: bool = True,
         **kwargs: Any,
-    ) -> LowLevelOutputs:
+    ) -> LowLevelOutputs | HighLevelCoordinates:
         """
         Invert coordinates from output frame to input frame using analytical or
         user-supplied inverse. When neither analytical nor user-supplied
@@ -571,7 +589,7 @@ class WCS(Pipeline, WCSAPIMixin):
 
         inputs: Sequence[LowLevelInput] = unit_handler.args
         if with_bounding_box and self.bounding_box is not None:
-            inputs = self.outside_footprint(inputs)
+            inputs = cast("Sequence[LowLevelInput]", self.outside_footprint(inputs))
 
         if transform is not None:
             result = transform(
@@ -599,19 +617,30 @@ class WCS(Pipeline, WCSAPIMixin):
         return unit_handler.handle_output(result, frame=self.input_frame)
 
     def outside_footprint(
-        self, world_arrays: Sequence[LowLevelInput]
-    ) -> list[LowLevelInput]:
-        world_arrays_list = [copy(array) for array in world_arrays]
+        self, world_arrays: Sequence[LowLevelInput | HighLevelCoordinate]
+    ) -> list[LowLevelInput] | HighLevelCoordinates:
+        world_arrays_copy: list[LowLevelInput | HighLevelCoordinate] = [
+            copy(array) for array in world_arrays
+        ]
 
         axes_types = set(self.output_frame.axes_type)
         axes_phys_types = self.world_axis_physical_types or ()
         footprint = self.footprint()
         not_numerical = False
-        if self.output_frame.is_high_level(*world_arrays_list):
+
+        world_arrays_list: list[LowLevelInput]
+        if self.output_frame.is_high_level(*world_arrays_copy):
             not_numerical = True
-            world_arrays_list = _from_high_level_coordinates(
-                self.output_frame, *world_arrays_list, correct_1d=False
+            converted = _from_high_level_coordinates(
+                self.output_frame, *world_arrays_copy, correct_1d=False
             )
+            if not isinstance(converted, list | tuple):
+                world_arrays_list = [converted]
+            else:
+                world_arrays_list = list(converted)
+        else:
+            # If it is not a high level object then it must be a numerical value
+            world_arrays_list = list(cast("list[LowLevelInput]", world_arrays_copy))
 
         for axtyp in axes_types:
             ind = np.asarray(np.asarray(self.output_frame.axes_type) == axtyp)
@@ -644,9 +673,13 @@ class WCS(Pipeline, WCSAPIMixin):
                             world_arrays_list[0], self.output_frame
                         )
                     else:
-                        coord_ = self._remove_quantity_frame(
-                            world_arrays_list, self.output_frame
-                        )[idim]
+                        coordinates = cast(
+                            "tuple[LowLevelArrayValue, ...]",
+                            self._remove_quantity_frame(
+                                world_arrays_list, self.output_frame
+                            ),
+                        )
+                        coord_ = coordinates[idim]
 
                     outside = (coord_ < min_ax) | (coord_ > max_ax)
                 if np.any(outside):
@@ -656,7 +689,7 @@ class WCS(Pipeline, WCSAPIMixin):
                         coord[outside] = np.nan
                     world_arrays_list[idim] = coord
         if not_numerical:
-            world_arrays_list = _to_high_level_coordinates(
+            return _to_high_level_coordinates(
                 self.output_frame, *world_arrays_list, correct_1d=False
             )
         return world_arrays_list
@@ -1342,7 +1375,7 @@ class WCS(Pipeline, WCSAPIMixin):
         with_bounding_box: bool = True,
         fill_value: Numeric = np.nan,
         **kwargs: Any,
-    ) -> tuple[LowLevelArray, ...] | LowLevelArray:
+    ) -> LowLevelArrayOutputs:
         """
         Transform positions between two frames.
 

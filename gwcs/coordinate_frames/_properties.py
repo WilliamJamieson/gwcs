@@ -7,29 +7,33 @@ import numpy as np
 from astropy import units as u
 from astropy.wcs.wcsapi.low_level_api import VALID_UCDS, validate_physical_types
 
-from ._axis import AxisType
-
 if TYPE_CHECKING:
-    from gwcs.typing import AxesType
+    from gwcs.typing import (
+        AxesType,
+        AxisNames,
+        AxisPhysicalTypes,
+        AxisTypes,
+        AxisUnits,
+    )
 
 __all__ = ["FrameProperties"]
 
 
 @dataclass(frozen=True)
 class FrameProperties:
-    axes_type: tuple[AxisType | str, ...]
-    unit: tuple[u.Unit, ...]
-    axes_names: tuple[str, ...]
-    axis_physical_types: tuple[str | None, ...]
+    axes_type: AxisTypes
+    unit: AxisUnits
+    axes_names: AxisNames
+    axis_physical_types: AxisPhysicalTypes
 
     @classmethod
     def from_frame(
         cls,
         naxes: int,
         axes_type: AxesType,
-        unit: tuple[u.Unit, ...] | None,
-        axes_names: tuple[str, ...] | None,
-        axis_physical_types: tuple[str | None, ...] | str,
+        unit: AxisUnits | None,
+        axes_names: AxisNames | None,
+        axis_physical_types: AxisPhysicalTypes | str,
     ) -> Self:
         """Class method constructor to allow FrameProperties to be Frozen."""
         axes_type = (axes_type,) if isinstance(axes_type, str) else tuple(axes_type)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Literal, NoReturn, Self, overload
 
 from astropy import units as u
 
@@ -14,7 +14,14 @@ from ._base import (
 
 if TYPE_CHECKING:
     from gwcs.typing import (
+        AxesOrder,
         AxesType,
+        AxisNames,
+        AxisPhysicalTypes,
+        AxisUnits,
+        HighLevelCoordinate,
+        HighLevelCoordinates,
+        LowLevelArrayOutputs,
         LowLevelInput,
         LowLevelOutputs,
         Mdl,
@@ -92,7 +99,7 @@ class EmptyFrame(CoordinateFrameProtocol):
         """A custom name of this frame."""
         self._name = val
 
-    def _raise_error(self) -> None:
+    def _raise_error(self) -> NoReturn:
         msg = "EmptyFrame does not have any information"
         raise NotImplementedError(msg)
 
@@ -109,15 +116,15 @@ class EmptyFrame(CoordinateFrameProtocol):
         self._naxes = val
 
     @property
-    def unit(self) -> tuple[None, ...]:
+    def unit(self) -> AxisUnits:
         return (None,) * self.naxes
 
     @property
-    def axes_names(self) -> tuple[str, ...]:
+    def axes_names(self) -> AxisNames:
         return ("",) * self.naxes
 
     @property
-    def axes_order(self) -> tuple[int, ...]:
+    def axes_order(self) -> AxesOrder:
         return tuple(range(self.naxes))
 
     @property
@@ -129,7 +136,7 @@ class EmptyFrame(CoordinateFrameProtocol):
         return (AxisType.UNDEFINED,) * self.naxes
 
     @property
-    def axis_physical_types(self):
+    def axis_physical_types(self) -> AxisPhysicalTypes:
         return tuple(f"custom:{t}" for t in self.axes_type)
 
     @property
@@ -148,10 +155,46 @@ class EmptyFrame(CoordinateFrameProtocol):
             for i, at in enumerate(self.axes_type)
         ]
 
-    def to_high_level_coordinates(self, *values, correct_1d: bool = True):
+    @overload
+    def to_high_level_coordinates(
+        self, *values: LowLevelInput, correct_1d: Literal[True] = True
+    ) -> HighLevelCoordinates: ...
+
+    @overload
+    def to_high_level_coordinates(
+        self, *values: LowLevelInput, correct_1d: Literal[False]
+    ) -> tuple[HighLevelCoordinate, ...]: ...
+
+    @overload
+    def to_high_level_coordinates(
+        self, *values: LowLevelInput, correct_1d: bool
+    ) -> HighLevelCoordinates: ...
+
+    def to_high_level_coordinates(
+        self, *values: LowLevelInput, correct_1d: bool = True
+    ) -> HighLevelCoordinates:
         self._raise_error()
 
-    def from_high_level_coordinates(self, *high_level_coords, correct_1d: bool = True):
+    @overload
+    def from_high_level_coordinates(
+        self,
+        *high_level_coords: HighLevelCoordinate,
+        correct_1d: Literal[True] = True,
+    ) -> LowLevelArrayOutputs: ...
+
+    @overload
+    def from_high_level_coordinates(
+        self, *high_level_coords: HighLevelCoordinate, correct_1d: Literal[False]
+    ) -> tuple[LowLevelInput, ...]: ...
+
+    @overload
+    def from_high_level_coordinates(
+        self, *high_level_coords: HighLevelCoordinate, correct_1d: bool
+    ) -> LowLevelArrayOutputs: ...
+
+    def from_high_level_coordinates(
+        self, *high_level_coords: HighLevelCoordinate, correct_1d: bool = True
+    ) -> LowLevelArrayOutputs:
         self._raise_error()
 
     def add_units(self, arrays: LowLevelOutputs) -> tuple[LowLevelInput, ...]:

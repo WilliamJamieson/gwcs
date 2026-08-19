@@ -8,7 +8,7 @@ This module defines the abstract APIs for the GWCS Package:
 from __future__ import annotations
 
 import abc
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from astropy import units as u
@@ -19,14 +19,18 @@ from gwcs import utils
 
 if TYPE_CHECKING:
     from astropy.modeling import Model
-    from astropy.modeling.bounding_box import CompoundBoundingBox, ModelBoundingBox
 
     from gwcs.coordinate_frames import (
         CoordinateFrameProtocol,
         WorldAxisObjectComponent,
     )
     from gwcs.typing import (
+        AxisPhysicalTypes,
+        BoundingBoxLike,
+        HighLevelCoordinate,
+        HighLevelCoordinates,
         LowLevelArray,
+        LowLevelArrayOutputs,
         LowLevelInput,
         LowLevelOutputs,
         Numeric,
@@ -61,17 +65,17 @@ class NativeAPIMixin(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def bounding_box(self) -> ModelBoundingBox | CompoundBoundingBox | None:
+    def bounding_box(self) -> BoundingBoxLike | None:
         """The input_frame's bounding box"""
 
     @abc.abstractmethod
     def evaluate(
         self,
-        *args: LowLevelInput,
+        *args: LowLevelInput | HighLevelCoordinate,
         with_bounding_box: bool = True,
         fill_value: Numeric = np.nan,
-        **kwargs,
-    ) -> LowLevelOutputs:
+        **kwargs: Any,
+    ) -> LowLevelOutputs | HighLevelCoordinates:
         """
         Executes the forward transform.
 
@@ -97,11 +101,11 @@ class NativeAPIMixin(abc.ABC):
     @abc.abstractmethod
     def invert(
         self,
-        *args: LowLevelInput,
+        *args: LowLevelInput | HighLevelCoordinate,
         with_bounding_box: bool = True,
         fill_value: Numeric = np.nan,
-        **kwargs,
-    ) -> LowLevelOutputs:
+        **kwargs: Any,
+    ) -> LowLevelOutputs | HighLevelCoordinates:
         """
         Invert coordinates from output frame to input frame using analytical or
         user-supplied inverse. When neither analytical nor user-supplied
@@ -165,7 +169,7 @@ class WCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin, NativeAPIMixin):
         return self.output_frame.naxes
 
     @property
-    def world_axis_physical_types(self) -> tuple[str | None, ...] | None:
+    def world_axis_physical_types(self) -> AxisPhysicalTypes | None:
         """
         An iterable of strings describing the physical type for each world axis.
         These should be names from the VO UCD1+ controlled Vocabulary
@@ -195,7 +199,7 @@ class WCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin, NativeAPIMixin):
     def _remove_quantity_frame(
         result: LowLevelOutputs,
         frame: CoordinateFrameProtocol,
-    ) -> tuple[LowLevelArray, ...] | LowLevelArray:
+    ) -> LowLevelArrayOutputs:
         if frame.naxes == 1:
             result = (result,)
 
@@ -208,7 +212,7 @@ class WCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin, NativeAPIMixin):
 
     def pixel_to_world_values(
         self, *pixel_arrays: LowLevelInput
-    ) -> tuple[LowLevelArray, ...] | LowLevelArray:
+    ) -> LowLevelArrayOutputs:
         """
         Convert pixel coordinates to world coordinates.
 
@@ -227,7 +231,7 @@ class WCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin, NativeAPIMixin):
 
     def array_index_to_world_values(
         self, *index_arrays: LowLevelInput
-    ) -> tuple[LowLevelArray, ...] | LowLevelArray:
+    ) -> LowLevelArrayOutputs:
         """
         Convert array indices to world coordinates.
         This is the same as `~astropy.wcs.wcsapi.BaseLowLevelWCS.pixel_to_world_values`
@@ -239,7 +243,7 @@ class WCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin, NativeAPIMixin):
 
     def world_to_pixel_values(
         self, *world_arrays: LowLevelInput
-    ) -> tuple[LowLevelArray, ...] | LowLevelArray:
+    ) -> LowLevelArrayOutputs:
         """
         Convert world coordinates to pixel coordinates.
 
@@ -255,7 +259,7 @@ class WCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin, NativeAPIMixin):
 
     def world_to_array_index_values(
         self, *world_arrays: LowLevelInput
-    ) -> tuple[LowLevelArray, ...] | LowLevelArray:
+    ) -> LowLevelArrayOutputs:
         """
         Convert world coordinates to array indices.
         This is the same as `~astropy.wcs.wcsapi.BaseLowLevelWCS.world_to_pixel_values`
@@ -351,7 +355,7 @@ class WCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin, NativeAPIMixin):
             self._pixel_shape = tuple(value)
 
     @property
-    def axis_correlation_matrix(self):
+    def axis_correlation_matrix(self) -> LowLevelArray:
         """
         Returns an (`~astropy.wcs.wcsapi.BaseLowLevelWCS.world_n_dim`,
         `~astropy.wcs.wcsapi.BaseLowLevelWCS.pixel_n_dim`) matrix that indicates

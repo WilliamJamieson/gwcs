@@ -2199,42 +2199,15 @@ def test_transform_does_not_corrupt_parent_pipeline():
     assert_allclose(gw.invert(*expected_forward), expected_inverse)
 
 
-def test_correct_1d_output_decorator():
+def test_correct_1d_output():
     """
-    Direct coverage of the ``correct_1d_output`` decorator: single-element
-    sequences collapse to a scalar only when ``correct_1d`` is True, longer
-    sequences pass through, and non-sequence returns are never indexed.
+    Direct coverage of the ``correct_1d_output`` helper.
     """
     from gwcs.utils import correct_1d_output
 
-    def returns_one(*args):
-        return (args[0],)
-
-    def returns_two(*args):
-        return (args[0], args[1])
-
-    def returns_scalar(*args):
-        return args[0]
-
-    # pass_correct_1d=False path (legacy-style functions without the kwarg)
-    collapse = correct_1d_output(returns_one, pass_correct_1d=False)
-    assert collapse(42, correct_1d=True) == 42
-    assert collapse(42, correct_1d=False) == (42,)
-
-    passthrough = correct_1d_output(returns_two, pass_correct_1d=False)
-    assert passthrough(1, 2, correct_1d=True) == (1, 2)
-
-    # A non-sequence return must never be indexed, regardless of correct_1d.
-    scalar = correct_1d_output(returns_scalar, pass_correct_1d=False)
-    assert scalar(7, correct_1d=True) == 7
-
-    # pass_correct_1d=True path forwards correct_1d into the wrapped function.
-    def uses_correct_1d(*args, correct_1d=True):
-        return (args[0], correct_1d)
-
-    forwarded = correct_1d_output(uses_correct_1d, pass_correct_1d=True)
-    # Two-element result so it is not collapsed; confirms correct_1d was passed.
-    assert forwarded(9, correct_1d=False) == (9, False)
+    assert correct_1d_output(42) == 42
+    assert correct_1d_output(1, 2) == (1, 2)
+    assert correct_1d_output(42, correct_1d=False) == (42,)
 
 
 def test_legacy_coordinate_frame_protocol_warns_and_functions():

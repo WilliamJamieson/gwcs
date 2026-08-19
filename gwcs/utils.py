@@ -9,7 +9,7 @@ from __future__ import annotations
 import functools
 import re
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, TypeVar, overload
 
 import astropy.units as u
 import numpy as np
@@ -21,6 +21,36 @@ from astropy.wcs import Celprm
 
 if TYPE_CHECKING:
     from gwcs.typing import Mdl
+
+
+_T = TypeVar("_T")
+
+
+@overload
+def correct_1d_output(value: _T, *, correct_1d: Literal[True] = True) -> _T: ...
+
+
+@overload
+def correct_1d_output(
+    value: _T, *values: _T, correct_1d: Literal[False]
+) -> tuple[_T, ...]: ...
+
+
+@overload
+def correct_1d_output(
+    value: _T, *values: _T, correct_1d: bool
+) -> _T | tuple[_T, ...]: ...
+
+
+def correct_1d_output(
+    value: _T, *values: _T, correct_1d: bool = True
+) -> _T | tuple[_T, ...]:
+    values = (value, *values)
+    if correct_1d and len(values) == 1:
+        return values[0]
+
+    return values
+
 
 # these ctype values do not include yzLN and yzLT pairs
 sky_pairs = {
@@ -498,26 +528,6 @@ def create_projection_transform(projcode):
 
     projparams = {}
     return projklass(**projparams)
-
-
-def correct_1d_output(func, pass_correct_1d: bool = True):
-    """
-    Decorator to correct the output of a function to be 1D if the input is 1D.
-    """
-
-    @functools.wraps(func)
-    def wrapper(*args, correct_1d: bool = True, **kwargs):
-        if pass_correct_1d:
-            value = func(*args, correct_1d=correct_1d, **kwargs)
-        else:
-            value = func(*args, **kwargs)
-
-        if correct_1d and isinstance(value, (tuple, list)) and len(value) == 1:
-            return value[0]
-
-        return value
-
-    return wrapper
 
 
 def is_high_level(*args, low_level_wcs):

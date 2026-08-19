@@ -13,7 +13,7 @@ from astropy.coordinates import BaseCoordinateFrame
 from astropy.modeling import Model
 from astropy.modeling.bounding_box import CompoundBoundingBox, ModelBoundingBox
 from astropy.time import Time
-from astropy.units import Quantity
+from astropy.units import Quantity, Unit
 from numpy import dtype, generic, ndarray, number
 
 from .coordinate_frames import (
@@ -27,12 +27,22 @@ from .wcs._pipeline import _BasePipeline
 
 __all__ = [
     "AstropyBuiltInFrame",
+    "AxesOrder",
     "AxesType",
+    "AxisNames",
+    "AxisPhysicalTypes",
+    "AxisTypeValue",
+    "AxisTypes",
+    "AxisUnits",
     "BoundingBoxInput",
+    "BoundingBoxLike",
     "Degree",
     "ForwardTransform",
     "FrameLike",
+    "HighLevelCoordinate",
+    "HighLevelCoordinates",
     "LowLevelArray",
+    "LowLevelArrayOutputs",
     "LowLevelArrayValue",
     "LowLevelInput",
     "LowLevelOutputs",
@@ -51,7 +61,15 @@ _DtypeGeneric = TypeVar("_DtypeGeneric", bound=generic)
 AstropyBuiltInFrame: TypeAlias = Time | BaseCoordinateFrame
 FrameLike: TypeAlias = str | CoordinateFrameProtocol
 OptionalFrameLike: TypeAlias = FrameLike | None
-AxesType: TypeAlias = tuple[AxisType | str, ...] | AxisType | str
+HighLevelCoordinate: TypeAlias = object
+HighLevelCoordinates: TypeAlias = tuple[HighLevelCoordinate, ...] | HighLevelCoordinate
+AxisTypeValue: TypeAlias = AxisType | str
+AxisTypes: TypeAlias = tuple[AxisTypeValue, ...]
+AxesType: TypeAlias = AxisTypes | AxisTypeValue
+AxisUnits: TypeAlias = tuple[Unit | None, ...]
+AxisNames: TypeAlias = tuple[str, ...]
+AxesOrder: TypeAlias = tuple[int, ...]
+AxisPhysicalTypes: TypeAlias = tuple[str | None, ...]
 WorldAxisObjectClasses: TypeAlias = (
     dict[str, WorldAxisObjectClass]
     | dict[str, WorldAxisObjectClassConverter]
@@ -64,12 +82,12 @@ LowLevelInput: TypeAlias = LowLevelArray | Quantity
 Numeric: TypeAlias = float | number
 LowLevelValue: TypeAlias = LowLevelInput | Numeric
 LowLevelArrayValue: TypeAlias = LowLevelArray | Numeric
+LowLevelArrayOutputs: TypeAlias = tuple[LowLevelArrayValue, ...] | LowLevelArrayValue
 LowLevelOutputs: TypeAlias = tuple[LowLevelInput, ...] | LowLevelInput
 
 # FITS and approximation configuration
-BoundingBoxInput: TypeAlias = (
-    ModelBoundingBox | CompoundBoundingBox | LowLevelInput | Sequence[LowLevelInput]
-)
+BoundingBoxLike: TypeAlias = ModelBoundingBox | CompoundBoundingBox
+BoundingBoxInput: TypeAlias = BoundingBoxLike | LowLevelInput | Sequence[LowLevelInput]
 Degree: TypeAlias = int | Sequence[int] | None
 Sampling: TypeAlias = float | Sequence[float]
 

@@ -1,13 +1,17 @@
 import warnings
+from collections.abc import Mapping
 
 from astropy.wcs.wcsapi.fitswcs import CTYPE_TO_UCD1
 
 __all__ = ["get_ctype_from_ucd"]
 
 
-def _ucd1_to_ctype_name_mapping(ctype_to_ucd, allowed_ucd_duplicates):
-    inv_map = {}
-    new_ucd = set()
+def _ucd1_to_ctype_name_mapping(
+    ctype_to_ucd: Mapping[str, str],
+    allowed_ucd_duplicates: Mapping[str, str],
+) -> dict[str, str]:
+    inv_map: dict[str, str] = {}
+    new_ucd: set[str] = set()
 
     for kwd, ucd in ctype_to_ucd.items():
         if ucd in inv_map:
@@ -39,7 +43,7 @@ UCD1_TO_CTYPE = _ucd1_to_ctype_name_mapping(
 )
 
 
-def get_ctype_from_ucd(ucd):
+def get_ctype_from_ucd(ucd: str | None) -> str:
     """
     Return the FITS ``CTYPE`` corresponding to a UCD1 value.
 
@@ -53,4 +57,6 @@ def get_ctype_from_ucd(ucd):
     CTYPE : str
         The corresponding FITS ``CTYPE`` value or an empty string.
     """
+    if ucd is None:
+        return ""
     return UCD1_TO_CTYPE.get(ucd, "")

@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, TypeVar
 import numpy as np
 from astropy import units as u
 
-from ._axis import AxisType
 from ._base import (
     CoordinateFrameProtocol,
     WorldAxisObjectClass,
@@ -14,7 +13,16 @@ from ._base import (
 from ._properties import FrameProperties
 
 if TYPE_CHECKING:
-    from gwcs.typing import AstropyBuiltInFrame, AxesType, WorldAxisObjectClasses
+    from gwcs.typing import (
+        AstropyBuiltInFrame,
+        AxesOrder,
+        AxesType,
+        AxisNames,
+        AxisPhysicalTypes,
+        AxisTypes,
+        AxisUnits,
+        WorldAxisObjectClasses,
+    )
 
 __all__ = ["CoordinateFrame"]
 
@@ -48,12 +56,12 @@ class CoordinateFrame(CoordinateFrameProtocol):
         self,
         naxes: int,
         axes_type: AxesType,
-        axes_order: tuple[int, ...],
+        axes_order: AxesOrder,
         reference_frame: AstropyBuiltInFrame | None = None,
-        unit: tuple[u.Unit, ...] | None = None,
-        axes_names: tuple[str, ...] | None = None,
+        unit: AxisUnits | None = None,
+        axes_names: AxisNames | None = None,
         name: str | None = None,
-        axis_physical_types: tuple[str | None, ...] | None = None,
+        axis_physical_types: AxisPhysicalTypes | None = None,
     ) -> None:
         self._naxes = naxes
         self._axes_order = tuple(axes_order)
@@ -78,9 +86,7 @@ class CoordinateFrame(CoordinateFrameProtocol):
 
         super().__init__()
 
-    def _default_axis_physical_types(
-        self, axes_type: tuple[AxisType | str, ...]
-    ) -> tuple[str, ...]:
+    def _default_axis_physical_types(self, axes_type: AxisTypes) -> tuple[str, ...]:
         """
         The default physical types to use for this frame if none are specified
         by the user.
@@ -124,17 +130,17 @@ class CoordinateFrame(CoordinateFrameProtocol):
         return self._naxes
 
     @property
-    def unit(self) -> tuple[u.Unit, ...]:
+    def unit(self) -> AxisUnits:
         """The unit of this frame."""
         return self._sort_property(self._prop.unit)
 
     @property
-    def axes_names(self) -> tuple[str, ...]:
+    def axes_names(self) -> AxisNames:
         """Names of axes in the frame."""
         return self._sort_property(self._prop.axes_names)
 
     @property
-    def axes_order(self) -> tuple[int, ...]:
+    def axes_order(self) -> AxesOrder:
         """A tuple of indices which map inputs to axes."""
         return self._axes_order
 
@@ -144,12 +150,12 @@ class CoordinateFrame(CoordinateFrameProtocol):
         return self._reference_frame
 
     @property
-    def axes_type(self) -> tuple[AxisType | str, ...]:
+    def axes_type(self) -> AxisTypes:
         """Type of this frame, one of 'SPATIAL', 'SPECTRAL', 'TIME'."""
         return self._sort_property(self._prop.axes_type)
 
     @property
-    def axis_physical_types(self) -> tuple[str | None, ...]:
+    def axis_physical_types(self) -> AxisPhysicalTypes:
         """
         The axis physical types for this frame.
 

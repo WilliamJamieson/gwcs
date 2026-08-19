@@ -3,7 +3,7 @@ from __future__ import annotations
 import warnings
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Generic, Self, TypeVar, overload
+from typing import TYPE_CHECKING, Generic, Self, TypeVar
 
 from astropy.modeling import Model
 from astropy.modeling.bounding_box import CompoundBoundingBox, ModelBoundingBox
@@ -17,6 +17,7 @@ from ._step import IndexedStep, Step
 
 if TYPE_CHECKING:
     from gwcs.typing import (
+        BoundingBoxLike,
         ForwardTransform,
         FrameLike,
         Mdl,
@@ -103,7 +104,7 @@ class _BasePipeline:
             raise CoordinateFrameError(msg) from err
 
     @property
-    def bounding_box(self) -> ModelBoundingBox | CompoundBoundingBox | None:
+    def bounding_box(self) -> BoundingBoxLike | None:
         """
         Return the bounding box of the pipeline.
         """
@@ -336,24 +337,6 @@ class Pipeline(_BasePipeline):
         (or WCSs) from existing pipelines (or WCSs) without the expensive overhead
         of validation and copies.
     """
-
-    @overload
-    def __init__(
-        self,
-        forward_transform: Model,
-        *,
-        input_frame: FrameLike,
-        output_frame: FrameLike,
-    ) -> None: ...
-
-    @overload
-    def __init__(
-        self,
-        forward_transform: Sequence[StepSpec] | _BasePipeline,
-        *,
-        input_frame: None = None,
-        output_frame: None = None,
-    ) -> None: ...
 
     def __init__(
         self,
@@ -717,7 +700,7 @@ class Pipeline(_BasePipeline):
             self._insert(input_index + 1, Step(output_frame, current))
 
     @property
-    def bounding_box(self) -> ModelBoundingBox | CompoundBoundingBox | None:
+    def bounding_box(self) -> BoundingBoxLike | None:
         """
         Return the bounding box of the pipeline.
         """
@@ -757,9 +740,7 @@ class Pipeline(_BasePipeline):
         return bounding_box
 
     @bounding_box.setter
-    def bounding_box(
-        self, value: tuple | ModelBoundingBox | CompoundBoundingBox | None
-    ) -> None:
+    def bounding_box(self, value: tuple | BoundingBoxLike | None) -> None:
         """
         Set the range of acceptable values for each input axis.
 

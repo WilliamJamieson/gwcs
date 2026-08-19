@@ -8,9 +8,11 @@ from numbers import Number
 from typing import (
     TYPE_CHECKING,
     Any,
+    Literal,
     NamedTuple,
     Protocol,
     Self,
+    overload,
     runtime_checkable,
 )
 
@@ -27,8 +29,16 @@ from gwcs.utils import correct_1d_output
 if TYPE_CHECKING:
     from gwcs.typing import (
         AstropyBuiltInFrame,
+        AxesOrder,
         AxesType,
+        AxisNames,
+        AxisPhysicalTypes,
+        AxisUnits,
+        HighLevelCoordinate,
+        HighLevelCoordinates,
         LowLevelArray,
+        LowLevelArrayOutputs,
+        LowLevelArrayValue,
         LowLevelInput,
         LowLevelOutputs,
         WorldAxisObjectClasses,
@@ -93,7 +103,7 @@ class WorldAxisObjectClassConverter(NamedTuple):
         A callable that will convert the input values into the desired output
     """
 
-    class_object: type | str
+    class_object: type[HighLevelCoordinate] | str
     arguments: tuple[Any, ...]
     keyword_arguments: dict[str, Any]
     converter: Callable[..., Any]
@@ -132,7 +142,7 @@ class WorldAxisObjectComponent(NamedTuple):
 
     name: str
     position: str | int
-    property: str | Callable[[Any], str]
+    property: str | Callable[[Any], LowLevelArrayValue]
 
     @classmethod
     def from_tuple(cls, tup: tuple[str, str | int, str]) -> Self:
@@ -162,21 +172,21 @@ class _LegacyCoordinateFrameProtocol(Protocol):
 
     @property
     @abstractmethod
-    def unit(self) -> tuple[u.Unit | None, ...]:
+    def unit(self) -> AxisUnits:
         """
         The units of the axes in this frame.
         """
 
     @property
     @abstractmethod
-    def axes_names(self) -> tuple[str, ...]:
+    def axes_names(self) -> AxisNames:
         """
         Names describing the axes of the frame.
         """
 
     @property
     @abstractmethod
-    def axes_order(self) -> tuple[int, ...]:
+    def axes_order(self) -> AxesOrder:
         """
         The position of the axes in the frame in the transform.
         """
@@ -202,7 +212,7 @@ class _LegacyCoordinateFrameProtocol(Protocol):
 
     @property
     @abstractmethod
-    def axis_physical_types(self) -> tuple[str | None, ...]:
+    def axis_physical_types(self) -> AxisPhysicalTypes:
         """
         The UCD 1+ physical types for the axes, in frame order.
         """
@@ -277,8 +287,24 @@ class _LegacyCoordinateFrameProtocol(Protocol):
             for array in self.add_units(arrays)
         )
 
-    @correct_1d_output
-    def to_high_level_coordinates(self, *values, correct_1d=True):
+    @overload
+    def to_high_level_coordinates(
+        self, *values: LowLevelInput, correct_1d: Literal[True] = True
+    ) -> HighLevelCoordinates: ...
+
+    @overload
+    def to_high_level_coordinates(
+        self, *values: LowLevelInput, correct_1d: Literal[False]
+    ) -> tuple[HighLevelCoordinate, ...]: ...
+
+    @overload
+    def to_high_level_coordinates(
+        self, *values: LowLevelInput, correct_1d: bool
+    ) -> HighLevelCoordinates: ...
+
+    def to_high_level_coordinates(
+        self, *values: LowLevelInput, correct_1d: bool = True
+    ) -> HighLevelCoordinates:
         """
         Convert "values" to high level coordinate objects described by this frame.
 
@@ -304,10 +330,33 @@ class _LegacyCoordinateFrameProtocol(Protocol):
             msg = "All values should be a scalar number or a numpy array."
             raise TypeError(msg)
 
-        return values_to_high_level_objects(*values, low_level_wcs=self)
+        return correct_1d_output(
+            *values_to_high_level_objects(*values, low_level_wcs=self),
+            correct_1d=correct_1d,
+        )
 
-    @correct_1d_output
-    def from_high_level_coordinates(self, *high_level_coords, correct_1d=True):
+    @overload
+    def from_high_level_coordinates(
+        self,
+        *high_level_coords: HighLevelCoordinate,
+        correct_1d: Literal[True] = True,
+    ) -> LowLevelArrayOutputs: ...
+
+    @overload
+    def from_high_level_coordinates(
+        self,
+        *high_level_coords: HighLevelCoordinate,
+        correct_1d: Literal[False],
+    ) -> tuple[LowLevelArrayValue, ...]: ...
+
+    @overload
+    def from_high_level_coordinates(
+        self, *high_level_coords: HighLevelCoordinate, correct_1d: bool
+    ) -> LowLevelArrayOutputs: ...
+
+    def from_high_level_coordinates(
+        self, *high_level_coords: HighLevelCoordinate, correct_1d: bool = True
+    ) -> LowLevelArrayOutputs:
         """
         Convert high level coordinate objects to "values" as described by this frame.
 
@@ -325,10 +374,13 @@ class _LegacyCoordinateFrameProtocol(Protocol):
         values : `numbers.Number` or `numpy.ndarray`
             ``naxis`` number of coordinates as scalars or arrays.
         """
-        return high_level_objects_to_values(*high_level_coords, low_level_wcs=self)
+        return correct_1d_output(
+            *high_level_objects_to_values(*high_level_coords, low_level_wcs=self),
+            correct_1d=correct_1d,
+        )
 
 
-def _is_high_level(self: CoordinateFrameProtocol, *args) -> bool:
+def _is_high_level(self: CoordinateFrameProtocol, *args: HighLevelCoordinate) -> bool:
     """
     Return `True` if the input coordinates are already high level objects
     described by this frame.
@@ -385,7 +437,7 @@ class CoordinateFrameProtocol(_LegacyCoordinateFrameProtocol, Protocol):
     API Definition for a Coordinate frame
     """
 
-    def is_high_level(self, *args) -> bool:
+    def is_high_level(self, *args: HighLevelCoordinate) -> bool:
         """
         Return `True` if the input coordinates are already high level objects
         described by this frame.
@@ -402,7 +454,7 @@ class BaseCoordinateFrame(CoordinateFrameProtocol):
     Legacy base class for coordinate frames.
     """
 
-    def __init_subclass__(cls, *args, **kwargs):
+    def __init_subclass__(cls, *args: Any, **kwargs: Any) -> None:
         msg = (
             "BaseCoordinateFrame has been deprecated and will be removed in a"
             "future release. Please implement or inherit from CoordinateFrameProtocol "
@@ -413,7 +465,7 @@ class BaseCoordinateFrame(CoordinateFrameProtocol):
         super().__init_subclass__(*args, **kwargs)
 
     @property
-    def world_axis_object_components(self):
+    def world_axis_object_components(self) -> list[WorldAxisObjectComponent]:
         """
         The APE 14 object components for this frame.
 
@@ -429,11 +481,11 @@ class BaseCoordinateFrame(CoordinateFrameProtocol):
         ordered = np.array(self._native_world_axis_object_components, dtype=object)[
             np.argsort(self.axes_order)
         ]
-        return list(map(tuple, ordered))
+        return list(map(WorldAxisObjectComponent.from_tuple, ordered))
 
     @property
     @abstractmethod
-    def _native_world_axis_object_components(self):
+    def _native_world_axis_object_components(self) -> list[WorldAxisObjectComponent]:
         """
         This property holds the "native" frame order of the components.
 
