@@ -6,8 +6,10 @@ import inspect
 import itertools
 import sys
 import warnings
+from collections.abc import Callable, Sequence
 from copy import copy
-from typing import TYPE_CHECKING, Self, overload
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Literal, Self, cast, overload
 
 import astropy.units as u
 import numpy as np
@@ -25,7 +27,6 @@ from astropy.modeling.models import (
 )
 from astropy.modeling.parameters import _tofloat
 from astropy.wcs.utils import celestial_frame_to_wcs, proj_plane_pixel_scales
-from numpy import typing as npt
 from scipy import optimize
 
 from gwcs.api import WCSAPIMixin
@@ -40,7 +41,6 @@ from gwcs.utils import _compute_lon_pole, correct_1d_output, to_index
 
 from ._exception import NoConvergence
 from ._pipeline import Pipeline, _BasePipeline
-from ._step import Step
 from ._utils import (
     fit_2D_poly,
     fix_transform_inputs,
@@ -50,49 +50,62 @@ from ._utils import (
 )
 
 if TYPE_CHECKING:
-    from gwcs.typing import ForwardTransform, LowLevelArray, LowLevelInput, StepTuple
+    from gwcs.typing import (
+        BoundingBoxInput,
+        Degree,
+        ForwardTransform,
+        FrameLike,
+        LowLevelArray,
+        LowLevelArrayValue,
+        LowLevelInput,
+        LowLevelOutputs,
+        LowLevelValue,
+        Numeric,
+        OptionalFrameLike,
+        Sampling,
+        StepSpec,
+    )
 
 __all__ = ["WCS"]
 
-_ITER_INV_KWARGS = ["tolerance", "maxiter", "adaptive", "detect_divergence", "quiet"]
 
-
+@dataclass(frozen=True, slots=True)
 class _WorldAxisInfo:
-    def __init__(self, axis, frame, world_axis_order, cunit, ctype, input_axes):  # noqa: PLR0917
-        """
-        A class for holding information about a world axis from an output frame.
+    """
+    A class for holding information about a world axis from an output frame.
 
-        Parameters
-        ----------
-        axis : int
-            Output axis number [in the forward transformation].
+    Parameters
+    ----------
+    axis
+        Output axis number [in the forward transformation].
 
-        frame : cf.CoordinateFrameProtocol
-            Coordinate frame to which this axis belongs.
+    frame
+        Coordinate frame to which this axis belongs.
 
-        world_axis_order : int
-            Index of this axis in `gwcs.WCS.output_frame.axes_order`
+    world_axis_order
+        Index of this axis in `gwcs.WCS.output_frame.axes_order`
 
-        cunit : str
-            Axis unit using FITS conversion (``CUNIT``).
+    cunit
+        Axis unit using FITS conversion (``CUNIT``).
 
-        ctype : str
-            Axis FITS type (``CTYPE``).
+    ctype
+        Axis FITS type (``CTYPE``).
 
-        input_axes : tuple of int
-            Tuple of input axis indices contributing to this world axis.
+    input_axes
+        Tuple of input axis indices contributing to this world axis.
 
-        """
-        self.axis = axis
-        self.frame = frame
-        self.world_axis_order = world_axis_order
-        self.cunit = cunit
-        self.ctype = ctype
-        self.input_axes = input_axes
+    """
+
+    axis: int
+    frame: CoordinateFrameProtocol
+    world_axis_order: int
+    cunit: str
+    ctype: str
+    input_axes: tuple[int, ...]
 
 
 @functools.cache
-def _func_accepts_correct_1d(func) -> bool:
+def _func_accepts_correct_1d(func: Callable[..., Any]) -> bool:
     """
     Determine whether a frame's coordinate-conversion method accepts the
     ``correct_1d`` keyword. Legacy frames predate this argument.
@@ -107,7 +120,7 @@ def _func_accepts_correct_1d(func) -> bool:
     )
 
 
-def _accepts_correct_1d(method) -> bool:
+def _accepts_correct_1d(method: Callable[..., Any]) -> bool:
     """
     Helper to pass to the _func_accepts_correct_1d function so that the cache
     is not grown every time this function is called.
@@ -116,7 +129,9 @@ def _accepts_correct_1d(method) -> bool:
     return _func_accepts_correct_1d(getattr(method, "__func__", method))
 
 
-def _from_high_level_coordinates(frame, *args, correct_1d=True):
+def _from_high_level_coordinates(
+    frame: CoordinateFrameProtocol, *args: Any, correct_1d: bool = True
+) -> Any:
     """
     Helper to support legacy frames whose ``from_high_level_coordinates`` does
     not implement the ``correct_1d`` argument.
@@ -130,7 +145,9 @@ def _from_high_level_coordinates(frame, *args, correct_1d=True):
     )
 
 
-def _to_high_level_coordinates(frame, *args, correct_1d=True):
+def _to_high_level_coordinates(
+    frame: CoordinateFrameProtocol, *args: Any, correct_1d: bool = True
+) -> Any:
     """
     Helper to support legacy frames whose ``to_high_level_coordinates`` does
     not implement the ``correct_1d`` argument.
@@ -177,10 +194,10 @@ class _UnitHandler:
 
     def __init__(
         self,
-        inputs: tuple[LowLevelInput, ...] | LowLevelInput,
+        inputs: LowLevelOutputs,
         transform: Model,
         frame: CoordinateFrameProtocol,
-    ):
+    ) -> None:
         # Handle the case where a HLO is passed into the Native API
         self._is_high_level = frame.is_high_level(*inputs)
         if self._is_high_level:
@@ -276,7 +293,7 @@ class _UnitHandler:
     ) -> tuple[LowLevelInput, ...]:
         # Return a high level object if the input was a high level object
         if self._is_high_level:
-            values = _to_high_level_coordinates(frame, *outputs, correct_1d=False)  # type: ignore[no-any-return]
+            values: Any = _to_high_level_coordinates(frame, *outputs, correct_1d=False)
 
             if not isinstance(values, list | tuple):
                 values = (values,)
@@ -292,9 +309,9 @@ class _UnitHandler:
 
     def handle_output(
         self,
-        outputs: tuple[LowLevelInput, ...] | LowLevelInput,
+        outputs: LowLevelOutputs,
         frame: CoordinateFrameProtocol,
-    ) -> tuple[LowLevelInput, ...] | LowLevelInput:
+    ) -> LowLevelOutputs:
         """
         Handle the output of a transform by adding or removing units as needed
         and converting to high level objects if the input was high level.
@@ -348,15 +365,15 @@ class WCS(Pipeline, WCSAPIMixin):
     def __init__(
         self,
         forward_transform: Model,
-        input_frame: str | CoordinateFrameProtocol,
-        output_frame: str | CoordinateFrameProtocol,
+        input_frame: FrameLike,
+        output_frame: FrameLike,
         name: str | None = None,
     ) -> None: ...
 
     @overload
     def __init__(
         self,
-        forward_transform: list[Step | StepTuple] | _BasePipeline,
+        forward_transform: list[StepSpec] | _BasePipeline,
         input_frame: None = None,
         output_frame: None = None,
         name: str | None = None,
@@ -365,18 +382,24 @@ class WCS(Pipeline, WCSAPIMixin):
     def __init__(
         self,
         forward_transform: ForwardTransform,
-        input_frame: str | CoordinateFrameProtocol | None = None,
-        output_frame: str | CoordinateFrameProtocol | None = None,
+        input_frame: OptionalFrameLike = None,
+        output_frame: OptionalFrameLike = None,
         name: str | None = None,
     ) -> None:
-        super().__init__(
-            forward_transform=forward_transform,
-            # mypy for some reason isn't able to infer the correct overload here
-            input_frame=input_frame,  # type: ignore[arg-type]
-            output_frame=output_frame,  # type: ignore[arg-type]
-        )
+        if isinstance(forward_transform, Model):
+            super().__init__(
+                forward_transform=forward_transform,
+                input_frame=cast("FrameLike", input_frame),
+                output_frame=cast("FrameLike", output_frame),
+            )
+        else:
+            super().__init__(
+                forward_transform=forward_transform,
+                input_frame=cast(Any, input_frame),
+                output_frame=cast(Any, output_frame),
+            )
 
-        self._approx_inverse = None
+        self._approx_inverse: Callable[..., Any] | None = None
         self._name = "" if name is None else name
         self._pixel_shape = None
 
@@ -384,9 +407,9 @@ class WCS(Pipeline, WCSAPIMixin):
         self,
         *args: LowLevelInput,
         with_bounding_box: bool = True,
-        fill_value: float | np.number = np.nan,
-        **kwargs,
-    ) -> tuple[LowLevelInput, ...] | LowLevelInput:
+        fill_value: Numeric = np.nan,
+        **kwargs: Any,
+    ) -> LowLevelOutputs:
         # Call into variable as this involves computing the forward transform
         #   after each call to it.
         transform = self.forward_transform
@@ -406,9 +429,9 @@ class WCS(Pipeline, WCSAPIMixin):
         self,
         *args: LowLevelInput,
         with_bounding_box: bool = True,
-        fill_value: float | np.number = np.nan,
-        **kwargs,
-    ) -> tuple[LowLevelInput, ...] | LowLevelInput:
+        fill_value: Numeric = np.nan,
+        **kwargs: Any,
+    ) -> LowLevelOutputs:
         """
         Executes the forward transform.
 
@@ -433,9 +456,9 @@ class WCS(Pipeline, WCSAPIMixin):
         self,
         *args: LowLevelInput,
         with_bounding_box: bool = True,
-        fill_value: float | np.number = np.nan,
-        **kwargs,
-    ) -> bool | np.ndarray[tuple[int, ...], np.dtype[np.bool_]]:
+        fill_value: Numeric = np.nan,
+        **kwargs: Any,
+    ) -> bool | LowLevelArray[np.bool_]:
         """
         This method tests if one or more of the input world coordinates are
         contained within forward transformation's image and that it maps to
@@ -466,7 +489,7 @@ class WCS(Pipeline, WCSAPIMixin):
             *args, with_bounding_box=with_bounding_box, fill_value=fill_value, **kwargs
         )
 
-        result: npt.NDArray[np.bool_] = np.isfinite(coords)
+        result: LowLevelArray = np.isfinite(coords)
         if self.input_frame.naxes > 1:
             result = np.all(result, axis=0)
 
@@ -476,9 +499,14 @@ class WCS(Pipeline, WCSAPIMixin):
         self,
         *args: LowLevelInput,
         with_bounding_box: bool = True,
-        fill_value: float | np.number = np.nan,
-        **kwargs,
-    ) -> tuple[LowLevelInput, ...] | LowLevelInput:
+        fill_value: Numeric = np.nan,
+        tolerance: float = 1e-5,
+        maxiter: int = 30,
+        adaptive: bool = True,
+        detect_divergence: bool = True,
+        quiet: bool = True,
+        **kwargs: Any,
+    ) -> LowLevelOutputs:
         """
         Invert coordinates from output frame to input frame using analytical or
         user-supplied inverse. When neither analytical nor user-supplied
@@ -502,11 +530,28 @@ class WCS(Pipeline, WCSAPIMixin):
         fill_value
             Output value for inputs outside the bounding_box (default is ``np.nan``).
 
+        tolerance : float, optional
+            Absolute tolerance for the numerical inverse solution.
+
+        maxiter : int, optional
+            Maximum number of iterations for the numerical inverse.
+
+        adaptive : bool, optional
+            Whether to iterate only over points that have not converged.
+
+        detect_divergence : bool, optional
+            Whether to detect and handle diverging solutions.
+
+        quiet : bool, optional
+            Whether to suppress :py:class:`NoConvergence` exceptions.
+
         Other Parameters
         ----------------
         kwargs : dict
-            Keyword arguments to be passed to :py:meth:`numerical_inverse`
-            (when defined) or to the iterative invert method.
+            Keyword arguments to be passed to the analytical backward
+            transform when one is defined. The numerical inverse options are
+            exposed explicitly as ``tolerance``, ``maxiter``, ``adaptive``,
+            ``detect_divergence``, and ``quiet``.
 
         Returns
         -------
@@ -524,21 +569,25 @@ class WCS(Pipeline, WCSAPIMixin):
 
         unit_handler = _UnitHandler(args, transform, self.output_frame)
 
-        inputs = unit_handler.args
+        inputs: Sequence[LowLevelInput] = unit_handler.args
         if with_bounding_box and self.bounding_box is not None:
             inputs = self.outside_footprint(inputs)
 
         if transform is not None:
-            akwargs = {k: v for k, v in kwargs.items() if k not in _ITER_INV_KWARGS}
             result = transform(
                 *inputs,
                 with_bounding_box=with_bounding_box,
                 fill_value=fill_value,
-                **akwargs,
+                **kwargs,
             )
         else:
             result = self._numerical_inverse(
                 *inputs,
+                tolerance=tolerance,
+                maxiter=maxiter,
+                adaptive=adaptive,
+                detect_divergence=detect_divergence,
+                quiet=quiet,
                 with_bounding_box=with_bounding_box,
                 fill_value=fill_value,
                 **kwargs,
@@ -549,24 +598,26 @@ class WCS(Pipeline, WCSAPIMixin):
 
         return unit_handler.handle_output(result, frame=self.input_frame)
 
-    def outside_footprint(self, world_arrays):
-        world_arrays = [copy(array) for array in world_arrays]
+    def outside_footprint(
+        self, world_arrays: Sequence[LowLevelInput]
+    ) -> list[LowLevelInput]:
+        world_arrays_list = [copy(array) for array in world_arrays]
 
         axes_types = set(self.output_frame.axes_type)
-        axes_phys_types = self.world_axis_physical_types
+        axes_phys_types = self.world_axis_physical_types or ()
         footprint = self.footprint()
         not_numerical = False
-        if self.output_frame.is_high_level(*world_arrays):
+        if self.output_frame.is_high_level(*world_arrays_list):
             not_numerical = True
-            world_arrays = _from_high_level_coordinates(
-                self.output_frame, *world_arrays, correct_1d=False
+            world_arrays_list = _from_high_level_coordinates(
+                self.output_frame, *world_arrays_list, correct_1d=False
             )
 
         for axtyp in axes_types:
             ind = np.asarray(np.asarray(self.output_frame.axes_type) == axtyp)
 
             for idim, (coordinate, phys) in enumerate(
-                zip(world_arrays, axes_phys_types, strict=False)
+                zip(world_arrays_list, axes_phys_types, strict=False)
             ):
                 coord = _tofloat(coordinate)
                 if np.asarray(ind).sum() > 1:
@@ -588,13 +639,13 @@ class WCS(Pipeline, WCSAPIMixin):
                     max_ax = axis_range[~m].min()
                     outside = (coord > min_ax) & (coord < max_ax)
                 else:
-                    if len(world_arrays) == 1:
+                    if len(world_arrays_list) == 1:
                         coord_ = self._remove_quantity_frame(
-                            world_arrays[0], self.output_frame
+                            world_arrays_list[0], self.output_frame
                         )
                     else:
                         coord_ = self._remove_quantity_frame(
-                            world_arrays, self.output_frame
+                            world_arrays_list, self.output_frame
                         )[idim]
 
                     outside = (coord_ < min_ax) | (coord_ > max_ax)
@@ -603,44 +654,54 @@ class WCS(Pipeline, WCSAPIMixin):
                         coord = np.nan
                     else:
                         coord[outside] = np.nan
-                    world_arrays[idim] = coord
+                    world_arrays_list[idim] = coord
         if not_numerical:
-            world_arrays = _to_high_level_coordinates(
-                self.output_frame, *world_arrays, correct_1d=False
+            world_arrays_list = _to_high_level_coordinates(
+                self.output_frame, *world_arrays_list, correct_1d=False
             )
-        return world_arrays
+        return world_arrays_list
 
-    def out_of_bounds(self, pixel_arrays, fill_value=np.nan):
+    def out_of_bounds(
+        self,
+        pixel_arrays: tuple[LowLevelValue, ...] | LowLevelValue,
+        fill_value: Numeric = np.nan,
+    ) -> list[LowLevelValue] | LowLevelValue:
         if np.isscalar(pixel_arrays) or self.input_frame.naxes == 1:
-            pixel_arrays = [pixel_arrays]
+            pixel_arrays_list: list[LowLevelValue] = [
+                cast("LowLevelValue", pixel_arrays)
+            ]
+        else:
+            pixel_arrays_list = list(cast("tuple[LowLevelValue, ...]", pixel_arrays))
 
-        pixel_arrays = list(pixel_arrays)
         bbox = self.bounding_box
-        for idim, pix in enumerate(pixel_arrays):
+        if bbox is None:
+            msg = "A bounding_box is required to check pixel bounds."
+            raise ValueError(msg)
+        for idim, pix in enumerate(pixel_arrays_list):
             outside = (pix < bbox[idim][0]) | (pix > bbox[idim][1])
             if np.any(outside):
                 if np.isscalar(pix):
-                    pixel_arrays[idim] = np.nan
+                    pixel_arrays_list[idim] = np.nan
                 else:
-                    pix_ = pixel_arrays[idim].astype(float, copy=True)
+                    pix_ = cast("LowLevelInput", pix).astype(float, copy=True)
                     pix_[outside] = np.nan
-                    pixel_arrays[idim] = pix_
+                    pixel_arrays_list[idim] = pix_
         if self.input_frame.naxes == 1:
-            pixel_arrays = pixel_arrays[0]
-        return pixel_arrays
+            return pixel_arrays_list[0]
+        return pixel_arrays_list
 
     def numerical_inverse(
         self,
-        *args,
-        tolerance=1e-5,
-        maxiter=30,
-        adaptive=True,
-        detect_divergence=True,
-        quiet=True,
-        with_bounding_box=True,
-        fill_value=np.nan,
-        **kwargs,
-    ):
+        *args: LowLevelInput,
+        tolerance: float = 1e-5,
+        maxiter: int = 30,
+        adaptive: bool = True,
+        detect_divergence: bool = True,
+        quiet: bool = True,
+        with_bounding_box: bool = True,
+        fill_value: Numeric = np.nan,
+        **kwargs: Any,
+    ) -> tuple[LowLevelArrayValue, ...]:
         """
         Invert coordinates from output frame to input frame using numerical
         inverse.
@@ -781,6 +842,12 @@ class WCS(Pipeline, WCSAPIMixin):
                reported in the ``divergent`` attribute of the
                raised :py:class:`NoConvergence` exception object.
 
+        Other Parameters
+        ----------------
+        kwargs : dict
+            Additional keyword arguments accepted for backward compatibility
+            and passed through to the internal numerical inverse.
+
         Returns
         -------
         result : tuple
@@ -885,16 +952,16 @@ class WCS(Pipeline, WCSAPIMixin):
 
     def _numerical_inverse(
         self,
-        *args,
-        tolerance=1e-5,
-        maxiter=30,
-        adaptive=True,
-        detect_divergence=True,
-        quiet=True,
-        with_bounding_box=True,
-        fill_value=np.nan,
-        **kwargs,
-    ):
+        *args: LowLevelInput,
+        tolerance: float = 1e-5,
+        maxiter: int = 30,
+        adaptive: bool = True,
+        detect_divergence: bool = True,
+        quiet: bool = True,
+        with_bounding_box: bool = True,
+        fill_value: Numeric = np.nan,
+        **kwargs: Any,
+    ) -> tuple[LowLevelArrayValue, ...]:
         args_shape = np.shape(args)
         nargs = args_shape[0]
         arg_dim = len(args_shape) - 1
@@ -930,7 +997,7 @@ class WCS(Pipeline, WCSAPIMixin):
             if nargs == 2 and self._approx_inverse is not None:
                 x0 = self._approx_inverse(*argsi)
                 if not np.all(np.isfinite(x0)):
-                    return [np.array(np.nan) for _ in range(nargs)]
+                    return tuple(np.array(np.nan) for _ in range(nargs))
 
             result = tuple(
                 self._vectorized_fixed_point(
@@ -952,16 +1019,16 @@ class WCS(Pipeline, WCSAPIMixin):
             arg_shape = args_shape[1:]
             nelem = np.prod(arg_shape)
 
-            args = np.reshape(args, (nargs, nelem))
+            args_array = np.reshape(args, (nargs, nelem))
 
             if self._approx_inverse is None:
                 x0 = np.full((nelem, nargs), x0)
             else:
-                x0 = np.array(self._approx_inverse(*args)).T
+                x0 = np.array(self._approx_inverse(*args_array)).T
 
             result = self._vectorized_fixed_point(
                 x0,
-                args.T,
+                args_array.T,
                 tolerance=tolerance,
                 maxiter=maxiter,
                 adaptive=adaptive,
@@ -977,16 +1044,16 @@ class WCS(Pipeline, WCSAPIMixin):
 
     def _vectorized_fixed_point(  # noqa: PLR0917
         self,
-        pix0,
-        world,
-        tolerance,
-        maxiter,
-        adaptive,
-        detect_divergence,
-        quiet,
-        with_bounding_box,
-        fill_value,
-    ):
+        pix0: LowLevelArray,
+        world: LowLevelArray,
+        tolerance: float,
+        maxiter: int,
+        adaptive: bool,
+        detect_divergence: bool,
+        quiet: bool,
+        with_bounding_box: bool,
+        fill_value: Numeric,
+    ) -> LowLevelArray:
         # ############################################################
         # #            INITIALIZE ITERATIVE PROCESS:                ##
         # ############################################################
@@ -1019,12 +1086,12 @@ class WCS(Pipeline, WCSAPIMixin):
         inv_pscale = 1 / np.rad2deg(np.sqrt(area))
 
         # form equation:
-        def f(x):
+        def f(x: LowLevelArray) -> LowLevelArray:
             w = np.array(self.__call__(*(x.T), with_bounding_box=False)).T
             dw = np.mod(np.subtract(w, world) - 180.0, 360.0) - 180.0
             return np.add(inv_pscale * dw, x)
 
-        def froot(x):
+        def froot(x: LowLevelArray) -> LowLevelArray:
             return (
                 np.mod(
                     np.subtract(self.__call__(*x, with_bounding_box=False), worldi)
@@ -1035,7 +1102,7 @@ class WCS(Pipeline, WCSAPIMixin):
             )
 
         # compute correction:
-        def correction(pix):
+        def correction(pix: LowLevelArray) -> LowLevelArray:
             p1 = f(pix)
             p2 = f(p1)
             d = p2 - 2.0 * p1 + pix
@@ -1269,12 +1336,12 @@ class WCS(Pipeline, WCSAPIMixin):
 
     def transform(
         self,
-        from_frame: str | CoordinateFrameProtocol,
-        to_frame: str | CoordinateFrameProtocol,
-        *args: float | np.ndarray,
+        from_frame: FrameLike,
+        to_frame: FrameLike,
+        *args: float | LowLevelArray,
         with_bounding_box: bool = True,
-        fill_value: float | np.number = np.nan,
-        **kwargs,
+        fill_value: Numeric = np.nan,
+        **kwargs: Any,
     ) -> tuple[LowLevelArray, ...] | LowLevelArray:
         """
         Transform positions between two frames.
@@ -1346,8 +1413,14 @@ class WCS(Pipeline, WCSAPIMixin):
         )
 
     def footprint(
-        self, bounding_box=None, center=False, axis_type: AxisType | str | None = None
-    ):
+        self,
+        bounding_box: Bbox
+        | LowLevelInput
+        | tuple[tuple[float | u.Quantity, float | u.Quantity], ...]
+        | None = None,
+        center: bool = False,
+        axis_type: AxisType | str | None = None,
+    ) -> LowLevelArray:
         """
         Return the footprint in world coordinates.
 
@@ -1371,7 +1444,9 @@ class WCS(Pipeline, WCSAPIMixin):
         """
         axis_type = AxisType.from_input("all" if axis_type is None else axis_type)
 
-        def _order_clockwise(v):
+        def _order_clockwise(
+            v: list[LowLevelInput] | LowLevelArray,
+        ) -> LowLevelArray:
             return np.asarray(
                 [
                     [v[0][0], v[1][0]],
@@ -1394,6 +1469,7 @@ class WCS(Pipeline, WCSAPIMixin):
             raise ValueError(msg)
 
         all_spatial = all(t.lower() == "spatial" for t in self.output_frame.axes_type)
+        vertices: Any
         if self.output_frame.naxes == 1:
             if isinstance(bb[0], u.Quantity):
                 bb = np.asarray([b.value for b in bb]) * bb[0].unit
@@ -1401,7 +1477,7 @@ class WCS(Pipeline, WCSAPIMixin):
         elif all_spatial:
             vertices = _order_clockwise([self.input_frame.remove_units(b) for b in bb])
         else:
-            vertices = np.array(list(itertools.product(*bb))).T  # type: ignore[assignment]
+            vertices = np.array(list(itertools.product(*bb))).T
 
         # workaround an issue with bbox with quantity, interval needs to be a cquantity,
         # not a list of quantities strip units
@@ -1435,9 +1511,7 @@ class WCS(Pipeline, WCSAPIMixin):
 
         return result.T
 
-    def fix_inputs(
-        self, fixed: dict[str | int, LowLevelArray | u.Quantity | float | np.number]
-    ) -> Self:
+    def fix_inputs(self, fixed: dict[str | int, LowLevelValue]) -> Self:
         """
         Return a new unique WCS by fixing inputs to constant values.
 
@@ -1468,16 +1542,16 @@ class WCS(Pipeline, WCSAPIMixin):
 
     def to_fits_sip(  # noqa: PLR0917
         self,
-        bounding_box=None,
-        max_pix_error=0.25,
-        degree=None,
-        max_inv_pix_error=0.25,
-        inv_degree=None,
-        npoints=32,
-        crpix=None,
-        projection="TAN",
-        verbose=False,
-    ):
+        bounding_box: BoundingBoxInput | None = None,
+        max_pix_error: float = 0.25,
+        degree: Degree = None,
+        max_inv_pix_error: float | None = 0.25,
+        inv_degree: Degree = None,
+        npoints: int = 32,
+        crpix: Sequence[float] | None = None,
+        projection: str | projections.Sky2PixProjection = "TAN",
+        verbose: bool = False,
+    ) -> fits.Header:
         """
         Construct a SIP-based approximation to the WCS for the axes
         corresponding to the `~gwcs.coordinate_frames.CelestialFrame`
@@ -1597,19 +1671,19 @@ class WCS(Pipeline, WCSAPIMixin):
 
     def _to_fits_sip(  # noqa: PLR0917
         self,
-        celestial_group,
-        keep_axis_position,
-        bounding_box,
-        max_pix_error,
-        degree,
-        max_inv_pix_error,
-        inv_degree,
-        npoints,
-        crpix,
-        projection,
-        matrix_type,
-        verbose,
-    ):
+        celestial_group: list[_WorldAxisInfo],
+        keep_axis_position: bool,
+        bounding_box: BoundingBoxInput | None,
+        max_pix_error: float,
+        degree: Degree,
+        max_inv_pix_error: float | None,
+        inv_degree: Degree,
+        npoints: int,
+        crpix: Sequence[float] | None,
+        projection: str | projections.Sky2PixProjection,
+        matrix_type: str,
+        verbose: bool,
+    ) -> fits.Header:
         r"""
         Construct a SIP-based approximation to the WCS for the axes
         corresponding to the `~gwcs.coordinate_frames.CelestialFrame`
@@ -1734,7 +1808,7 @@ class WCS(Pipeline, WCSAPIMixin):
         lat_axis = frame.axes_order[1]
 
         # identify input axes:
-        input_axes = []
+        input_axes: list[int] = []
         for wax in celestial_group:
             input_axes.extend(wax.input_axes)
         input_axes = sorted(set(input_axes))
@@ -1760,6 +1834,8 @@ class WCS(Pipeline, WCSAPIMixin):
             raise ValueError(msg)
         if bounding_box is None:
             bounding_box = self.bounding_box
+
+        bounding_box = cast(Sequence[Any], bounding_box)
 
         first_bound = bounding_box[0][0]
         if isinstance(first_bound, u.Quantity):
@@ -1814,7 +1890,7 @@ class WCS(Pipeline, WCSAPIMixin):
         )
 
         # standard sampling:
-        crpix_ = [crpix1, crpix2]
+        crpix_ = (crpix1, crpix2)
         if isinstance(crpix1, u.Quantity):
             crpix_ = self.input_frame.remove_units(crpix_)
         u_grid, v_grid = make_sampling_grid(
@@ -2058,7 +2134,30 @@ class WCS(Pipeline, WCSAPIMixin):
 
         return hdr
 
-    def _separable_groups(self, detect_celestial):
+    @overload
+    def _separable_groups(
+        self, detect_celestial: Literal[True]
+    ) -> tuple[
+        list[list[_WorldAxisInfo]],
+        list[_WorldAxisInfo],
+        list[_WorldAxisInfo] | None,
+    ]: ...
+
+    @overload
+    def _separable_groups(
+        self, detect_celestial: Literal[False]
+    ) -> tuple[list[list[_WorldAxisInfo]], list[_WorldAxisInfo]]: ...
+
+    def _separable_groups(
+        self, detect_celestial: bool
+    ) -> (
+        tuple[
+            list[list[_WorldAxisInfo]],
+            list[_WorldAxisInfo],
+            list[_WorldAxisInfo] | None,
+        ]
+        | tuple[list[list[_WorldAxisInfo]], list[_WorldAxisInfo]]
+    ):
         """
         This method finds sets (groups) of separable axes - axes that are
         dependent on other axes within a set/group but do not depend on
@@ -2096,7 +2195,9 @@ class WCS(Pipeline, WCSAPIMixin):
 
         """
 
-        def find_frame(axis_number):
+        frames: Sequence[CoordinateFrameProtocol]
+
+        def find_frame(axis_number: int) -> CoordinateFrameProtocol:
             for frame in frames:
                 if axis_number in frame.axes_order:
                     return frame
@@ -2108,7 +2209,7 @@ class WCS(Pipeline, WCSAPIMixin):
 
         # use correlation matrix to find separable axes:
         corr_mat = self.axis_correlation_matrix
-        axes_sets = [set(np.flatnonzero(r)) for r in corr_mat.T]
+        axes_sets: list[set[int]] = [set(np.flatnonzero(r)) for r in corr_mat.T]
 
         k = 0
         while len(axes_sets) - 1 > k:
@@ -2120,22 +2221,26 @@ class WCS(Pipeline, WCSAPIMixin):
             k += 1
 
         # create a mapping of output axes to input/image axes groups:
-        mapping = {k: tuple(np.flatnonzero(r)) for k, r in enumerate(corr_mat)}
+        mapping: dict[int, tuple[int, ...]] = {
+            k: tuple(np.flatnonzero(r)) for k, r in enumerate(corr_mat)
+        }
 
-        axes_groups = []
-        world_axes = []  # flattened version of axes_groups
-        input_axes = []  # all input axes
+        axes_groups: list[list[_WorldAxisInfo]] = []
+        world_axes: list[_WorldAxisInfo] = []  # flattened version of axes_groups
+        input_axes: list[int] = []  # all input axes
 
         if isinstance(self.output_frame, CompositeFrame):
             frames = self.output_frame.frames
         else:
             frames = [self.output_frame]
 
-        celestial_group = None
+        world_axis_physical_types = self.world_axis_physical_types or ()
+
+        celestial_group: list[_WorldAxisInfo] | None = None
 
         # identify which separable group of axes belong
         for s in axes_sets:
-            axis_info_group = []  # group of separable output axes info
+            axis_info_group: list[_WorldAxisInfo] = []
 
             # Find the frame to which the first axis in the group belongs.
             # Most likely this frame will be the frame of all other axes in
@@ -2162,8 +2267,10 @@ class WCS(Pipeline, WCSAPIMixin):
                     axis=axno,
                     frame=frame,
                     world_axis_order=self.output_frame.axes_order.index(axno),
-                    cunit=frame.unit[fidx].to_string("fits", fraction=True).upper(),
-                    ctype=get_ctype_from_ucd(self.world_axis_physical_types[axno]),
+                    cunit=(frame.unit[fidx] or u.dimensionless_unscaled)
+                    .to_string("fits", fraction=True)
+                    .upper(),
+                    ctype=get_ctype_from_ucd(world_axis_physical_types[axno]),
                     input_axes=mapping[axno],
                 )
                 axis_info_group.append(axis_info)
@@ -2176,18 +2283,18 @@ class WCS(Pipeline, WCSAPIMixin):
                 axes_groups.append(axis_info_group)
 
         # sanity check:
-        input_axes = set(
+        input_axes_set = set(
             sum(
                 (ax.input_axes for ax in world_axes),
                 world_axes[0].input_axes.__class__(),
             )
         )
-        n_inputs = len(input_axes)
+        n_inputs = len(input_axes_set)
 
         if (
             n_inputs != self.pixel_n_dim
-            or max(input_axes) + 1 != n_inputs
-            or min(input_axes) < 0
+            or max(input_axes_set) + 1 != n_inputs
+            or min(input_axes_set) < 0
         ):
             msg = "Input axes indices are inconsistent with the forward transformation."
             raise ValueError(msg)
@@ -2198,11 +2305,11 @@ class WCS(Pipeline, WCSAPIMixin):
 
     def to_fits_tab(
         self,
-        bounding_box=None,
-        bin_ext_name="WCS-TABLE",
-        coord_col_name="coordinates",
-        sampling=1,
-    ):
+        bounding_box: BoundingBoxInput | None = None,
+        bin_ext_name: str = "WCS-TABLE",
+        coord_col_name: str = "coordinates",
+        sampling: Sampling = 1,
+    ) -> tuple[fits.Header, fits.BinTableHDU]:
         """
         Construct a FITS WCS ``-TAB``-based approximation to the WCS
         in the form of a FITS header and a binary table extension. For the
@@ -2311,19 +2418,19 @@ class WCS(Pipeline, WCSAPIMixin):
 
     def to_fits(  # noqa: PLR0917
         self,
-        bounding_box=None,
-        max_pix_error=0.25,
-        degree=None,
-        max_inv_pix_error=0.25,
-        inv_degree=None,
-        npoints=32,
-        crpix=None,
-        projection="TAN",
-        bin_ext_name="WCS-TABLE",
-        coord_col_name="coordinates",
-        sampling=1,
-        verbose=False,
-    ):
+        bounding_box: BoundingBoxInput | None = None,
+        max_pix_error: float = 0.25,
+        degree: Degree = None,
+        max_inv_pix_error: float | None = 0.25,
+        inv_degree: Degree = None,
+        npoints: int = 32,
+        crpix: Sequence[float] | None = None,
+        projection: str | projections.Sky2PixProjection = "TAN",
+        bin_ext_name: str = "WCS-TABLE",
+        coord_col_name: str = "coordinates",
+        sampling: Sampling = 1,
+        verbose: bool = False,
+    ) -> tuple[fits.Header, list[fits.BinTableHDU]]:
         """
         Construct a FITS WCS ``-TAB``-based approximation to the WCS
         in the form of a FITS header and a binary table extension. For the
@@ -2558,14 +2665,14 @@ class WCS(Pipeline, WCSAPIMixin):
 
     def _to_fits_tab(  # noqa: PLR0917
         self,
-        hdr,
-        world_axes_group,
-        use_cd,
-        bounding_box,
-        bin_ext,
-        coord_col_name,
-        sampling,
-    ):
+        hdr: fits.Header | None,
+        world_axes_group: list[_WorldAxisInfo],
+        use_cd: bool,
+        bounding_box: BoundingBoxInput,
+        bin_ext: str | tuple[str, int],
+        coord_col_name: str,
+        sampling: Sampling,
+    ) -> tuple[fits.Header, fits.BinTableHDU]:
         """
         Construct a FITS WCS ``-TAB``-based approximation to the WCS
         in the form of a FITS header and a binary table extension. For the
@@ -2655,6 +2762,8 @@ class WCS(Pipeline, WCSAPIMixin):
         if isinstance(bin_ext, str):
             bin_ext = (bin_ext, 1)
 
+        sampling = cast(Sequence[float], np.atleast_1d(sampling))
+
         if isinstance(bounding_box, Bbox):
             bounding_box = bounding_box.bounding_box(order="F")
         if isinstance(bounding_box, list):
@@ -2663,7 +2772,7 @@ class WCS(Pipeline, WCSAPIMixin):
                     bounding_box[index] = bbox.bounding_box(order="F")
 
         # identify input axes:
-        input_axes = []
+        input_axes: list[int] = []
         world_axes_idx = []
         for ax in world_axes_group:
             world_axes_idx.append(ax.axis)
@@ -2747,17 +2856,19 @@ class WCS(Pipeline, WCSAPIMixin):
         if hdr is None:
             hdr = fits.Header()
 
+        world_axis_units = self.world_axis_units or ()
+        world_axis_physical_types = self.world_axis_physical_types or ()
         for axis_info in world_axes_group:
             k = axis_info.axis
             widx = world_axes_idx.index(k)
             k1 = k + 1
-            ct = get_ctype_from_ucd(self.world_axis_physical_types[k])
+            ct = get_ctype_from_ucd(world_axis_physical_types[k])
             if len(ct) > 4:
                 msg = "Axis type name too long."
                 raise ValueError(msg)
 
             hdr[f"CTYPE{k1:d}"] = ct + (4 - len(ct)) * "-" + "-TAB"
-            hdr[f"CUNIT{k1:d}"] = self.world_axis_units[k]
+            hdr[f"CUNIT{k1:d}"] = world_axis_units[k]
             hdr[f"PS{k1:d}_0"] = bin_ext[0]
             hdr[f"PV{k1:d}_1"] = bin_ext[1]
             hdr[f"PS{k1:d}_1"] = coord_col_name
@@ -2802,7 +2913,12 @@ class WCS(Pipeline, WCSAPIMixin):
 
         return hdr, bin_table_hdu
 
-    def _calc_approx_inv(self, max_inv_pix_error=5, inv_degree=None, npoints=16):
+    def _calc_approx_inv(
+        self,
+        max_inv_pix_error: float | None = 5,
+        inv_degree: Degree = None,
+        npoints: int = 16,
+    ) -> None:
         """
         Compute polynomial fit for the inverse transformation to be used as
         initial approximation/guess for the iterative solution.

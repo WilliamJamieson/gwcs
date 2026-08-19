@@ -17,7 +17,7 @@ from gwcs.coordinate_frames import (
 from gwcs.coordinate_frames._base import _is_high_level, _LegacyCoordinateFrameProtocol
 
 if TYPE_CHECKING:
-    from gwcs.typing import Mdl
+    from gwcs.typing import FrameLike, Mdl
 
 __all__ = ["IndexedStep", "Step"]
 
@@ -28,18 +28,18 @@ __all__ = ["IndexedStep", "Step"]
 #    evaluate the properties of the object, so it does not cause an error.
 if sys.version_info >= (3, 12):
 
-    def _is_coordinate_frame(frame: str | CoordinateFrameProtocol) -> bool:
+    def _is_coordinate_frame(frame: FrameLike) -> bool:
         return isinstance(frame, CoordinateFrameProtocol)
 
     def _is_legacy_coordinate_frame(
-        frame: str | CoordinateFrameProtocol | _LegacyCoordinateFrameProtocol,
+        frame: FrameLike | _LegacyCoordinateFrameProtocol,
     ) -> bool:
         return isinstance(frame, _LegacyCoordinateFrameProtocol) and not isinstance(
             frame, CoordinateFrameProtocol
         )
 else:
 
-    def _is_coordinate_frame(frame: str | CoordinateFrameProtocol) -> bool:
+    def _is_coordinate_frame(frame: FrameLike) -> bool:
         return isinstance(frame, BaseCoordinateFrame | CoordinateFrame | EmptyFrame)
 
     def _has_legacy_coordinate_frame_interface(frame: object) -> bool:
@@ -73,7 +73,7 @@ else:
         )
 
     def _is_legacy_coordinate_frame(
-        frame: str | CoordinateFrameProtocol,
+        frame: FrameLike,
     ) -> bool:
         return _has_legacy_coordinate_frame_interface(frame) and not hasattr(
             frame, "is_high_level"
@@ -93,9 +93,7 @@ class Step:
         The transform of the last step should be `None`.
     """
 
-    def __init__(
-        self, frame: str | CoordinateFrameProtocol, transform: Mdl = None
-    ) -> None:
+    def __init__(self, frame: FrameLike, transform: Mdl = None) -> None:
         # Allow for a string to be passed in for the frame but be turned into a
         # frame object
         # This is correct type-wise, but the Python 3.11 bugfix causes a MyPy error
@@ -169,7 +167,7 @@ class Step:
     def copy(self) -> Self:
         return type(self)(self.frame, self.transform)
 
-    def __getitem__(self, ind):
+    def __getitem__(self, ind: int) -> CoordinateFrameProtocol | Mdl:
         warnings.warn(
             "Indexing a WCS.pipeline step is deprecated. "
             "Use the `frame` and `transform` attributes instead.",

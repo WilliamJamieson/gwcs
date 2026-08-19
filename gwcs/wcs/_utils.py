@@ -1,8 +1,15 @@
+from __future__ import annotations
+
 import sys
 import warnings
+from collections.abc import Mapping as MappingType
+from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.linalg as npla
+from astropy.io import fits
+from astropy.modeling import Model
 from astropy.modeling.models import (
     Const1D,
     Identity,
@@ -13,6 +20,9 @@ from scipy import linalg
 
 from gwcs.wcstools import grid_from_bounding_box
 
+if TYPE_CHECKING:
+    from gwcs.typing import Degree, LowLevelArray, LowLevelValue
+
 __all__ = [
     "fit_2D_poly",
     "fix_transform_inputs",
@@ -22,7 +32,20 @@ __all__ = [
 ]
 
 
-def _poly_fit_lu(xin, yin, xout, yout, degree, coord_pow=None):  # noqa: PLR0917
+def _poly_fit_lu(  # noqa: PLR0917
+    xin: LowLevelArray,
+    yin: LowLevelArray,
+    xout: LowLevelArray,
+    yout: LowLevelArray,
+    degree: int,
+    coord_pow: dict[tuple[int, int], LowLevelArray] | None = None,
+) -> tuple[
+    LowLevelArray,
+    LowLevelArray,
+    float,
+    list[tuple[int, int]],
+    float,
+]:
     # This function fits 2D polynomials to data by writing the normal system
     # of equations and solving it using LU-decomposition. In theory this
     # should be less stable than the SVD method used by numpy's lstsq or
@@ -64,7 +87,7 @@ def _poly_fit_lu(xin, yin, xout, yout, degree, coord_pow=None):  # noqa: PLR0917
     # 0 < i + j <= degree.
     pseudo_vander = np.empty((x.size, nterms), dtype=float)
 
-    def pow2(p, q):
+    def pow2(p: int, q: int) -> LowLevelArray:
         # computes product of powers of coordinate arrays (x**p) * (y**q)
         # in an efficient way avoiding unnecessary array copying
         # and/or raising to power
@@ -120,23 +143,27 @@ def _poly_fit_lu(xin, yin, xout, yout, degree, coord_pow=None):  # noqa: PLR0917
 
 
 def fit_2D_poly(  # noqa: PLR0917
-    degree,
-    max_error,
-    plate_scale,
-    xin,
-    yin,
-    xout,
-    yout,
-    xind,
-    yind,
-    xoutd,
-    youtd,
-    verbose=False,
-):
+    degree: Degree,
+    max_error: float | None,
+    plate_scale: float,
+    xin: LowLevelArray,
+    yin: LowLevelArray,
+    xout: LowLevelArray,
+    yout: LowLevelArray,
+    xind: LowLevelArray,
+    yind: LowLevelArray,
+    xoutd: LowLevelArray,
+    youtd: LowLevelArray,
+    verbose: bool = False,
+) -> tuple[Polynomial2D, Polynomial2D, float]:
     """
     Fit a pair of ordinary 2D polynomials to the supplied transform.
 
     """
+    if max_error is None:
+        msg = "max_error must be specified"
+        raise ValueError(msg)
+
     # The case of one pass with the specified polynomial degree
     if degree is None:
         deglist = list(range(1, 10))
@@ -159,10 +186,12 @@ def fit_2D_poly(  # noqa: PLR0917
         sys.stdout.write(f"Maximum specified SIP approximation error: {max_error}")
     max_error *= plate_scale
 
-    fit_warning_msg = "Failed to achieve requested SIP approximation accuracy."
+    fit_warning_msg: str | None = (
+        "Failed to achieve requested SIP approximation accuracy."
+    )
 
     # Fit lowest degree SIP first.
-    coord_pow = {}  # hold coordinate arrays powers for optimization purpose
+    coord_pow: dict[tuple[int, int], LowLevelArray] = {}
     for deg in deglist:
         try:
             cfx_i, cfy_i, fit_error_i, powers_i, cond = _poly_fit_lu(
@@ -252,22 +281,34 @@ def fit_2D_poly(  # noqa: PLR0917
     return fit_poly_x, fit_poly_y, fit_error / plate_scale
 
 
-def make_sampling_grid(npoints, bounding_box, crpix):
+def make_sampling_grid(
+    npoints: int,
+    bounding_box: Sequence[Sequence[float]] | LowLevelArray,
+    crpix: Sequence[float] | LowLevelArray,
+) -> tuple[LowLevelArray, LowLevelArray]:
     step = np.subtract.reduce(bounding_box, axis=1) / (1.0 - npoints)
     crpix = np.asanyarray(crpix)[:, None, None]
     x, y = grid_from_bounding_box(bounding_box, step=step, center=False) - crpix
     return x.flatten(), y.flatten()
 
 
-def _compute_distance_residual(undist_x, undist_y, fit_poly_x, fit_poly_y):
+def _compute_distance_residual(
+    undist_x: LowLevelArray,
+    undist_y: LowLevelArray,
+    fit_poly_x: LowLevelArray,
+    fit_poly_y: LowLevelArray,
+) -> float:
     """
     Compute the distance residuals and return the rms and maximum values.
     """
     dist = np.sqrt((undist_x - fit_poly_x) ** 2 + (undist_y - fit_poly_y) ** 2)
-    return dist.max()
+    return float(dist.max())
 
 
-def reform_poly_coefficients(fit_poly_x, fit_poly_y):
+def reform_poly_coefficients(
+    fit_poly_x: Polynomial2D,
+    fit_poly_y: Polynomial2D,
+) -> tuple[tuple[tuple[float, float], tuple[float, float]], Polynomial2D, Polynomial2D]:
     """
     The fit polynomials must be recombined to align with the SIP decomposition
 
@@ -304,7 +345,12 @@ def reform_poly_coefficients(fit_poly_x, fit_poly_y):
     return cdmat, sip_poly_x, sip_poly_y
 
 
-def store_2D_coefficients(hdr, poly_model, coeff_prefix, keeplinear=False):
+def store_2D_coefficients(
+    hdr: fits.Header,
+    poly_model: Polynomial2D,
+    coeff_prefix: str,
+    keeplinear: bool = False,
+) -> None:
     """
     Write the polynomial model coefficients to the header.
     """
@@ -316,7 +362,10 @@ def store_2D_coefficients(hdr, poly_model, coeff_prefix, keeplinear=False):
                 hdr[f"{coeff_prefix}_{i}_{j}"] = getattr(poly_model, f"c{i}_{j}").value
 
 
-def fix_transform_inputs(transform, inputs):
+def fix_transform_inputs(
+    transform: Model,
+    inputs: MappingType[int, LowLevelValue],
+) -> Model:
     # This is a workaround to the bug in https://github.com/astropy/astropy/issues/11360
     # Once that bug is fixed, the code below can be replaced with fix_inputs
     if not inputs:
@@ -332,7 +381,7 @@ def fix_transform_inputs(transform, inputs):
             c = 0 if c is None else (c + 1)
             mapping.append(c)
 
-    in_selector = Mapping(mapping, n_inputs=transform.n_inputs - len(inputs))
+    in_selector: Model = Mapping(mapping, n_inputs=transform.n_inputs - len(inputs))
 
     input_fixer = Const1D(inputs[0]) if 0 in inputs else Identity(1)
     for k in range(1, transform.n_inputs):

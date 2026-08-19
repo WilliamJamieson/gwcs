@@ -25,7 +25,13 @@ if TYPE_CHECKING:
         CoordinateFrameProtocol,
         WorldAxisObjectComponent,
     )
-    from gwcs.typing import LowLevelArray, LowLevelInput, WorldAxisObjectClasses
+    from gwcs.typing import (
+        LowLevelArray,
+        LowLevelInput,
+        LowLevelOutputs,
+        Numeric,
+        WorldAxisObjectClasses,
+    )
 
 __all__ = ["NativeAPIMixin", "WCSAPIMixin"]
 
@@ -63,9 +69,9 @@ class NativeAPIMixin(abc.ABC):
         self,
         *args: LowLevelInput,
         with_bounding_box: bool = True,
-        fill_value: float | np.number = np.nan,
+        fill_value: Numeric = np.nan,
         **kwargs,
-    ) -> tuple[LowLevelInput, ...] | LowLevelInput:
+    ) -> LowLevelOutputs:
         """
         Executes the forward transform.
 
@@ -93,9 +99,9 @@ class NativeAPIMixin(abc.ABC):
         self,
         *args: LowLevelInput,
         with_bounding_box: bool = True,
-        fill_value: float | np.number = np.nan,
+        fill_value: Numeric = np.nan,
         **kwargs,
-    ) -> tuple[LowLevelInput, ...] | LowLevelInput:
+    ) -> LowLevelOutputs:
         """
         Invert coordinates from output frame to input frame using analytical or
         user-supplied inverse. When neither analytical nor user-supplied
@@ -187,7 +193,7 @@ class WCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin, NativeAPIMixin):
 
     @staticmethod
     def _remove_quantity_frame(
-        result: tuple[LowLevelInput, ...] | LowLevelInput,
+        result: LowLevelOutputs,
         frame: CoordinateFrameProtocol,
     ) -> tuple[LowLevelArray, ...] | LowLevelArray:
         if frame.naxes == 1:

@@ -16,7 +16,13 @@ from ._exception import GwcsBoundingBoxWarning, GwcsFrameExistsError
 from ._step import IndexedStep, Step
 
 if TYPE_CHECKING:
-    from gwcs.typing import ForwardTransform, Mdl, StepTuple
+    from gwcs.typing import (
+        ForwardTransform,
+        FrameLike,
+        Mdl,
+        OptionalFrameLike,
+        StepSpec,
+    )
 
 __all__ = ["DirectionalWCS", "Pipeline"]
 
@@ -62,7 +68,7 @@ class _BasePipeline:
         return [step.frame.name for step in self._pipeline]
 
     @staticmethod
-    def _frame_name(frame: str | CoordinateFrameProtocol) -> str:
+    def _frame_name(frame: FrameLike) -> str:
         """
         Return the name of the frame.
 
@@ -77,7 +83,7 @@ class _BasePipeline:
         """
         return frame.name if isinstance(frame, CoordinateFrameProtocol) else frame
 
-    def _frame_index(self, frame: str | CoordinateFrameProtocol) -> int:
+    def _frame_index(self, frame: FrameLike) -> int:
         """
         Return the index of the given frame in the pipeline.
 
@@ -158,8 +164,8 @@ class _BasePipeline:
 
     def _pipeline_between(
         self,
-        from_frame: str | CoordinateFrameProtocol,
-        to_frame: str | CoordinateFrameProtocol,
+        from_frame: FrameLike,
+        to_frame: FrameLike,
     ) -> DirectionalWCS[_BasePipeline] | None:
         """
         Return a pipeline between the two given frames.
@@ -213,8 +219,8 @@ class _BasePipeline:
 
     def pipeline_between(
         self,
-        from_frame: str | CoordinateFrameProtocol,
-        to_frame: str | CoordinateFrameProtocol,
+        from_frame: FrameLike,
+        to_frame: FrameLike,
     ) -> DirectionalWCS[Self] | None:
         """
         Return a pipeline between the two given frames.
@@ -245,8 +251,8 @@ class _BasePipeline:
 
     def get_transform(
         self,
-        from_frame: str | CoordinateFrameProtocol,
-        to_frame: str | CoordinateFrameProtocol,
+        from_frame: FrameLike,
+        to_frame: FrameLike,
     ) -> Mdl:
         """
         Return a transform between two coordinate frames.
@@ -336,14 +342,14 @@ class Pipeline(_BasePipeline):
         self,
         forward_transform: Model,
         *,
-        input_frame: str | CoordinateFrameProtocol,
-        output_frame: str | CoordinateFrameProtocol,
+        input_frame: FrameLike,
+        output_frame: FrameLike,
     ) -> None: ...
 
     @overload
     def __init__(
         self,
-        forward_transform: Sequence[Step | StepTuple] | _BasePipeline,
+        forward_transform: Sequence[StepSpec] | _BasePipeline,
         *,
         input_frame: None = None,
         output_frame: None = None,
@@ -353,8 +359,8 @@ class Pipeline(_BasePipeline):
         self,
         forward_transform: ForwardTransform,
         *,
-        input_frame: str | CoordinateFrameProtocol | None = None,
-        output_frame: str | CoordinateFrameProtocol | None = None,
+        input_frame: OptionalFrameLike = None,
+        output_frame: OptionalFrameLike = None,
     ) -> None:
         if isinstance(forward_transform, _BasePipeline):
             super().__init__(forward_transform)
@@ -365,8 +371,8 @@ class Pipeline(_BasePipeline):
     def _initialize_pipeline(
         self,
         forward_transform: ForwardTransform,
-        input_frame: str | CoordinateFrameProtocol | None,
-        output_frame: str | CoordinateFrameProtocol | None,
+        input_frame: OptionalFrameLike,
+        output_frame: OptionalFrameLike,
     ) -> None:
         """
         Initialize a pipeline from a forward transform specification.
@@ -469,9 +475,7 @@ class Pipeline(_BasePipeline):
         if isinstance(self._pipeline[-1].frame, EmptyFrame):
             self._pipeline[-1].frame.naxes = self.forward_transform.n_outputs
 
-    def get_frame(
-        self, frame: str | CoordinateFrameProtocol
-    ) -> CoordinateFrameProtocol:
+    def get_frame(self, frame: FrameLike) -> CoordinateFrameProtocol:
         """
         Return the frame object corresponding to the given frame name.
 
@@ -487,9 +491,7 @@ class Pipeline(_BasePipeline):
         """
         return self._pipeline[self._frame_index(frame)].frame
 
-    def _wrap_step(
-        self, step: Step | StepTuple, *, replace_index: int | None = None
-    ) -> Step:
+    def _wrap_step(self, step: StepSpec, *, replace_index: int | None = None) -> Step:
         """
         Wrap the step in a Step object if it is not already, and
         check that the frame is not already in the pipeline.
@@ -533,14 +535,14 @@ class Pipeline(_BasePipeline):
             msg = "The last step in the pipeline must have a None transform."
             raise ValueError(msg)
 
-    def _insert(self, index: int, value: Step | StepTuple) -> None:
+    def _insert(self, index: int, value: StepSpec) -> None:
         """
         Handle insertion of a step into the pipeline.
         """
         self._pipeline.insert(index, self._wrap_step(value))
         self._check_last_step()
 
-    def _extend(self, values: list[Step | StepTuple]) -> None:
+    def _extend(self, values: list[StepSpec]) -> None:
         """
         Handle extending the pipeline with a list of steps
         """
@@ -568,7 +570,7 @@ class Pipeline(_BasePipeline):
         """The unit of the coordinates in the output coordinate system."""
         return self._pipeline[-1].frame.unit if self._pipeline else None
 
-    def _get_step(self, frame: str | CoordinateFrameProtocol) -> IndexedStep:
+    def _get_step(self, frame: FrameLike) -> IndexedStep:
         """
         Get the index and step corresponding to the given frame.
         """
@@ -578,8 +580,8 @@ class Pipeline(_BasePipeline):
 
     def set_transform(
         self,
-        from_frame: str | CoordinateFrameProtocol,
-        to_frame: str | CoordinateFrameProtocol,
+        from_frame: FrameLike,
+        to_frame: FrameLike,
         transform: Model,
     ) -> None:
         """
@@ -609,7 +611,7 @@ class Pipeline(_BasePipeline):
 
     def insert_transform(
         self,
-        frame: str | CoordinateFrameProtocol,
+        frame: FrameLike,
         transform: Model,
         after: bool = False,
     ) -> None:
@@ -652,9 +654,9 @@ class Pipeline(_BasePipeline):
 
     def insert_frame(
         self,
-        input_frame: str | CoordinateFrameProtocol,
+        input_frame: FrameLike,
         transform: Model,
-        output_frame: str | CoordinateFrameProtocol,
+        output_frame: FrameLike,
     ) -> None:
         """
         Insert a new frame into an existing pipeline. This frame must be
@@ -674,7 +676,7 @@ class Pipeline(_BasePipeline):
             Coordinate frame at end of new transform
         """
 
-        def get_index(frame: str | CoordinateFrameProtocol) -> int | None:
+        def get_index(frame: FrameLike) -> int | None:
             try:
                 index = self._frame_index(frame)
             except CoordinateFrameError as err:

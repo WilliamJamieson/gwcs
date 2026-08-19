@@ -11,9 +11,10 @@ from typing import TypeAlias, TypeVar, Union
 
 from astropy.coordinates import BaseCoordinateFrame
 from astropy.modeling import Model
+from astropy.modeling.bounding_box import CompoundBoundingBox, ModelBoundingBox
 from astropy.time import Time
 from astropy.units import Quantity
-from numpy import dtype, generic, ndarray
+from numpy import dtype, generic, ndarray, number
 
 from .coordinate_frames import (
     AxisType,
@@ -27,32 +28,52 @@ from .wcs._pipeline import _BasePipeline
 __all__ = [
     "AstropyBuiltInFrame",
     "AxesType",
+    "BoundingBoxInput",
+    "Degree",
     "ForwardTransform",
+    "FrameLike",
     "LowLevelArray",
+    "LowLevelArrayValue",
     "LowLevelInput",
+    "LowLevelOutputs",
+    "LowLevelValue",
     "Mdl",
-    "StepTuple",
+    "Numeric",
+    "OptionalFrameLike",
+    "Sampling",
+    "StepSpec",
     "WorldAxisObjectClasses",
 ]
 
 _DtypeGeneric = TypeVar("_DtypeGeneric", bound=generic)
 
+# Coordinate-frame types
 AstropyBuiltInFrame: TypeAlias = Time | BaseCoordinateFrame
-LowLevelArray: TypeAlias = ndarray[tuple[int, ...], dtype[_DtypeGeneric]]
-LowLevelInput: TypeAlias = LowLevelArray | Quantity
-
-
+FrameLike: TypeAlias = str | CoordinateFrameProtocol
+OptionalFrameLike: TypeAlias = FrameLike | None
+AxesType: TypeAlias = tuple[AxisType | str, ...] | AxisType | str
 WorldAxisObjectClasses: TypeAlias = (
     dict[str, WorldAxisObjectClass]
     | dict[str, WorldAxisObjectClassConverter]
     | dict[str, WorldAxisObjectClass | WorldAxisObjectClassConverter]
 )
 
+# Low-level numerical values
+LowLevelArray: TypeAlias = ndarray[tuple[int, ...], dtype[_DtypeGeneric]]
+LowLevelInput: TypeAlias = LowLevelArray | Quantity
+Numeric: TypeAlias = float | number
+LowLevelValue: TypeAlias = LowLevelInput | Numeric
+LowLevelArrayValue: TypeAlias = LowLevelArray | Numeric
+LowLevelOutputs: TypeAlias = tuple[LowLevelInput, ...] | LowLevelInput
 
-AxesType: TypeAlias = tuple[AxisType | str, ...] | AxisType | str
+# FITS and approximation configuration
+BoundingBoxInput: TypeAlias = (
+    ModelBoundingBox | CompoundBoundingBox | LowLevelInput | Sequence[LowLevelInput]
+)
+Degree: TypeAlias = int | Sequence[int] | None
+Sampling: TypeAlias = float | Sequence[float]
 
-
-# Type aliases due to the use of the `|` for type hints not working with Model
+# Models and pipeline types
 Mdl: TypeAlias = Union[Model, None]  # noqa: UP007
-StepTuple: TypeAlias = tuple[CoordinateFrameProtocol, Mdl]
-ForwardTransform: TypeAlias = Union[Model, Sequence[Step | StepTuple] | _BasePipeline]  # noqa: UP007
+StepSpec: TypeAlias = Step | tuple[CoordinateFrameProtocol, Mdl]
+ForwardTransform: TypeAlias = Union[Model, Sequence[StepSpec] | _BasePipeline]  # noqa: UP007

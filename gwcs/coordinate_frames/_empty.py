@@ -13,7 +13,13 @@ from ._base import (
 )
 
 if TYPE_CHECKING:
-    from gwcs.typing import AxesType, LowLevelInput, Mdl, WorldAxisObjectClasses
+    from gwcs.typing import (
+        AxesType,
+        LowLevelInput,
+        LowLevelOutputs,
+        Mdl,
+        WorldAxisObjectClasses,
+    )
 
 __all__ = ["EmptyFrame", "EmptyFrameDeprecationWarning", "EmptyFrameUnitsWarning"]
 
@@ -148,9 +154,7 @@ class EmptyFrame(CoordinateFrameProtocol):
     def from_high_level_coordinates(self, *high_level_coords, correct_1d: bool = True):
         self._raise_error()
 
-    def add_units(
-        self, arrays: tuple[LowLevelInput, ...] | LowLevelInput
-    ) -> tuple[LowLevelInput, ...]:
+    def add_units(self, arrays: LowLevelOutputs) -> tuple[LowLevelInput, ...]:
         msg = (
             "EmptyFrame (string frame) does not have any unit information. "
             "Therefore, GWCS cannot ensure that units are being properly handled. "
@@ -162,9 +166,7 @@ class EmptyFrame(CoordinateFrameProtocol):
 
         return super().add_units(arrays)
 
-    def remove_units(
-        self, arrays: tuple[LowLevelInput, ...] | LowLevelInput
-    ) -> tuple[LowLevelInput, ...]:
+    def remove_units(self, arrays: LowLevelOutputs) -> tuple[LowLevelInput, ...]:
         with warnings.catch_warnings():
             # Filter unit warning if there is no unit information to remove. This
             #   is because there is nothing for GWCS to be concerned about in this

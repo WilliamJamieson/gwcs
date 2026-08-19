@@ -1,3 +1,11 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from gwcs.typing import LowLevelArray
+
+
 __all__ = [
     "GwcsBoundingBoxWarning",
     "GwcsFrameExistsError",
@@ -40,15 +48,21 @@ class NoConvergence(Exception):
 
     """
 
+    best_solution: LowLevelArray | None
+    accuracy: LowLevelArray | None
+    niter: int | None
+    divergent: LowLevelArray | None
+    slow_conv: LowLevelArray | None
+
     def __init__(
         self,
-        *args,
-        best_solution=None,
-        accuracy=None,
-        niter=None,
-        divergent=None,
-        slow_conv=None,
-    ):
+        *args: object,
+        best_solution: LowLevelArray | None = None,
+        accuracy: LowLevelArray | None = None,
+        niter: int | None = None,
+        divergent: LowLevelArray | None = None,
+        slow_conv: LowLevelArray | None = None,
+    ) -> None:
         super().__init__(*args)
 
         self.best_solution = best_solution

@@ -30,6 +30,7 @@ if TYPE_CHECKING:
         AxesType,
         LowLevelArray,
         LowLevelInput,
+        LowLevelOutputs,
         WorldAxisObjectClasses,
     )
 
@@ -228,9 +229,7 @@ class _LegacyCoordinateFrameProtocol(Protocol):
         astropy.wcs.wcsapi.BaseLowLevelWCS.world_axis_object_components
         """
 
-    def add_units(
-        self, arrays: tuple[LowLevelInput, ...] | LowLevelInput
-    ) -> tuple[LowLevelInput, ...]:
+    def add_units(self, arrays: LowLevelOutputs) -> tuple[LowLevelInput, ...]:
         """
         Add units to the arrays
         """
@@ -257,9 +256,7 @@ class _LegacyCoordinateFrameProtocol(Protocol):
             for array, unit in zip_longest(arrays, self.unit)
         )
 
-    def remove_units(
-        self, arrays: tuple[LowLevelInput, ...] | LowLevelInput
-    ) -> tuple[LowLevelArray, ...]:
+    def remove_units(self, arrays: LowLevelOutputs) -> tuple[LowLevelArray, ...]:
         """
         Remove units from the input arrays
         """
