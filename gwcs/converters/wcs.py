@@ -3,16 +3,26 @@ from __future__ import annotations
 
 import warnings
 from contextlib import suppress
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
-from asdf.extension import Converter
+from asdf.extension import Converter, SerializationContext
 from asdf_astropy.converters.transform.core import (
     TransformConverterBase,
     parameter_to_value,
 )
 
 if TYPE_CHECKING:
-    from gwcs.coordinate_frames import CoordinateFrame
+    from gwcs.coordinate_frames import (
+        CelestialFrame,
+        CompositeFrame,
+        CoordinateFrame,
+        Frame2D,
+        SpectralFrame,
+        StokesFrame,
+        TemporalFrame,
+    )
+    from gwcs.fitswcs import FITSImagingWCSTransform
+    from gwcs.wcs import WCS, Step
 
 __all__ = [
     "CelestialFrameConverter",
@@ -32,7 +42,9 @@ class WCSConverter(Converter):
     tags = ("tag:stsci.edu:gwcs/wcs-*",)
     types = ("gwcs.wcs.WCS",)
 
-    def from_yaml_tree(self, node, tag, ctx):
+    def from_yaml_tree(
+        self, node: dict[str, Any], tag: str, ctx: SerializationContext
+    ) -> WCS:
         from gwcs.wcs import WCS, GwcsBoundingBoxWarning
 
         gwcsobj = WCS(node["steps"], name=node["name"])
@@ -47,7 +59,9 @@ class WCSConverter(Converter):
 
         return gwcsobj
 
-    def to_yaml_tree(self, gwcsobj, tag, ctx):
+    def to_yaml_tree(
+        self, gwcsobj: WCS, tag: str, ctx: SerializationContext
+    ) -> dict[str, Any]:
         return {
             "name": gwcsobj.name,
             "steps": gwcsobj.pipeline,
@@ -59,15 +73,19 @@ class StepConverter(Converter):
     tags = ("tag:stsci.edu:gwcs/step-*",)
     types = ("gwcs.wcs.Step",)
 
-    def from_yaml_tree(self, node, tag, ctx):
+    def from_yaml_tree(
+        self, node: dict[str, Any], tag: str, ctx: SerializationContext
+    ) -> Step:
         from gwcs.coordinate_frames import EmptyFrameDeprecationWarning
         from gwcs.wcs import Step
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=EmptyFrameDeprecationWarning)
-            return Step(frame=node["frame"], transform=node.get("transform", None))
+            return Step(frame=node["frame"], transform=node.get("transform"))
 
-    def to_yaml_tree(self, step, tag, ctx):
+    def to_yaml_tree(
+        self, step: Step, tag: str, ctx: SerializationContext
+    ) -> dict[str, Any]:
         from gwcs.coordinate_frames import EmptyFrame
 
         return {
@@ -82,7 +100,9 @@ class FrameConverter(Converter):
     tags = ("tag:stsci.edu:gwcs/frame-*",)
     types = ("gwcs.coordinate_frames.CoordinateFrame",)
 
-    def _from_yaml_tree(self, node, tag, ctx):
+    def _from_yaml_tree(
+        self, node: dict[str, Any], tag: str, ctx: SerializationContext
+    ) -> dict[str, Any]:
         kwargs = {"name": node["name"]}
 
         if "axes_type" in node and "naxes" in node:
@@ -105,7 +125,9 @@ class FrameConverter(Converter):
 
         return kwargs
 
-    def _to_yaml_tree(self, frame: CoordinateFrame, tag, ctx):
+    def _to_yaml_tree(
+        self, frame: CoordinateFrame, tag: str, ctx: SerializationContext
+    ) -> dict[str, Any]:
         from gwcs.coordinate_frames import CoordinateFrame
 
         node: dict[str, Any] = {}
@@ -136,13 +158,17 @@ class FrameConverter(Converter):
 
         return node
 
-    def from_yaml_tree(self, node, tag, ctx):
+    def from_yaml_tree(
+        self, node: dict[str, Any], tag: str, ctx: SerializationContext
+    ) -> CoordinateFrame:
         from gwcs.coordinate_frames import CoordinateFrame
 
         node = self._from_yaml_tree(node, tag, ctx)
         return CoordinateFrame(**node)
 
-    def to_yaml_tree(self, frame, tag, ctx):
+    def to_yaml_tree(
+        self, frame: CoordinateFrame, tag: str, ctx: SerializationContext
+    ) -> dict[str, Any]:
         return self._to_yaml_tree(frame, tag, ctx)
 
 
@@ -150,7 +176,9 @@ class Frame2DConverter(FrameConverter):
     tags = ("tag:stsci.edu:gwcs/frame2d-*",)
     types = ("gwcs.coordinate_frames.Frame2D",)
 
-    def from_yaml_tree(self, node, tag, ctx):
+    def from_yaml_tree(
+        self, node: dict[str, Any], tag: str, ctx: SerializationContext
+    ) -> Frame2D:
         from gwcs.coordinate_frames import Frame2D
 
         node = self._from_yaml_tree(node, tag, ctx)
@@ -161,7 +189,9 @@ class CelestialFrameConverter(FrameConverter):
     tags = ("tag:stsci.edu:gwcs/celestial_frame-*",)
     types = ("gwcs.coordinate_frames.CelestialFrame",)
 
-    def from_yaml_tree(self, node, tag, ctx):
+    def from_yaml_tree(
+        self, node: dict[str, Any], tag: str, ctx: SerializationContext
+    ) -> CelestialFrame:
         from gwcs.coordinate_frames import CelestialFrame
 
         node = self._from_yaml_tree(node, tag, ctx)
@@ -172,7 +202,9 @@ class SpectralFrameConverter(FrameConverter):
     tags = ("tag:stsci.edu:gwcs/spectral_frame-*",)
     types = ("gwcs.coordinate_frames.SpectralFrame",)
 
-    def from_yaml_tree(self, node, tag, ctx):
+    def from_yaml_tree(
+        self, node: dict[str, Any], tag: str, ctx: SerializationContext
+    ) -> SpectralFrame:
         from gwcs.coordinate_frames import SpectralFrame
 
         node = self._from_yaml_tree(node, tag, ctx)
@@ -184,7 +216,9 @@ class CompositeFrameConverter(FrameConverter):
     tags = ("tag:stsci.edu:gwcs/composite_frame-*",)
     types = ("gwcs.coordinate_frames.CompositeFrame",)
 
-    def from_yaml_tree(self, node, tag, ctx):
+    def from_yaml_tree(
+        self, node: dict[str, Any], tag: str, ctx: SerializationContext
+    ) -> CompositeFrame:
         from gwcs.coordinate_frames import CompositeFrame
 
         if len(node) != 2:
@@ -196,15 +230,20 @@ class CompositeFrameConverter(FrameConverter):
 
         return CompositeFrame(frames, name)
 
-    def to_yaml_tree(self, frame, tag, ctx):
-        return {"name": frame.name, "frames": frame.frames}
+    def to_yaml_tree(
+        self, frame: CoordinateFrame, tag: str, ctx: SerializationContext
+    ) -> dict[str, Any]:
+        composite_frame = cast("CompositeFrame", frame)
+        return {"name": composite_frame.name, "frames": composite_frame.frames}
 
 
 class TemporalFrameConverter(FrameConverter):
     tags = ("tag:stsci.edu:gwcs/temporal_frame-*",)
     types = ("gwcs.coordinate_frames.TemporalFrame",)
 
-    def from_yaml_tree(self, node, tag, ctx):
+    def from_yaml_tree(
+        self, node: dict[str, Any], tag: str, ctx: SerializationContext
+    ) -> TemporalFrame:
         from gwcs.coordinate_frames import TemporalFrame
 
         node = self._from_yaml_tree(node, tag, ctx)
@@ -215,18 +254,23 @@ class StokesFrameConverter(FrameConverter):
     tags = ("tag:stsci.edu:gwcs/stokes_frame-*",)
     types = ("gwcs.coordinate_frames.StokesFrame",)
 
-    def from_yaml_tree(self, node, tag, ctx):
+    def from_yaml_tree(
+        self, node: dict[str, Any], tag: str, ctx: SerializationContext
+    ) -> StokesFrame:
         from gwcs.coordinate_frames import StokesFrame
 
         node = self._from_yaml_tree(node, tag, ctx)
         return StokesFrame(**node)
 
-    def to_yaml_tree(self, frame, tag, ctx):
-        node = {}
+    def to_yaml_tree(
+        self, frame: CoordinateFrame, tag: str, ctx: SerializationContext
+    ) -> dict[str, Any]:
+        stokes_frame = cast("StokesFrame", frame)
+        node: dict[str, Any] = {}
 
-        node["name"] = frame.name
-        if frame.axes_order:
-            node["axes_order"] = list(frame.axes_order)
+        node["name"] = stokes_frame.name
+        if stokes_frame.axes_order:
+            node["axes_order"] = list(stokes_frame.axes_order)
 
         return node
 
@@ -235,7 +279,9 @@ class FITSImagingWCSConverter(TransformConverterBase):
     tags = ("tag:stsci.edu:gwcs/fitswcs_imaging-*",)
     types = ("gwcs.fitswcs.FITSImagingWCSTransform",)
 
-    def from_yaml_tree_transform(self, node, tag, ctx):
+    def from_yaml_tree_transform(
+        self, node: dict[str, Any], tag: str, ctx: SerializationContext
+    ) -> FITSImagingWCSTransform:
         from gwcs.fitswcs import FITSImagingWCSTransform
 
         return FITSImagingWCSTransform(
@@ -246,7 +292,12 @@ class FITSImagingWCSConverter(TransformConverterBase):
             pc=node["pc"],
         )
 
-    def to_yaml_tree_transform(self, model, tag, ctx):
+    def to_yaml_tree_transform(
+        self,
+        model: FITSImagingWCSTransform,
+        tag: str,
+        ctx: SerializationContext,
+    ) -> dict[str, Any]:
         return {
             "crpix": parameter_to_value(model.crpix),
             "crval": parameter_to_value(model.crval),

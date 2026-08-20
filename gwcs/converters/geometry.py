@@ -3,7 +3,13 @@ ASDF tags for geometry related models.
 
 """
 
+from __future__ import annotations
+
+from typing import Any
+
+from asdf.extension import SerializationContext
 from asdf_astropy.converters.transform.core import TransformConverterBase
+from astropy.modeling.core import Model
 
 __all__ = ["DirectionCosinesConverter", "SphericalCartesianConverter"]
 
@@ -15,7 +21,9 @@ class DirectionCosinesConverter(TransformConverterBase):
         "gwcs.geometry.FromDirectionCosines",
     )
 
-    def from_yaml_tree_transform(self, node, tag, ctx):
+    def from_yaml_tree_transform(
+        self, node: dict[str, Any], tag: str, ctx: SerializationContext
+    ) -> Model:
         from gwcs.geometry import FromDirectionCosines, ToDirectionCosines
 
         transform_type = node["transform_type"]
@@ -26,7 +34,9 @@ class DirectionCosinesConverter(TransformConverterBase):
         msg = f"Unknown model_type {transform_type}"
         raise TypeError(msg)
 
-    def to_yaml_tree_transform(self, model, tag, ctx):
+    def to_yaml_tree_transform(
+        self, model: Model, tag: str, ctx: SerializationContext
+    ) -> dict[str, Any]:
         from gwcs.geometry import FromDirectionCosines, ToDirectionCosines
 
         if isinstance(model, FromDirectionCosines):
@@ -46,7 +56,9 @@ class SphericalCartesianConverter(TransformConverterBase):
         "gwcs.geometry.CartesianToSpherical",
     )
 
-    def from_yaml_tree_transform(self, node, tag, ctx):
+    def from_yaml_tree_transform(
+        self, node: dict[str, Any], tag: str, ctx: SerializationContext
+    ) -> Model:
         from gwcs.geometry import CartesianToSpherical, SphericalToCartesian
 
         transform_type = node["transform_type"]
@@ -58,7 +70,9 @@ class SphericalCartesianConverter(TransformConverterBase):
         msg = f"Unknown model_type {transform_type}"
         raise TypeError(msg)
 
-    def to_yaml_tree_transform(self, model, tag, ctx):
+    def to_yaml_tree_transform(
+        self, model: Model, tag: str, ctx: SerializationContext
+    ) -> dict[str, Any]:
         from gwcs.geometry import CartesianToSpherical, SphericalToCartesian
 
         if isinstance(model, SphericalToCartesian):

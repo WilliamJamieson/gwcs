@@ -3,11 +3,17 @@ ASDF tags for spectroscopy related models.
 
 """
 
+from __future__ import annotations
+
+from typing import Any
+
+from asdf.extension import SerializationContext
 from asdf_astropy.converters.transform.core import (
     TransformConverterBase,
     parameter_to_value,
 )
 from astropy import units as u
+from astropy.modeling.core import Model
 
 __all__ = [
     "GratingEquationConverter",
@@ -21,12 +27,16 @@ class SellmeierGlassConverter(TransformConverterBase):
     tags = ("tag:stsci.edu:gwcs/sellmeier_glass-*",)
     types = ("gwcs.spectroscopy.SellmeierGlass",)
 
-    def from_yaml_tree_transform(self, node, tag, ctx):
+    def from_yaml_tree_transform(
+        self, node: dict[str, Any], tag: str, ctx: SerializationContext
+    ) -> Model:
         from gwcs.spectroscopy import SellmeierGlass
 
         return SellmeierGlass(node["B_coef"], node["C_coef"])
 
-    def to_yaml_tree_transform(self, model, tag, ctx):
+    def to_yaml_tree_transform(
+        self, model: Model, tag: str, ctx: SerializationContext
+    ) -> dict[str, Any]:
         return {
             "B_coef": parameter_to_value(model.B_coef),
             "C_coef": parameter_to_value(model.C_coef),
@@ -37,7 +47,9 @@ class SellmeierZemaxConverter(TransformConverterBase):
     tags = ("tag:stsci.edu:gwcs/sellmeier_zemax-*",)
     types = ("gwcs.spectroscopy.SellmeierZemax",)
 
-    def from_yaml_tree_transform(self, node, tag, ctx):
+    def from_yaml_tree_transform(
+        self, node: dict[str, Any], tag: str, ctx: SerializationContext
+    ) -> Model:
         from gwcs.spectroscopy import SellmeierZemax
 
         return SellmeierZemax(
@@ -51,7 +63,9 @@ class SellmeierZemaxConverter(TransformConverterBase):
             node["E_coef"],
         )
 
-    def to_yaml_tree_transform(self, model, tag, ctx):
+    def to_yaml_tree_transform(
+        self, model: Model, tag: str, ctx: SerializationContext
+    ) -> dict[str, Any]:
         return {
             "B_coef": parameter_to_value(model.B_coef),
             "C_coef": parameter_to_value(model.C_coef),
@@ -68,12 +82,16 @@ class Snell3DConverter(TransformConverterBase):
     tags = ("tag:stsci.edu:gwcs/snell3d-*",)
     types = ("gwcs.spectroscopy.Snell3D",)
 
-    def from_yaml_tree_transform(self, node, tag, ctx):
+    def from_yaml_tree_transform(
+        self, node: dict[str, Any], tag: str, ctx: SerializationContext
+    ) -> Model:
         from gwcs.spectroscopy import Snell3D
 
         return Snell3D()
 
-    def to_yaml_tree_transform(self, model, tag, ctx):
+    def to_yaml_tree_transform(
+        self, model: Model, tag: str, ctx: SerializationContext
+    ) -> dict[str, Any]:
         return {}
 
 
@@ -84,7 +102,9 @@ class GratingEquationConverter(TransformConverterBase):
         "gwcs.spectroscopy.WavelengthFromGratingEquation",
     )
 
-    def from_yaml_tree_transform(self, node, tag, ctx):
+    def from_yaml_tree_transform(
+        self, node: dict[str, Any], tag: str, ctx: SerializationContext
+    ) -> Model:
         from gwcs.spectroscopy import (
             AnglesFromGratingEquation3D,
             WavelengthFromGratingEquation,
@@ -106,7 +126,9 @@ class GratingEquationConverter(TransformConverterBase):
             raise ValueError(msg)
         return model
 
-    def to_yaml_tree_transform(self, model, tag, ctx):
+    def to_yaml_tree_transform(
+        self, model: Model, tag: str, ctx: SerializationContext
+    ) -> dict[str, Any]:
         from gwcs.spectroscopy import (
             AnglesFromGratingEquation3D,
             WavelengthFromGratingEquation,

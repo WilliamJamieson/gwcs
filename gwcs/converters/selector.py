@@ -1,8 +1,11 @@
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
+from __future__ import annotations
 
 from collections import OrderedDict
+from typing import Any
 
 import numpy as np
+from asdf.extension import SerializationContext
 from asdf.tags.core.ndarray import NDArrayType
 from asdf_astropy.converters.transform.core import TransformConverterBase
 from astropy.modeling import models
@@ -20,7 +23,9 @@ class LabelMapperConverter(TransformConverterBase):
         "gwcs.selector.LabelMapper",
     )
 
-    def from_yaml_tree_transform(self, node, tag, ctx):
+    def from_yaml_tree_transform(
+        self, node: dict[str, Any], tag: str, ctx: SerializationContext
+    ) -> Model:
         from gwcs.selector import (
             LabelMapper,
             LabelMapperArray,
@@ -28,7 +33,7 @@ class LabelMapperConverter(TransformConverterBase):
             LabelMapperRange,
         )
 
-        inputs_mapping = node.get("inputs_mapping", None)
+        inputs_mapping = node.get("inputs_mapping")
         if inputs_mapping is not None and not isinstance(
             inputs_mapping, models.Mapping
         ):
@@ -48,13 +53,11 @@ class LabelMapperConverter(TransformConverterBase):
                 return LabelMapperArray(mapper, inputs_mapping)
             return LabelMapperArray(mapper, inputs_mapping, inputs=tuple(inputs))
         if isinstance(mapper, Model):
-            inputs = node.get("inputs")
+            inputs = tuple(node.get("inputs", ()))
             return LabelMapper(
                 inputs, mapper, inputs_mapping=inputs_mapping, no_label=no_label
             )
-        inputs = node.get("inputs", None)
-        if inputs is not None:
-            inputs = tuple(inputs)
+        inputs = tuple(node.get("inputs", ()))
         labels = mapper.get("labels")
         transforms = mapper.get("models")
         if np.iterable(labels[0]):
@@ -64,7 +67,9 @@ class LabelMapperConverter(TransformConverterBase):
         dict_mapper = dict(zip(labels, transforms, strict=False))
         return LabelMapperDict(inputs, dict_mapper, inputs_mapping, atol=atol)
 
-    def to_yaml_tree_transform(self, model, tag, ctx):
+    def to_yaml_tree_transform(
+        self, model: Model, tag: str, ctx: SerializationContext
+    ) -> dict[str, Any]:
         from gwcs.selector import (
             LabelMapper,
             LabelMapperArray,
@@ -106,7 +111,9 @@ class RegionsSelectorConverter(TransformConverterBase):
     tags = ("tag:stsci.edu:gwcs/regions_selector-*",)
     types = ("gwcs.selector.RegionsSelector",)
 
-    def from_yaml_tree_transform(self, node, tag, ctx):
+    def from_yaml_tree_transform(
+        self, node: dict[str, Any], tag: str, ctx: SerializationContext
+    ) -> Model:
         from gwcs.selector import RegionsSelector
 
         inputs = node["inputs"]
@@ -119,9 +126,11 @@ class RegionsSelectorConverter(TransformConverterBase):
             inputs, outputs, sel, label_mapper, undefined_transform_value
         )
 
-    def to_yaml_tree_transform(self, model, tag, ctx):
-        selector = OrderedDict()
-        node = OrderedDict()
+    def to_yaml_tree_transform(
+        self, model: Model, tag: str, ctx: SerializationContext
+    ) -> dict[str, Any]:
+        selector: dict[str, Any] = OrderedDict()
+        node: dict[str, Any] = OrderedDict()
         labels = list(model.selector)
         values = [model.selector[label] for label in labels]
         selector["labels"] = labels
