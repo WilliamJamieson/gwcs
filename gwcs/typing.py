@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any, TypeAlias, TypeVar, Union
 
-from astropy.coordinates import BaseCoordinateFrame
+from astropy.coordinates import BaseCoordinateFrame, SkyCoord
 from astropy.modeling import Model, projections
 from astropy.modeling.bounding_box import CompoundBoundingBox, ModelBoundingBox
 from astropy.time import Time
@@ -34,8 +34,11 @@ __all__ = [
     "AxisTypeValue",
     "AxisTypes",
     "AxisUnits",
+    "BoundingBoxBounds",
     "BoundingBoxInput",
+    "BoundingBoxInterval",
     "BoundingBoxLike",
+    "CelestialFiducial",
     "Degree",
     "FITSProjection",
     "ForwardTransform",
@@ -69,6 +72,7 @@ FrameLike: TypeAlias = str | CoordinateFrameProtocol
 OptionalFrameLike: TypeAlias = FrameLike | None
 HighLevelCoordinate: TypeAlias = object
 HighLevelCoordinates: TypeAlias = tuple[HighLevelCoordinate, ...] | HighLevelCoordinate
+CelestialFiducial: TypeAlias = SkyCoord | tuple[float | Quantity, float | Quantity]
 AxisTypeValue: TypeAlias = AxisType | str
 AxisTypes: TypeAlias = tuple[AxisTypeValue, ...]
 AxesType: TypeAlias = AxisTypes | AxisTypeValue
@@ -97,7 +101,11 @@ LowLevelIndexArrayOutputs: TypeAlias = (
 
 # FITS and approximation configuration
 BoundingBoxLike: TypeAlias = ModelBoundingBox | CompoundBoundingBox
-BoundingBoxInput: TypeAlias = BoundingBoxLike | LowLevelInput | Sequence[LowLevelInput]
+BoundingBoxInterval: TypeAlias = tuple[float | Quantity, float | Quantity]
+BoundingBoxBounds: TypeAlias = tuple[BoundingBoxInterval, ...]
+BoundingBoxInput: TypeAlias = (
+    BoundingBoxLike | BoundingBoxBounds | LowLevelInput | Sequence[LowLevelInput]
+)
 Degree: TypeAlias = int | Sequence[int] | None
 Sampling: TypeAlias = float | Sequence[float]
 PixelShape: TypeAlias = tuple[int, ...] | None

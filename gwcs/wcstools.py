@@ -3,8 +3,12 @@ This module contains utility functions for working with GWCS's WCS objects.
 """
 
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
+from __future__ import annotations
+
 import functools
 import warnings
+from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
 from astropy import coordinates as coord
@@ -18,6 +22,7 @@ from .coordinate_frames import (
     CelestialFrame,
     CompositeFrame,
     CoordinateFrame,
+    CoordinateFrameProtocol,
     Frame2D,
     SpectralFrame,
 )
@@ -27,18 +32,31 @@ from .utils import (
     _compute_lon_pole,
 )
 
+if TYPE_CHECKING:
+    from .typing import (
+        BoundingBoxBounds,
+        BoundingBoxInterval,
+        BoundingBoxLike,
+        CelestialFiducial,
+        LowLevelArray,
+        Sampling,
+    )
+    from .wcs import WCS
+
 __all__ = ["grid_from_bounding_box", "wcs_from_fiducial", "wcs_from_points"]
 
 
 def wcs_from_fiducial(  # noqa: PLR0917
-    fiducial,
-    coordinate_frame=None,
-    projection=None,
-    transform=None,
-    name="",
-    bounding_box=None,
-    input_frame=None,
-):
+    fiducial: coord.SkyCoord
+    | u.Quantity
+    | Sequence[coord.SkyCoord | u.Quantity | float],
+    coordinate_frame: CoordinateFrameProtocol | None = None,
+    projection: projections.Projection | None = None,
+    transform: Model | None = None,
+    name: str = "",
+    bounding_box: BoundingBoxLike | BoundingBoxBounds | None = None,
+    input_frame: CoordinateFrameProtocol | None = None,
+) -> WCS:
     """
     Create a WCS object from a fiducial point in a coordinate frame.
 
@@ -104,13 +122,15 @@ def wcs_from_fiducial(  # noqa: PLR0917
         )
     else:
         # The case of one coordinate frame with more than 1 axes.
+        if coordinate_frame is None:
+            msg = "coordinate_frame must be specified for a non-celestial fiducial."
+            raise TypeError(msg)
         try:
-            fiducial_transform = frame2transform[coordinate_frame.__class__](
-                fiducial, projection=projection
-            )
+            transform_factory = frame2transform[coordinate_frame.__class__]
         except KeyError as err:
             msg = f"Coordinate frame {coordinate_frame} is not supported"
             raise TypeError(msg) from err
+        fiducial_transform = transform_factory(fiducial, projection=projection)
 
     if transform is not None:
         forward_transform = transform | fiducial_transform
@@ -142,7 +162,7 @@ def wcs_from_fiducial(  # noqa: PLR0917
     )
 
 
-def _verify_projection(projection):
+def _verify_projection(projection: projections.Projection | None) -> None:
     if projection is None:
         msg = "Celestial coordinate frame requires a projection to be specified."
         raise ValueError(msg)
@@ -150,7 +170,10 @@ def _verify_projection(projection):
         raise UnsupportedProjectionError(projection)
 
 
-def _sky_transform(skycoord, projection):
+def _sky_transform(
+    skycoord: CelestialFiducial,
+    projection: projections.Projection | None,
+) -> Model:
     """
     A sky transform is a projection, followed by a rotation on the sky.
     """
@@ -164,25 +187,30 @@ def _sky_transform(skycoord, projection):
     return projection | sky_rotation
 
 
-def _spectral_transform(fiducial, **kwargs):
+def _spectral_transform(fiducial: float | u.Quantity, **kwargs: Any) -> Model:
     """
     A spectral transform is a shift by the fiducial.
     """
     return models.Shift(fiducial)
 
 
-def _frame2D_transform(fiducial, **kwargs):
+def _frame2D_transform(fiducial: Sequence[float | u.Quantity], **kwargs: Any) -> Model:
     return functools.reduce(lambda x, y: x & y, [models.Shift(val) for val in fiducial])
 
 
-frame2transform = {
+frame2transform: dict[type[CoordinateFrameProtocol], Callable[..., Model]] = {
     CelestialFrame: _sky_transform,
     SpectralFrame: _spectral_transform,
     Frame2D: _frame2D_transform,
 }
 
 
-def grid_from_bounding_box(bounding_box, step=1, center=True, selector=None):
+def grid_from_bounding_box(
+    bounding_box: BoundingBoxLike | BoundingBoxInterval | BoundingBoxBounds,
+    step: Sampling = 1,
+    center: bool = True,
+    selector: tuple[Any, ...] | None = None,
+) -> LowLevelArray:
     """
     Create a grid of input points from the WCS bounding_box.
 
@@ -233,13 +261,16 @@ def grid_from_bounding_box(bounding_box, step=1, center=True, selector=None):
         Grid of points.
     """  # noqa: E501
 
-    def _bbox_to_pixel(bbox):
+    def _bbox_to_pixel(
+        bbox: tuple[float | u.Quantity, float | u.Quantity],
+    ) -> tuple[Any, Any]:
         return (np.floor(bbox[0] + 0.5), np.ceil(bbox[1] - 0.5))
 
     if selector is not None and not isinstance(bounding_box, CompoundBoundingBox):
         msg = "Cannot use selector with a non-CompoundBoundingBox"
         raise ValueError(msg)
 
+    bbox: tuple[tuple[Any, Any], ...]
     if isinstance(bounding_box, CompoundBoundingBox):
         if selector is None:
             msg = "selector must be set when bounding_box is a CompoundBoundingBox"
@@ -251,45 +282,43 @@ def grid_from_bounding_box(bounding_box, step=1, center=True, selector=None):
         input_names = bounding_box.model.inputs
 
         # Get tuple of tuples of the bounding box values
-        bounding_box = tuple(
+        bbox = tuple(
             tuple(bounding_box[name])
             for name in input_names
             if name not in bounding_box.ignored_inputs
         )
-
-    # 1D case
-    if np.isscalar(bounding_box[0]):
-        ndim = 1
-        bounding_box = (bounding_box,)
+    # Normalize a one-dimensional interval to the same shape as multi-axis bounds.
+    elif np.isscalar(bounding_box[0]):
+        bbox = (cast(tuple[Any, Any], bounding_box),)
     else:
-        ndim = len(bounding_box)
-    bb = tuple([_bbox_to_pixel(bb) for bb in bounding_box]) if center else bounding_box
+        bbox = cast(tuple[tuple[Any, Any], ...], bounding_box)
 
-    step = np.atleast_1d(step)
-    if ndim > 1 and len(step) == 1:
-        step = np.repeat(step, ndim)
+    bb = tuple(_bbox_to_pixel(interval) for interval in bbox) if center else bbox
+    step_values: LowLevelArray = np.atleast_1d(step)
+    if len(bbox) > 1 and len(step_values) == 1:
+        step_values = np.repeat(step_values, len(bbox))
 
-    if len(step) != len(bb):
+    if len(step_values) != len(bb):
         msg = "`step` must be a scalar, or tuple with length matching `bounding_box`"
         raise ValueError(msg)
 
     slices = []
-    for d, s in zip(bb, step, strict=False):
+    for d, s in zip(bb, step_values, strict=False):
         slices.append(slice(d[0], d[1] + s, s))
     grid = np.mgrid[slices[::-1]][::-1]
-    if ndim == 1:
+    if len(bbox) == 1:
         return grid[0]
     return grid
 
 
 def wcs_from_points(  # noqa: PLR0917
-    xy,
-    world_coords,
-    proj_point="center",
-    projection=None,
-    poly_degree=4,
-    polynomial_type="polynomial",
-):
+    xy: tuple[LowLevelArray, LowLevelArray],
+    world_coords: coord.SkyCoord,
+    proj_point: Literal["center"] | coord.SkyCoord = "center",
+    projection: projections.Sky2PixProjection | None = None,
+    poly_degree: int = 4,
+    polynomial_type: Literal["polynomial", "chebyshev", "legendre"] = "polynomial",
+) -> WCS:
     """
     Given two matching sets of coordinates on detector and sky, compute the WCS.
 
@@ -389,8 +418,11 @@ def wcs_from_points(  # noqa: PLR0917
         raise ValueError(msg)
 
     lon_pole = _compute_lon_pole(crval, projection)
+    lon_pole_degrees = (
+        lon_pole.to_value(u.deg) if isinstance(lon_pole, u.Quantity) else lon_pole
+    )
     skyrot = models.RotateCelestial2Native(
-        crval[0].to_value(u.deg), crval[1].to_value(u.deg), lon_pole.to_value(u.deg)
+        crval[0].to_value(u.deg), crval[1].to_value(u.deg), lon_pole_degrees
     )
     trans = skyrot | projection
     projection_x, projection_y = trans(lon, lat)

@@ -51,6 +51,7 @@ from ._utils import (
 
 if TYPE_CHECKING:
     from gwcs.typing import (
+        BoundingBoxBounds,
         BoundingBoxInput,
         Degree,
         FITSProjection,
@@ -1449,10 +1450,7 @@ class WCS(Pipeline, WCSAPIMixin):
 
     def footprint(
         self,
-        bounding_box: Bbox
-        | LowLevelInput
-        | tuple[tuple[float | u.Quantity, float | u.Quantity], ...]
-        | None = None,
+        bounding_box: BoundingBoxInput | BoundingBoxBounds | None = None,
         center: bool = False,
         axis_type: AxisType | str | None = None,
     ) -> LowLevelArray:

@@ -30,7 +30,12 @@ from astropy.modeling import models as astmodels
 from astropy.wcs import Celprm
 
 if TYPE_CHECKING:
-    from gwcs.typing import LowLevelArrayValue, LowLevelIndexArray, Mdl
+    from gwcs.typing import (
+        CelestialFiducial,
+        LowLevelArrayValue,
+        LowLevelIndexArray,
+        Mdl,
+    )
 
 
 _T = TypeVar("_T")
@@ -182,7 +187,7 @@ def get_values(units: Sequence[u.Unit] | None, *args: u.Quantity) -> list[Any]:
 
 
 def _compute_lon_pole(
-    skycoord: coords.SkyCoord | tuple[float | u.Quantity, float | u.Quantity],
+    skycoord: CelestialFiducial,
     projection: projections.Projection,
 ) -> float | u.Quantity:
     """
