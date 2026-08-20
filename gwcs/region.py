@@ -12,9 +12,15 @@ from __future__ import annotations
 import abc
 import warnings
 from collections import OrderedDict
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
 import numpy as np
 from astropy.utils import deprecated
+
+if TYPE_CHECKING:
+    from .coordinate_frames import CoordinateFrameProtocol
+    from .typing import LowLevelArray
 
 __all__ = (
     "Edge",
@@ -27,6 +33,9 @@ __all__ = (
 )
 
 _INTERSECT_ATOL = 1e2 * np.finfo(float).eps
+RegionId: TypeAlias = int | str
+Pixel: TypeAlias = tuple[float, float]
+VertexInput: TypeAlias = Sequence[float] | np.ndarray
 
 
 class _Region:
@@ -41,7 +50,11 @@ class _Region:
         Coordinate frame in which the region is defined.
     """
 
-    def __init__(self, rid, coordinate_frame=None):
+    def __init__(
+        self,
+        rid: RegionId,
+        coordinate_frame: CoordinateFrameProtocol | None = None,
+    ) -> None:
         if coordinate_frame is not None:
             warnings.warn(
                 "The `coordinate_frame/coord_system` parameter is deprecated and "
@@ -52,7 +65,7 @@ class _Region:
         self._rid = rid
 
     @abc.abstractmethod
-    def __contains__(self, px):
+    def __contains__(self, px: Pixel) -> bool:
         """
         Determines if a pixel is within a region.
 
@@ -69,7 +82,7 @@ class _Region:
         """
 
     @abc.abstractmethod
-    def scan(self, mask):
+    def scan(self, mask: LowLevelArray) -> LowLevelArray:
         """
         Sets mask values to region id for all pixels within the region.
         Subclasses must define this method.
@@ -93,7 +106,11 @@ class Region(_Region):
     Legacy public object for the Region class. This class has been deprecated.
     """
 
-    def __init__(self, rid, coordinate_frame):
+    def __init__(
+        self,
+        rid: RegionId,
+        coordinate_frame: CoordinateFrameProtocol,
+    ) -> None:
         warnings.warn(
             "The `Region` class is deprecated and will be removed in a future release. "
             "Please use the `Polygon` class instead.",
@@ -120,7 +137,12 @@ class Polygon(_Region):
 
     """
 
-    def __init__(self, rid, vertices, coord_system=None):
+    def __init__(
+        self,
+        rid: RegionId,
+        vertices: Sequence[VertexInput],
+        coord_system: CoordinateFrameProtocol | None = None,
+    ) -> None:
         if len(vertices) < 4:
             msg = "Expected vertices to be a list of minimum 4 tuples (x,y)"
             raise ValueError(msg)
@@ -133,8 +155,8 @@ class Polygon(_Region):
         # polygon must be completely contained in the image. It seems that the
         # code works fine if we make sure that the bottom-left corner of the
         # polygon's bounding box has non-negative coordinates.
-        self._shiftx = 0
-        self._shifty = 0
+        self._shiftx: float = 0
+        self._shifty: float = 0
         for vertex in vertices:
             x, y = vertex
             self._shiftx = min(x, self._shiftx)
@@ -153,14 +175,14 @@ class Polygon(_Region):
         # constructs a Global Edge Table (GET) in bbox coordinates
         self._GET = self._construct_ordered_GET()
 
-    def _get_bounding_box(self):
+    def _get_bounding_box(self) -> tuple[Any, Any, Any, Any]:
         x = self._vertices[:, 0].min()
         y = self._vertices[:, 1].min()
         w = self._vertices[:, 0].max() - x
         h = self._vertices[:, 1].max() - y
         return (x, y, w, h)
 
-    def _construct_ordered_GET(self):
+    def _construct_ordered_GET(self) -> OrderedDict[int, list[_Edge] | None]:
         """
         Construct a Global Edge Table (GET)
 
@@ -177,7 +199,9 @@ class Polygon(_Region):
         # edges is a list of Edge objects which define a polygon
         # with these vertices
         edges = self.get_edges()
-        GET = OrderedDict.fromkeys(self._scan_line_range)
+        GET: OrderedDict[int, list[_Edge] | None] = OrderedDict.fromkeys(
+            self._scan_line_range
+        )
         ymin = np.asarray([e.ymin for e in edges])
         for i in self._scan_line_range:
             ymin_ind = (ymin == i).nonzero()[0]
@@ -185,12 +209,10 @@ class Polygon(_Region):
             # if ymin_ind.any():
             (yminindlen,) = ymin_ind.shape
             if yminindlen:
-                GET[i] = [edges[ymin_ind[0]]]
-                for j in ymin_ind[1:]:
-                    GET[i].append(edges[j])
+                GET[i] = [edges[index] for index in ymin_ind]
         return GET
 
-    def get_edges(self):
+    def get_edges(self) -> list[_Edge]:
         """
         Create a list of Edge objects from vertices
         """
@@ -199,7 +221,7 @@ class Polygon(_Region):
             for i in range(1, len(self._vertices))
         ]
 
-    def scan(self, data):
+    def scan(self, data: LowLevelArray) -> LowLevelArray:
         """
         This is the main function which scans the polygon and creates the mask
 
@@ -237,9 +259,9 @@ class Polygon(_Region):
 
         (ny, nx) = data.shape
 
-        y = np.min(list(self._GET.keys()))
+        y = int(np.min(list(self._GET.keys())))
 
-        AET = []
+        AET: list[_Edge] = []
         scline = self._scan_line_range[-1]
 
         while y <= scline:
@@ -276,7 +298,7 @@ class Polygon(_Region):
 
         return data
 
-    def update_AET(self, y, AET):
+    def update_AET(self, y: int, AET: list[_Edge]) -> list[_Edge]:
         """
         Update the Active Edge Table (AET)
 
@@ -288,18 +310,20 @@ class Polygon(_Region):
         """
         edge_cont = self._GET[y]
         if edge_cont is not None:
-            for edge in edge_cont:
-                if edge.start[1] != edge.stop[1] and edge.ymin == y:
-                    AET.append(edge)
+            AET.extend(
+                edge
+                for edge in edge_cont
+                if edge.start[1] != edge.stop[1] and edge.ymin == y
+            )
         for edge in AET[::-1]:
             if edge is not None and edge.ymax == y:
                 AET.remove(edge)
         return AET
 
     @deprecated("1.0.3", alternative="scan")
-    def __contains__(self, px):
+    def __contains__(self, px: Pixel) -> bool:
         """even-odd algorithm or something else better should be used"""
-        return (
+        return bool(
             px[0] >= self._bbox[0]
             and px[0] <= self._bbox[0] + self._bbox[2]
             and px[1] >= self._bbox[1]
@@ -318,7 +342,13 @@ class _Edge:
 
     """
 
-    def __init__(self, name=None, start=None, stop=None, next=None):  # noqa: A002
+    def __init__(
+        self,
+        name: str | None = None,
+        start: VertexInput | None = None,
+        stop: VertexInput | None = None,
+        next: _Edge | None = None,  # noqa: A002
+    ) -> None:
         self._start = None
         if start is not None:
             self._start = np.asarray(start)
@@ -350,27 +380,27 @@ class _Edge:
         self.GET_entry = self.compute_GET_entry()
 
     @property
-    def ymin(self):
+    def ymin(self) -> Any:
         return self._ymin
 
     @property
-    def start(self):
-        return self._start
+    def start(self) -> LowLevelArray:
+        return cast("LowLevelArray", self._start)
 
     @property
-    def stop(self):
-        return self._stop
+    def stop(self) -> LowLevelArray:
+        return cast("LowLevelArray", self._stop)
 
     @property
-    def ymax(self):
+    def ymax(self) -> Any:
         return self._ymax
 
     @property
     @deprecated("1.0.3")
-    def name(self):
+    def name(self) -> str | None:
         return self._name
 
-    def compute_GET_entry(self):
+    def compute_GET_entry(self) -> list[Any] | None:
         """
         Compute the entry in the Global Edge Table
 
@@ -391,7 +421,7 @@ class _Edge:
             ]
         return entry
 
-    def compute_AET_entry(self, edge):
+    def compute_AET_entry(self, edge: _Edge) -> list[Any]:
         """
         Compute the entry for an edge in the current Active Edge Table
 
@@ -399,9 +429,12 @@ class _Edge:
         note: currently 1/m is not used
         """
         x = self.intersection(edge)[0]
+        if self.GET_entry is None:
+            msg = "Horizontal edges do not have an Active Edge Table entry."
+            raise ValueError(msg)
         return [self._ymax, x, self.GET_entry[2]]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         fmt = ""
         if self._name is not None:
             fmt += self._name
@@ -415,11 +448,11 @@ class _Edge:
 
     @property
     @deprecated("1.0.3")
-    def next(self):
+    def next(self) -> _Edge | None:
         return self._next
 
     @next.setter  # noqa: A003
-    def next(self, edge: _Edge):
+    def next(self, edge: _Edge) -> None:
         warnings.warn(
             "The `next` property of the `_Edge` class is deprecated and will be "
             "removed in a future release.",
@@ -433,7 +466,7 @@ class _Edge:
         else:
             self._next = edge
 
-    def intersection(self, edge: _Edge):
+    def intersection(self, edge: _Edge) -> LowLevelArray:
         u = self.stop - self.start
         v = edge.stop - edge.start
         w = self.start - edge.start
@@ -446,10 +479,10 @@ class _Edge:
         return _det(v, w) / D * u + self._start
 
     @deprecated("1.0.3")
-    def is_parallel(self, edge: _Edge):
+    def is_parallel(self, edge: _Edge) -> bool:
         u = self.stop - self.start
         v = edge.stop - edge.start
-        return np.allclose(_det(u, v), 0, rtol=0, atol=_INTERSECT_ATOL)
+        return bool(np.allclose(_det(u, v), 0, rtol=0, atol=_INTERSECT_ATOL))
 
 
 class Edge(_Edge):
@@ -457,7 +490,13 @@ class Edge(_Edge):
     Legacy public object for the Edge class. This class has been deprecated.
     """
 
-    def __init__(self, name=None, start=None, stop=None, next=None):  # noqa: A002
+    def __init__(
+        self,
+        name: str | None = None,
+        start: VertexInput | None = None,
+        stop: VertexInput | None = None,
+        next: _Edge | None = None,  # noqa: A002
+    ) -> None:
         warnings.warn(
             "The `Edge` class is deprecated and will be removed in a future release. "
             "Please use the `_Edge` class instead.",
@@ -466,7 +505,7 @@ class Edge(_Edge):
         super().__init__(name=name, start=start, stop=stop, next=next)
 
 
-def _det(u, v):
+def _det(u: LowLevelArray, v: LowLevelArray) -> Any:
     """
     Find the determinant of the matrix formed by the vectors u and v
 
@@ -479,6 +518,6 @@ def _det(u, v):
     return u[0] * v[1] - u[1] * v[0]
 
 
-def _round_vertex(v):
+def _round_vertex(v: VertexInput) -> tuple[int, int]:
     x, y = v
     return (round(x), round(y))
