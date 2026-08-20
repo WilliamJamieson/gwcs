@@ -108,6 +108,7 @@ nitpick_ignore = [
     ("py:data", "typing.Union"),
     ("py:attr", "gwcs.WCS.bounding_box"),
     ("py:meth", "gwcs.WCS.footprint"),
+    ("py:class", "LowLevelArrayValue"),
     # Unqualified names left by `from __future__ import annotations`
     ("py:class", "WorldAxisObjectClasses"),
 ]

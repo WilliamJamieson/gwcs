@@ -111,7 +111,7 @@ select = [
   "ERA", # eradicate (remove commented out code)
   # "FAST",  # FastAPI
   "YTT", # flake8-2020 (system version info)
-  # "ANN",   # flake8-annotations
+  "ANN", # flake8-annotations
   # "ASYNC", # flake8-async
   "S",   # flake8-bandit (security checks)
   "BLE", # flake8-blind-except (prevent blind except statements)
@@ -127,7 +127,7 @@ select = [
   "EM", # flake8-errormessages (best practices for error messages)
   # "EXE",   # flake8-executable
   # "FIX",   # flake8-fixme
-  # "FA",    # flake8-future-annotations
+  "FA",  # flake8-future-annotations
   "INT", # flake8-gettext (when to use printf style strings)
   "ISC", # flake8-implicit-str-concat (prevent implicit string concat)
   "ICN", # flake8-import-conventions (enforce import conventions)
@@ -178,12 +178,13 @@ ignore = [
   "RUF059",  # Unpacked variable is never used
   "B028",    # No explicit stacklevel found
   "RUF043",  # pytest-raises-ambiguous-pattern
+  "ANN401",  # Any not allowed for **kwargs
 ]
 
 [tool.ruff.lint.extend-per-file-ignores]
-"gwcs/tests/*" = ["S101", "SLF001"]
-"gwcs/converters/tests/*" = ["S101", "SLF001"]
-"docs/conf.py" = ["INP001", "ERA001"]
+"gwcs/tests/*" = ["S101", "SLF001", "ANN"]
+"gwcs/converters/tests/*" = ["S101", "SLF001", "ANN"]
+"docs/conf.py" = ["INP001", "ERA001", "ANN"]
 "convert_schemas.py" = ["PTH"]
 
 [tool.mypy]

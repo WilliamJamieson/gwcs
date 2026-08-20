@@ -40,7 +40,7 @@
    {% endif %}
    {% endblock %}
 
-{% if all_classes %}
+{% if all_classes and fullname != "gwcs.typing" %}
 .. inheritance-diagram:: {% for item in all_classes %}{{ fullname }}.{{ item }} {% endfor %}
    :parts: 1
 {% endif %}
