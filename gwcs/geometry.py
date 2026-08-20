@@ -3,11 +3,17 @@
 Models for general analytical geometry transformations.
 """
 
+from __future__ import annotations
+
 import numbers
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 from astropy import units as u
 from astropy.modeling.core import Model
+
+if TYPE_CHECKING:
+    from .typing import LowLevelValue
 
 __all__ = [
     "CartesianToSpherical",
@@ -23,23 +29,33 @@ class ToDirectionCosines(Model):
     """
 
     _separable = False
+    input_units = None
+    return_units = None
 
     n_inputs = 3
     n_outputs = 4
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.inputs = ("x", "y", "z")
         self.outputs = ("cosa", "cosb", "cosc", "length")
 
-    def evaluate(self, x, y, z):
+    def evaluate(
+        self,
+        x: LowLevelValue,
+        y: LowLevelValue,
+        z: LowLevelValue,
+    ) -> tuple[LowLevelValue, LowLevelValue, LowLevelValue, LowLevelValue]:
         vabs = np.sqrt(1.0 + x**2 + y**2)
         cosa = x / vabs
         cosb = y / vabs
         cosc = 1.0 / vabs
-        return cosa, cosb, cosc, vabs
+        return cast(
+            "tuple[LowLevelValue, LowLevelValue, LowLevelValue, LowLevelValue]",
+            (cosa, cosb, cosc, vabs),
+        )
 
-    def inverse(self):
+    def inverse(self) -> FromDirectionCosines:
         return FromDirectionCosines()
 
 
@@ -49,19 +65,30 @@ class FromDirectionCosines(Model):
     """
 
     _separable = False
+    input_units = None
+    return_units = None
 
     n_inputs = 4
     n_outputs = 3
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.inputs = ("cosa", "cosb", "cosc", "length")
         self.outputs = ("x", "y", "z")
 
-    def evaluate(self, cosa, cosb, cosc, length):
-        return cosa * length, cosb * length, cosc * length
+    def evaluate(
+        self,
+        cosa: LowLevelValue,
+        cosb: LowLevelValue,
+        cosc: LowLevelValue,
+        length: LowLevelValue,
+    ) -> tuple[LowLevelValue, LowLevelValue, LowLevelValue]:
+        return cast(
+            "tuple[LowLevelValue, LowLevelValue, LowLevelValue]",
+            (cosa * length, cosb * length, cosc * length),
+        )
 
-    def inverse(self):
+    def inverse(self) -> ToDirectionCosines:
         return ToDirectionCosines()
 
 
@@ -78,11 +105,13 @@ class SphericalToCartesian(Model):
     _separable = False
 
     _input_units_allow_dimensionless = True
+    _wrap_lon_at: int
+    return_units = None
 
     n_inputs = 2
     n_outputs = 3
 
-    def __init__(self, wrap_lon_at=360, **kwargs):
+    def __init__(self, wrap_lon_at: int = 360, **kwargs: Any) -> None:
         """
         Parameters
         ----------
@@ -100,7 +129,7 @@ class SphericalToCartesian(Model):
         self.wrap_lon_at = wrap_lon_at
 
     @property
-    def wrap_lon_at(self):
+    def wrap_lon_at(self) -> int:
         """An **integer number** that specifies the range of the longitude
         (azimuthal) angle.
 
@@ -113,13 +142,15 @@ class SphericalToCartesian(Model):
         return self._wrap_lon_at
 
     @wrap_lon_at.setter
-    def wrap_lon_at(self, wrap_angle):
+    def wrap_lon_at(self, wrap_angle: int) -> None:
         if not (isinstance(wrap_angle, numbers.Integral) and wrap_angle in [180, 360]):
             msg = "'wrap_lon_at' must be an integer number: 180 or 360"
             raise ValueError(msg)
-        self._wrap_lon_at = wrap_angle
+        self._wrap_lon_at = int(wrap_angle)
 
-    def evaluate(self, lon, lat):
+    def evaluate(
+        self, lon: LowLevelValue, lat: LowLevelValue
+    ) -> tuple[LowLevelValue, LowLevelValue, LowLevelValue]:
         if isinstance(lon, u.Quantity) != isinstance(lat, u.Quantity):
             msg = "All arguments must be of the same type (i.e., quantity or not)."
             raise TypeError(msg)
@@ -132,13 +163,13 @@ class SphericalToCartesian(Model):
         y = cs * np.sin(lon)
         z = np.sin(lat)
 
-        return x, y, z
+        return cast("tuple[LowLevelValue, LowLevelValue, LowLevelValue]", (x, y, z))
 
-    def inverse(self):
+    def inverse(self) -> CartesianToSpherical:
         return CartesianToSpherical(wrap_lon_at=self._wrap_lon_at)
 
     @property
-    def input_units(self):
+    def input_units(self) -> dict[str, u.Unit]:
         return {"lon": u.deg, "lat": u.deg}
 
 
@@ -155,13 +186,16 @@ class CartesianToSpherical(Model):
     """
 
     _separable = False
+    input_units = None
 
     _input_units_allow_dimensionless = True
+    _wrap_lon_at: int
+    return_units = None
 
     n_inputs = 3
     n_outputs = 2
 
-    def __init__(self, wrap_lon_at=360, **kwargs):
+    def __init__(self, wrap_lon_at: int = 360, **kwargs: Any) -> None:
         """
         Parameters
         ----------
@@ -179,7 +213,7 @@ class CartesianToSpherical(Model):
         self.wrap_lon_at = wrap_lon_at
 
     @property
-    def wrap_lon_at(self):
+    def wrap_lon_at(self) -> int:
         """An **integer number** that specifies the range of the longitude
         (azimuthal) angle.
 
@@ -192,13 +226,18 @@ class CartesianToSpherical(Model):
         return self._wrap_lon_at
 
     @wrap_lon_at.setter
-    def wrap_lon_at(self, wrap_angle):
+    def wrap_lon_at(self, wrap_angle: int) -> None:
         if not (isinstance(wrap_angle, numbers.Integral) and wrap_angle in [180, 360]):
             msg = "'wrap_lon_at' must be an integer number: 180 or 360"
             raise ValueError(msg)
-        self._wrap_lon_at = wrap_angle
+        self._wrap_lon_at = int(wrap_angle)
 
-    def evaluate(self, x, y, z):
+    def evaluate(
+        self,
+        x: LowLevelValue,
+        y: LowLevelValue,
+        z: LowLevelValue,
+    ) -> tuple[LowLevelValue, LowLevelValue]:
         nquant = [isinstance(i, u.Quantity) for i in (x, y, z)].count(True)
         if nquant in [1, 2]:
             msg = "All arguments must be of the same type (i.e., quantity or not)."
@@ -214,7 +253,7 @@ class CartesianToSpherical(Model):
                 lon, 360.0 * u.deg if nquant else 360.0, where=np.isfinite(lon), out=lon
             )
 
-        return lon, lat
+        return cast("tuple[LowLevelValue, LowLevelValue]", (lon, lat))
 
-    def inverse(self):
+    def inverse(self) -> SphericalToCartesian:
         return SphericalToCartesian(wrap_lon_at=self._wrap_lon_at)

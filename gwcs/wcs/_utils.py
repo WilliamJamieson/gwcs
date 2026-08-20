@@ -3,7 +3,6 @@ from __future__ import annotations
 import sys
 import warnings
 from collections.abc import Mapping as MappingType
-from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -21,7 +20,13 @@ from scipy import linalg
 from gwcs.wcstools import grid_from_bounding_box
 
 if TYPE_CHECKING:
-    from gwcs.typing import Degree, LowLevelArray, LowLevelValue
+    from gwcs.typing import (
+        Degree,
+        LowLevelArray,
+        LowLevelValue,
+        SamplingGridBounds,
+        SamplingGridReferencePoint,
+    )
 
 __all__ = [
     "fit_2D_poly",
@@ -283,8 +288,8 @@ def fit_2D_poly(  # noqa: PLR0917
 
 def make_sampling_grid(
     npoints: int,
-    bounding_box: Sequence[Sequence[float]] | LowLevelArray,
-    crpix: Sequence[float] | LowLevelArray,
+    bounding_box: SamplingGridBounds,
+    crpix: SamplingGridReferencePoint,
 ) -> tuple[LowLevelArray, LowLevelArray]:
     step = np.subtract.reduce(bounding_box, axis=1) / (1.0 - npoints)
     crpix = np.asanyarray(crpix)[:, None, None]

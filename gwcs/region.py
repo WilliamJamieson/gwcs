@@ -12,7 +12,6 @@ from __future__ import annotations
 import abc
 import warnings
 from collections import OrderedDict
-from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
 import numpy as np
@@ -20,7 +19,7 @@ from astropy.utils import deprecated
 
 if TYPE_CHECKING:
     from .coordinate_frames import CoordinateFrameProtocol
-    from .typing import LowLevelArray
+    from .typing import LowLevelArray, PolygonVertex, PolygonVertices, RegionLabel
 
 __all__ = (
     "Edge",
@@ -33,9 +32,7 @@ __all__ = (
 )
 
 _INTERSECT_ATOL = 1e2 * np.finfo(float).eps
-RegionId: TypeAlias = int | str
 Pixel: TypeAlias = tuple[float, float]
-VertexInput: TypeAlias = Sequence[float] | np.ndarray
 
 
 class _Region:
@@ -52,7 +49,7 @@ class _Region:
 
     def __init__(
         self,
-        rid: RegionId,
+        rid: RegionLabel,
         coordinate_frame: CoordinateFrameProtocol | None = None,
     ) -> None:
         if coordinate_frame is not None:
@@ -108,7 +105,7 @@ class Region(_Region):
 
     def __init__(
         self,
-        rid: RegionId,
+        rid: RegionLabel,
         coordinate_frame: CoordinateFrameProtocol,
     ) -> None:
         warnings.warn(
@@ -139,8 +136,8 @@ class Polygon(_Region):
 
     def __init__(
         self,
-        rid: RegionId,
-        vertices: Sequence[VertexInput],
+        rid: RegionLabel,
+        vertices: PolygonVertices,
         coord_system: CoordinateFrameProtocol | None = None,
     ) -> None:
         if len(vertices) < 4:
@@ -345,8 +342,8 @@ class _Edge:
     def __init__(
         self,
         name: str | None = None,
-        start: VertexInput | None = None,
-        stop: VertexInput | None = None,
+        start: PolygonVertex | None = None,
+        stop: PolygonVertex | None = None,
         next: _Edge | None = None,  # noqa: A002
     ) -> None:
         self._start = None
@@ -493,8 +490,8 @@ class Edge(_Edge):
     def __init__(
         self,
         name: str | None = None,
-        start: VertexInput | None = None,
-        stop: VertexInput | None = None,
+        start: PolygonVertex | None = None,
+        stop: PolygonVertex | None = None,
         next: _Edge | None = None,  # noqa: A002
     ) -> None:
         warnings.warn(
@@ -518,6 +515,6 @@ def _det(u: LowLevelArray, v: LowLevelArray) -> Any:
     return u[0] * v[1] - u[1] * v[0]
 
 
-def _round_vertex(v: VertexInput) -> tuple[int, int]:
+def _round_vertex(v: PolygonVertex) -> tuple[int, int]:
     x, y = v
     return (round(x), round(y))

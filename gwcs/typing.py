@@ -54,12 +54,18 @@ __all__ = [
     "LowLevelOutputs",
     "LowLevelValue",
     "Mdl",
+    "ModelInputNames",
     "Numeric",
     "OptionalFrameLike",
     "PixelBounds",
     "PixelShape",
+    "PolygonVertices",
     "ReferencePixel",
+    "RegionLabel",
+    "RegionLabelValue",
     "Sampling",
+    "SamplingGridBounds",
+    "SamplingGridReferencePoint",
     "StepSpec",
     "WorldAxisObjectClasses",
 ]
@@ -80,6 +86,7 @@ AxisUnits: TypeAlias = tuple[Unit | None, ...]
 AxisNames: TypeAlias = tuple[str, ...]
 AxesOrder: TypeAlias = tuple[int, ...]
 AxisPhysicalTypes: TypeAlias = tuple[str | None, ...]
+ModelInputNames: TypeAlias = Sequence[str]
 WorldAxisObjectClasses: TypeAlias = (
     dict[str, WorldAxisObjectClass]
     | dict[str, WorldAxisObjectClassConverter]
@@ -98,6 +105,10 @@ LowLevelIndexArray: TypeAlias = LowLevelArray[integer[Any]]
 LowLevelIndexArrayOutputs: TypeAlias = (
     tuple[LowLevelIndexArray, ...] | LowLevelIndexArray
 )
+RegionLabel: TypeAlias = str | int
+RegionLabelValue: TypeAlias = RegionLabel | float
+PolygonVertex: TypeAlias = Sequence[float] | LowLevelArray
+PolygonVertices: TypeAlias = Sequence[PolygonVertex]
 
 # FITS and approximation configuration
 BoundingBoxLike: TypeAlias = ModelBoundingBox | CompoundBoundingBox
@@ -112,6 +123,8 @@ PixelShape: TypeAlias = tuple[int, ...] | None
 PixelBounds: TypeAlias = tuple[tuple[float, float], ...] | None
 ReferencePixel: TypeAlias = Sequence[float] | None
 FITSProjection: TypeAlias = str | projections.Sky2PixProjection
+SamplingGridBounds: TypeAlias = Sequence[Sequence[float]] | LowLevelArray
+SamplingGridReferencePoint: TypeAlias = Sequence[float] | LowLevelArray
 
 # Models and pipeline types
 Mdl: TypeAlias = Union[Model, None]  # noqa: UP007

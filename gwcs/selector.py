@@ -131,8 +131,12 @@ The base class _LabelMapper can be subclassed to create other
 label mappers.
 """  # noqa: E501
 
+from __future__ import annotations
+
 import contextlib
 import warnings
+from collections.abc import Callable, Mapping
+from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
 import numpy as np
 from astropy.modeling import models as astmodels
@@ -140,6 +144,15 @@ from astropy.modeling.core import Model
 
 from . import region
 from .utils import RegionError, to_index
+
+if TYPE_CHECKING:
+    from .typing import (
+        LowLevelArray,
+        ModelInputNames,
+        PolygonVertices,
+        RegionLabel,
+        RegionLabelValue,
+    )
 
 __all__ = [
     "LabelMapper",
@@ -149,8 +162,13 @@ __all__ = [
     "RegionsSelector",
 ]
 
+LabelMapperMapping: TypeAlias = Mapping["RegionLabelValue", Model]
 
-def get_unique_regions(regions):
+
+def get_unique_regions(
+    regions: LowLevelArray
+    | Mapping[RegionLabelValue, Callable[[RegionLabelValue], RegionLabelValue]],
+) -> list[RegionLabelValue]:
     regions = np.asarray(regions)
     if isinstance(regions, np.ndarray):
         unique_regions = np.unique(regions).tolist()
@@ -169,11 +187,11 @@ def get_unique_regions(regions):
     else:
         msg = "Unable to get unique regions."
         raise TypeError(msg)
-    return unique_regions
+    return cast("list[RegionLabelValue]", unique_regions)
 
 
 class LabelMapperArrayIndexingError(Exception):
-    def __init__(self, message):
+    def __init__(self, message: str) -> None:
         super().__init__(message)
 
 
@@ -199,34 +217,44 @@ class _LabelMapper(Model):
         The name of this transform.
     """
 
-    def __init__(self, mapper, no_label, inputs_mapping=None, name=None, **kwargs):
+    input_units = None
+    return_units = None
+
+    def __init__(
+        self,
+        mapper: Any,
+        no_label: RegionLabelValue,
+        inputs_mapping: Model | None = None,
+        name: str | None = None,
+        **kwargs: Any,
+    ) -> None:
         self._no_label = no_label
         self._inputs_mapping = inputs_mapping
         self._mapper = mapper
         super().__init__(name=name, **kwargs)
 
     @property
-    def mapper(self):
+    def mapper(self) -> Any:
         return self._mapper
 
     @property
-    def inputs_mapping(self):
+    def inputs_mapping(self) -> Model | None:
         return self._inputs_mapping
 
     @property
-    def no_label(self):
+    def no_label(self) -> RegionLabelValue:
         return self._no_label
 
-    def evaluate(self, *args):
+    def evaluate(self, *args: Any) -> LowLevelArray:
         msg = "Subclasses should implement this method."
         raise NotImplementedError(msg)
 
-    def filter_inputs(self, args, inputs_mapping):
-        if self.inputs_mapping is not None:
-            keys = self._inputs_mapping.evaluate(*args)
-        else:
-            keys = args
-        return keys
+    def filter_inputs(
+        self,
+        args: tuple[Any, ...],
+        inputs_mapping: Model | None,
+    ) -> Any:
+        return inputs_mapping.evaluate(*args) if inputs_mapping is not None else args
 
 
 class LabelMapperArray(_LabelMapper):
@@ -259,11 +287,16 @@ class LabelMapperArray(_LabelMapper):
     fittable = False
 
     def __init__(
-        self, mapper, inputs_mapping=None, name=None, inputs=("x", "y"), **kwargs
-    ):
+        self,
+        mapper: LowLevelArray,
+        inputs_mapping: Model | None = None,
+        name: str | None = None,
+        inputs: ModelInputNames = ("x", "y"),
+        **kwargs: Any,
+    ) -> None:
         if mapper.dtype.type is not np.str_:
             mapper = np.asanyarray(mapper, dtype=int)
-            _no_label = 0
+            _no_label: RegionLabelValue = 0
         else:
             _no_label = ""
         super().__init__(
@@ -273,17 +306,21 @@ class LabelMapperArray(_LabelMapper):
         self._n_inputs = len(inputs)
         self._outputs = ("label",)
 
-    def evaluate(self, *args):
+    def evaluate(self, *args: Any) -> LowLevelArray:
         keys = self.filter_inputs(args, self.inputs_mapping)
         keys = tuple(to_index(a) for a in keys)
         try:
             result = self._mapper[keys[::-1]]
         except IndexError as e:
-            raise LabelMapperArrayIndexingError(e) from e
-        return result
+            raise LabelMapperArrayIndexingError(str(e)) from e
+        return cast("LowLevelArray", result)
 
     @classmethod
-    def from_vertices(cls, shape, regions):
+    def from_vertices(
+        cls,
+        shape: tuple[int, ...],
+        regions: Mapping[RegionLabelValue, PolygonVertices],
+    ) -> LabelMapperArray:
         """
         Create a `~gwcs.selector.LabelMapperArray` from
         polygon vertices stores in a dict.
@@ -322,7 +359,7 @@ class LabelMapperArray(_LabelMapper):
         mask = np.zeros(shape, dtype=labels.dtype)
 
         for rid, vert in regions.items():
-            pol = region.Polygon(rid, vert)
+            pol = region.Polygon(cast("RegionLabel", rid), vert)
             mask = pol.scan(mask)
 
         return cls(mask)
@@ -361,8 +398,14 @@ class LabelMapperDict(_LabelMapper):
     n_outputs = 1
 
     def __init__(
-        self, inputs, mapper, inputs_mapping=None, atol=10**-8, name=None, **kwargs
-    ):
+        self,
+        inputs: ModelInputNames,
+        mapper: LabelMapperMapping,
+        inputs_mapping: Model | None = None,
+        atol: float = 10**-8,
+        name: str | None = None,
+        **kwargs: Any,
+    ) -> None:
         self._atol = atol
         _no_label = 0
         self._inputs = inputs
@@ -376,18 +419,18 @@ class LabelMapperDict(_LabelMapper):
         self._outputs = ("labels",)
 
     @property
-    def atol(self):
+    def atol(self) -> float:
         return self._atol
 
     @atol.setter
-    def atol(self, val):
+    def atol(self, val: float) -> None:
         self._atol = val
 
-    def evaluate(self, *args):
+    def evaluate(self, *args: Any) -> LowLevelArray:
         shape = args[0].shape
-        args = [a.flatten() for a in args]
+        flat_args = [a.flatten() for a in args]
         # if n_inputs > 1, determine which one is to be used as keys
-        keys = self.filter_inputs(args, self.inputs_mapping)
+        keys = np.asarray(self.filter_inputs(tuple(flat_args), self.inputs_mapping))
         keys = keys.flatten()
         # create an empty array for the results
         res = np.zeros(keys.shape) + self._no_label
@@ -400,10 +443,10 @@ class LabelMapperDict(_LabelMapper):
         # and evaluate the transform to get the corresponding label.
         for key in mapper_keys:
             ind = np.isclose(key, keys, atol=self._atol)
-            inputs = [a[ind] for a in args]
+            inputs = [array[ind] for array in flat_args]
             res[ind] = self.mapper[key](*inputs)
 
-        return np.reshape(res, shape)
+        return cast("LowLevelArray", np.reshape(res, shape))
 
 
 class LabelMapperRange(_LabelMapper):
@@ -439,7 +482,14 @@ class LabelMapperRange(_LabelMapper):
     linear = False
     fittable = False
 
-    def __init__(self, inputs, mapper, inputs_mapping=None, name=None, **kwargs):
+    def __init__(
+        self,
+        inputs: ModelInputNames,
+        mapper: Mapping[tuple[float, float], Model],
+        inputs_mapping: Model | None = None,
+        name: str | None = None,
+        **kwargs: Any,
+    ) -> None:
         if self._has_overlapping(np.array(list(mapper.keys()))):
             msg = "Overlapping ranges of values are not supported."
             raise ValueError(msg)
@@ -455,7 +505,7 @@ class LabelMapperRange(_LabelMapper):
         self._outputs = ("labels",)
 
     @staticmethod
-    def _has_overlapping(ranges):
+    def _has_overlapping(ranges: LowLevelArray) -> bool:
         """
         Test a list of tuple representing ranges of values has no overlapping ranges.
         """
@@ -470,7 +520,7 @@ class LabelMapperRange(_LabelMapper):
         return bool(any((end - start)[:-1] > 0) or any(start[-1] > end))
 
     # move this to utils?
-    def _find_range(self, value_range, value):
+    def _find_range(self, value_range: LowLevelArray, value: float) -> int | None:
         """
         Returns the index of the tuple which holds value.
 
@@ -494,12 +544,12 @@ class LabelMapperRange(_LabelMapper):
             raise ValueError(msg)
         if ind.size == 0:
             return None
-        return ind.item()
+        return int(ind.item())
 
-    def evaluate(self, *args):
+    def evaluate(self, *args: Any) -> LowLevelArray:
         shape = args[0].shape
-        args = [a.flatten() for a in args]
-        keys = self.filter_inputs(args, self.inputs_mapping)
+        flat_args = [a.flatten() for a in args]
+        keys = np.asarray(self.filter_inputs(tuple(flat_args), self.inputs_mapping))
         keys = keys.flatten()
         # Define an array for the results.
         res = np.zeros(keys.shape) + self._no_label
@@ -517,7 +567,7 @@ class LabelMapperRange(_LabelMapper):
             ind = ~np.isnan(temp)
 
             if ind.any():
-                inputs = [a[ind] for a in args]
+                inputs = [array[ind] for array in flat_args]
                 res[ind] = self.mapper[tuple(val_range)](*inputs)
             else:
                 continue
@@ -526,7 +576,7 @@ class LabelMapperRange(_LabelMapper):
             warnings.warn(
                 f"All data is outside the valid range - {self.name}.", stacklevel=2
             )
-        return res
+        return cast("LowLevelArray", res)
 
 
 class RegionsSelector(Model):
@@ -554,6 +604,9 @@ class RegionsSelector(Model):
         The name of this transform.
     """
 
+    input_units = None
+    return_units = None
+
     standard_broadcasting = False
 
     linear = False
@@ -561,14 +614,14 @@ class RegionsSelector(Model):
 
     def __init__(  # noqa: PLR0917
         self,
-        inputs,
-        outputs,
-        selector,
-        label_mapper,
-        undefined_transform_value=np.nan,
-        name=None,
-        **kwargs,
-    ):
+        inputs: ModelInputNames,
+        outputs: ModelInputNames,
+        selector: LabelMapperMapping,
+        label_mapper: _LabelMapper,
+        undefined_transform_value: float = np.nan,
+        name: str | None = None,
+        **kwargs: Any,
+    ) -> None:
         self._inputs = inputs
         self._outputs = outputs
         self._n_inputs = len(inputs)
@@ -587,7 +640,7 @@ class RegionsSelector(Model):
         _ = self.uses_quantity
 
     @property
-    def uses_quantity(self):
+    def uses_quantity(self) -> bool:
         all_uses_quantity = [t.uses_quantity for t in self._selector.values()]
         not_all_uses_quantity = [not uq for uq in all_uses_quantity]
         if all(all_uses_quantity):
@@ -600,7 +653,7 @@ class RegionsSelector(Model):
         )
         raise ValueError(msg)
 
-    def set_input(self, rid):
+    def set_input(self, rid: RegionLabelValue) -> Model:
         """
         Sets one of the inputs and returns a transform associated with it.
         """
@@ -609,7 +662,7 @@ class RegionsSelector(Model):
         msg = f"Region {rid} not found"
         raise RegionError(msg)
 
-    def inverse(self):
+    def inverse(self) -> RegionsSelector:
         if self.label_mapper.inverse is not None:
             try:
                 transforms_inv = {}
@@ -630,7 +683,7 @@ class RegionsSelector(Model):
         )
         raise NotImplementedError(msg)
 
-    def evaluate(self, *args):
+    def evaluate(self, *args: Any) -> list[LowLevelArray]:
         """
         Parameters
         ----------
@@ -654,12 +707,12 @@ class RegionsSelector(Model):
             out[no_trans_ind] = self.undefined_transform_value
 
         # Compute the transformations
-        args = [a.flatten() for a in args]
+        flat_args = [a.flatten() for a in args]
         uniq = get_unique_regions(rids)
 
         for rid in uniq:
             ind = rids == rid
-            inputs = [a[ind] for a in args]
+            inputs = [array[ind] for array in flat_args]
             if rid in self._selector:
                 result = self._selector[rid](*inputs)
             else:
@@ -670,18 +723,18 @@ class RegionsSelector(Model):
                 ]
             for j in range(self.n_outputs):
                 outputs[j][ind] = result[j]
-        return outputs
+        return cast("list[LowLevelArray]", outputs)
 
     @property
-    def undefined_transform_value(self):
+    def undefined_transform_value(self) -> float:
         return self._undefined_transform_value
 
     @undefined_transform_value.setter
-    def undefined_transform_value(self, value):
+    def undefined_transform_value(self, value: float) -> None:
         self._undefined_transform_value = value
 
     @property
-    def selector(self):
+    def selector(self) -> LabelMapperMapping:
         return self._selector
 
 
@@ -710,8 +763,14 @@ class LabelMapper(_LabelMapper):
     n_outputs = 1
 
     def __init__(
-        self, inputs, mapper, no_label=np.nan, inputs_mapping=None, name=None, **kwargs
-    ):
+        self,
+        inputs: ModelInputNames,
+        mapper: Model,
+        no_label: RegionLabelValue = np.nan,
+        inputs_mapping: Model | tuple[int, ...] | None = None,
+        name: str | None = None,
+        **kwargs: Any,
+    ) -> None:
         self._no_label = no_label
         self._inputs = inputs
         self._n_inputs = len(inputs)
@@ -730,11 +789,11 @@ class LabelMapper(_LabelMapper):
         self._input_units_allow_dimensionless = dict.fromkeys(self._inputs, False)
         super(_LabelMapper, self).__init__(name=name, **kwargs)
 
-    def evaluate(self, *args):
-        args = self.filter_inputs(args, self.inputs_mapping)
+    def evaluate(self, *args: Any) -> LowLevelArray:
+        filtered_args = self.filter_inputs(args, self.inputs_mapping)
         if self.n_outputs == 1:
-            args = [args]
-        res = self.mapper(*args)
+            filtered_args = [filtered_args]
+        res = self.mapper(*filtered_args)
         if np.isscalar(res):
             res = np.array([res])
-        return np.array(res)
+        return cast("LowLevelArray", np.array(res))

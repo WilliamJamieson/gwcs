@@ -3,6 +3,12 @@
 Models for generating FITS WCS standard transforms.
 """
 
+from __future__ import annotations
+
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, cast
+
+from astropy.modeling import projections
 from astropy.modeling.core import Model
 from astropy.modeling.models import (
     AffineTransformation2D,
@@ -13,6 +19,9 @@ from astropy.modeling.models import (
 from astropy.modeling.parameters import Parameter
 
 from .utils import _compute_lon_pole
+
+if TYPE_CHECKING:
+    from .typing import LowLevelArray, LowLevelArrayOutputs, LowLevelArrayValue
 
 __all__ = [
     "FITSImagingWCSTransform",
@@ -64,6 +73,7 @@ class FITSImagingWCSTransform(Model):
 
     standard_broadcasting = False
     fittable = False
+    input_units = None
 
     n_inputs = 2
     n_outputs = 2
@@ -74,8 +84,14 @@ class FITSImagingWCSTransform(Model):
     pc = Parameter(default=[[1.0, 0.0], [0.0, 1.0]], description="pc")
 
     def __init__(
-        self, projection, crpix=crpix, crval=crval, cdelt=cdelt, pc=pc, **kwargs
-    ):
+        self,
+        projection: projections.Projection,
+        crpix: Parameter | Sequence[float] = crpix,
+        crval: Parameter | Sequence[float] = crval,
+        cdelt: Parameter | Sequence[float] = cdelt,
+        pc: Parameter | LowLevelArray | Sequence[Sequence[float]] = pc,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(crpix=crpix, crval=crval, cdelt=cdelt, pc=pc, **kwargs)
         self.projection = projection
         self.inputs = ("x", "y")
@@ -90,8 +106,16 @@ class FITSImagingWCSTransform(Model):
             | RotateNative2Celestial(self.crval[0], self.crval[1], self.lon_pole)
         )
 
-    def evaluate(self, x, y, crpix, crval, cdelt, pc):  # noqa: PLR0917
-        return self.forward(x, y)
+    def evaluate(  # noqa: PLR0917
+        self,
+        x: LowLevelArrayValue,
+        y: LowLevelArrayValue,
+        crpix: LowLevelArray,
+        crval: LowLevelArray,
+        cdelt: LowLevelArray,
+        pc: LowLevelArray,
+    ) -> LowLevelArrayOutputs:
+        return cast("LowLevelArrayOutputs", self.forward(x, y))
 
-    def inverse(self):
-        return self.forward.inverse
+    def inverse(self) -> Model:
+        return cast(Model, self.forward.inverse)

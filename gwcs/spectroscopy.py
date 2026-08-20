@@ -3,10 +3,17 @@
 Spectroscopy related models.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, TypeAlias, cast
+
 import astropy.units as u
 import numpy as np
 from astropy.modeling.core import Model
 from astropy.modeling.parameters import Parameter
+
+if TYPE_CHECKING:
+    from .typing import LowLevelArray, LowLevelValue
 
 __all__ = [
     "AnglesFromGratingEquation3D",
@@ -15,6 +22,8 @@ __all__ = [
     "Snell3D",
     "WavelengthFromGratingEquation",
 ]
+
+CoefficientVector: TypeAlias = Parameter | np.ndarray
 
 
 class WavelengthFromGratingEquation(Model):
@@ -53,6 +62,7 @@ class WavelengthFromGratingEquation(Model):
     _separable = False
 
     linear = False
+    input_units = None
 
     n_inputs = 2
     n_outputs = 1
@@ -62,7 +72,12 @@ class WavelengthFromGratingEquation(Model):
     spectral_order = Parameter(default=1)
     """ Spectral order."""
 
-    def __init__(self, groove_density, spectral_order, **kwargs):
+    def __init__(
+        self,
+        groove_density: LowLevelValue,
+        spectral_order: int,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(
             groove_density=groove_density, spectral_order=spectral_order, **kwargs
         )
@@ -71,11 +86,20 @@ class WavelengthFromGratingEquation(Model):
         self.outputs = ("wavelength",)
         """ Wavelength."""
 
-    def evaluate(self, alpha_in, alpha_out, groove_density, spectral_order):
-        return (alpha_in + alpha_out) / (groove_density * spectral_order)
+    def evaluate(
+        self,
+        alpha_in: LowLevelValue,
+        alpha_out: LowLevelValue,
+        groove_density: LowLevelValue,
+        spectral_order: LowLevelValue,
+    ) -> LowLevelValue:
+        return cast(
+            "LowLevelValue",
+            (alpha_in + alpha_out) / (groove_density * spectral_order),
+        )
 
     @property
-    def return_units(self):
+    def return_units(self) -> dict[str, u.Unit] | None:
         if self.groove_density.unit is None:
             return None
         return {"wavelength": u.Unit(1 / self.groove_density.unit)}
@@ -108,6 +132,7 @@ class AnglesFromGratingEquation3D(Model):
 
     _separable = False
     linear = False
+    return_units = None
 
     n_inputs = 3
     n_outputs = 3
@@ -118,7 +143,12 @@ class AnglesFromGratingEquation3D(Model):
     spectral_order = Parameter(default=1)
     """ Spectral order."""
 
-    def __init__(self, groove_density, spectral_order, **kwargs):
+    def __init__(
+        self,
+        groove_density: LowLevelValue,
+        spectral_order: int,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(
             groove_density=groove_density, spectral_order=spectral_order, **kwargs
         )
@@ -128,7 +158,14 @@ class AnglesFromGratingEquation3D(Model):
         self.outputs = ("alpha_out", "beta_out", "gamma_out")
         """ Two angles coming out of the grating. """
 
-    def evaluate(self, wavelength, alpha_in, beta_in, groove_density, spectral_order):
+    def evaluate(
+        self,
+        wavelength: LowLevelValue,
+        alpha_in: LowLevelArray,
+        beta_in: LowLevelArray,
+        groove_density: LowLevelValue,
+        spectral_order: LowLevelValue,
+    ) -> tuple[LowLevelValue, LowLevelValue, LowLevelValue]:
         if alpha_in.shape != beta_in.shape:
             msg = "Expected input arrays to have the same shape."
             raise ValueError(msg)
@@ -140,10 +177,13 @@ class AnglesFromGratingEquation3D(Model):
         alpha_out = -groove_density * spectral_order * wavelength + alpha_in
         beta_out = -beta_in
         gamma_out = np.sqrt(1 - alpha_out**2 - beta_out**2)
-        return alpha_out, beta_out, gamma_out
+        return cast(
+            "tuple[LowLevelValue, LowLevelValue, LowLevelValue]",
+            (alpha_out, beta_out, gamma_out),
+        )
 
     @property
-    def input_units(self):
+    def input_units(self) -> dict[str, u.Unit] | None:
         if self.groove_density.unit is None:
             return None
         return {
@@ -167,23 +207,33 @@ class Snell3D(Model):
 
     _separable = False
     linear = False
+    input_units = None
+    return_units = None
 
     n_inputs = 4
     n_outputs = 3
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.inputs = ("n", "alpha_in", "beta_in", "gamma_in")
         self.outputs = ("alpha_out", "beta_out", "gamma_out")
 
     @staticmethod
-    def evaluate(n, alpha_in, beta_in, gamma_in):
+    def evaluate(
+        n: LowLevelValue,
+        alpha_in: LowLevelValue,
+        beta_in: LowLevelValue,
+        gamma_in: LowLevelValue,
+    ) -> tuple[LowLevelValue, LowLevelValue, LowLevelValue]:
         # Apply Snell's law through front surface,
         # eq 5.3.3 II in Nirspec docs
         alpha_out = alpha_in / n
         beta_out = beta_in / n
         gamma_out = np.sqrt(1.0 - alpha_out**2 - beta_out**2)
-        return alpha_out, beta_out, gamma_out
+        return cast(
+            "tuple[LowLevelValue, LowLevelValue, LowLevelValue]",
+            (alpha_out, beta_out, gamma_out),
+        )
 
 
 class SellmeierGlass(Model):
@@ -232,6 +282,7 @@ class SellmeierGlass(Model):
     _separable = False
     standard_broadcasting = False
     linear = False
+    return_units = None
 
     n_inputs = 1
     n_outputs = 1
@@ -241,25 +292,37 @@ class SellmeierGlass(Model):
     C_coef = Parameter(default=np.array([0, 0, 0]))
     """ C1, C2, C3 coefficients in units of um ** 2. """
 
-    def __init__(self, B_coef, C_coef, **kwargs):
+    def __init__(
+        self,
+        B_coef: CoefficientVector,
+        C_coef: CoefficientVector,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(B_coef, C_coef)
         self.inputs = ("wavelength",)
         self.outputs = ("n",)
 
     @staticmethod
-    def evaluate(wavelength, B_coef, C_coef):
+    def evaluate(
+        wavelength: LowLevelValue,
+        B_coef: CoefficientVector,
+        C_coef: CoefficientVector,
+    ) -> LowLevelValue:
         B1, B2, B3 = B_coef[0]
         C1, C2, C3 = C_coef[0]
 
-        return np.sqrt(
-            1.0
-            + B1 * wavelength**2 / (wavelength**2 - C1)
-            + B2 * wavelength**2 / (wavelength**2 - C2)
-            + B3 * wavelength**2 / (wavelength**2 - C3)
+        return cast(
+            "LowLevelValue",
+            np.sqrt(
+                1.0
+                + B1 * wavelength**2 / (wavelength**2 - C1)
+                + B2 * wavelength**2 / (wavelength**2 - C2)
+                + B3 * wavelength**2 / (wavelength**2 - C3)
+            ),
         )
 
     @property
-    def input_units(self):
+    def input_units(self) -> dict[str, u.Unit] | None:
         if self.C_coef.unit is None:
             return None
         return {"wavelength": u.um}
@@ -301,6 +364,8 @@ class SellmeierZemax(Model):
     _separable = False
     standard_broadcasting = False
     linear = False
+    input_units = None
+    return_units = None
 
     n_inputs = 1
     n_outputs = 1
@@ -316,16 +381,16 @@ class SellmeierZemax(Model):
 
     def __init__(  # noqa: PLR0917
         self,
-        temperature=temperature,
-        ref_temperature=ref_temperature,
-        ref_pressure=ref_pressure,
-        pressure=pressure,
-        B_coef=B_coef,
-        C_coef=C_coef,
-        D_coef=D_coef,
-        E_coef=E_coef,
-        **kwargs,
-    ):
+        temperature: LowLevelValue = temperature,
+        ref_temperature: LowLevelValue = ref_temperature,
+        ref_pressure: LowLevelValue = ref_pressure,
+        pressure: LowLevelValue = pressure,
+        B_coef: CoefficientVector = B_coef,
+        C_coef: CoefficientVector = C_coef,
+        D_coef: CoefficientVector = D_coef,
+        E_coef: CoefficientVector = E_coef,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(
             temperature=temperature,
             ref_temperature=ref_temperature,
@@ -342,20 +407,23 @@ class SellmeierZemax(Model):
 
     def evaluate(  # noqa: PLR0917
         self,
-        wavelength,
-        temp,
-        ref_temp,
-        ref_pressure,
-        pressure,
-        B_coef,
-        C_coef,
-        D_coef,
-        E_coef,
-    ):
+        wavelength: LowLevelValue,
+        temp: LowLevelValue,
+        ref_temp: LowLevelValue,
+        ref_pressure: LowLevelValue,
+        pressure: LowLevelValue,
+        B_coef: CoefficientVector,
+        C_coef: CoefficientVector,
+        D_coef: CoefficientVector,
+        E_coef: CoefficientVector,
+    ) -> LowLevelValue:
         """
         Input ``wavelength`` is in units of microns.
         """
         if isinstance(temp, u.Quantity):
+            if not isinstance(ref_temp, u.Quantity):
+                msg = "Temperature inputs must both be quantities or both be unitless."
+                raise TypeError(msg)
             temp = temp.to(u.Celsius)
             ref_temp = ref_temp.to(u.Celsius)
         else:
@@ -399,4 +467,4 @@ class SellmeierZemax(Model):
         nabs_obs = nabs_ref + delnabs
 
         # Define the relative index at the system's operating T and P.
-        return nabs_obs / nair_obs
+        return cast("LowLevelValue", nabs_obs / nair_obs)
