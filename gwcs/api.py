@@ -31,9 +31,12 @@ if TYPE_CHECKING:
         HighLevelCoordinates,
         LowLevelArray,
         LowLevelArrayOutputs,
+        LowLevelIndexArrayOutputs,
         LowLevelInput,
         LowLevelOutputs,
         Numeric,
+        PixelBounds,
+        PixelShape,
         WorldAxisObjectClasses,
     )
 
@@ -46,7 +49,7 @@ class NativeAPIMixin(abc.ABC):
     :class:`~gwcs.wcs.WCS` class and provides the native GWCS API.
     """
 
-    _pixel_shape: tuple[int, ...] | None
+    _pixel_shape: PixelShape
 
     @property
     @abc.abstractmethod
@@ -259,7 +262,7 @@ class WCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin, NativeAPIMixin):
 
     def world_to_array_index_values(
         self, *world_arrays: LowLevelInput
-    ) -> LowLevelArrayOutputs:
+    ) -> LowLevelIndexArrayOutputs:
         """
         Convert world coordinates to array indices.
         This is the same as `~astropy.wcs.wcsapi.BaseLowLevelWCS.world_to_pixel_values`
@@ -275,7 +278,7 @@ class WCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin, NativeAPIMixin):
         return results[0] if self.pixel_n_dim == 1 else results
 
     @property
-    def array_shape(self) -> tuple[int, ...] | None:
+    def array_shape(self) -> PixelShape:
         """
         The shape of the data that the WCS applies to as a tuple of
         length `~astropy.wcs.wcsapi.BaseLowLevelWCS.pixel_n_dim`.
@@ -292,11 +295,11 @@ class WCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin, NativeAPIMixin):
         return self._pixel_shape[::-1]
 
     @array_shape.setter
-    def array_shape(self, value: tuple[int, ...] | None) -> None:
+    def array_shape(self, value: PixelShape) -> None:
         self.pixel_shape = None if value is None else value[::-1]
 
     @property
-    def pixel_bounds(self) -> tuple[tuple[float, float], ...] | None:
+    def pixel_bounds(self) -> PixelBounds:
         """
         The bounds (in pixel coordinates) inside which the WCS is defined,
         as a list with `~astropy.wcs.wcsapi.BaseLowLevelWCS.pixel_n_dim`
@@ -324,7 +327,7 @@ class WCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin, NativeAPIMixin):
         return tuple(bounding_box)
 
     @property
-    def pixel_shape(self) -> tuple[int, ...] | None:
+    def pixel_shape(self) -> PixelShape:
         """
         The shape of the data that the WCS applies to as a tuple of length
         ``pixel_n_dim`` in ``(x, y)`` order (where for an image, ``x`` is
@@ -340,7 +343,7 @@ class WCSAPIMixin(BaseLowLevelWCS, HighLevelWCSMixin, NativeAPIMixin):
         return self._pixel_shape
 
     @pixel_shape.setter
-    def pixel_shape(self, value: tuple[int, ...] | None) -> None:
+    def pixel_shape(self, value: PixelShape) -> None:
         if value is None:
             self._pixel_shape = None
         else:

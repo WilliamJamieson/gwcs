@@ -9,7 +9,17 @@ from __future__ import annotations
 import functools
 import re
 import warnings
-from typing import TYPE_CHECKING, Literal, TypeVar, overload
+from collections.abc import Sequence
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Literal,
+    TypeAlias,
+    TypedDict,
+    TypeVar,
+    cast,
+    overload,
+)
 
 import astropy.units as u
 import numpy as np
@@ -20,10 +30,32 @@ from astropy.modeling import models as astmodels
 from astropy.wcs import Celprm
 
 if TYPE_CHECKING:
-    from gwcs.typing import Mdl
+    from gwcs.typing import LowLevelArrayValue, LowLevelIndexArray, Mdl
 
 
 _T = TypeVar("_T")
+
+
+class WCSInfo(TypedDict, total=False):
+    """Basic FITS WCS keywords extracted from a FITS header."""
+
+    WCSAXES: int
+    RADESYS: str
+    VAFACTOR: float
+    NAXIS: int
+    EQUINOX: float | None
+    EPOCH: float | None
+    DATEOBS: str | float | None
+    has_cd: bool
+    CTYPE: list[str]
+    CUNIT: list[str | None]
+    CRPIX: list[float]
+    CRVAL: list[float]
+    CDELT: list[float]
+    PC: np.ndarray
+
+
+HeaderLike: TypeAlias = fits.Header | WCSInfo
 
 
 @overload
@@ -66,27 +98,27 @@ radesys = ["ICRS", "FK5", "FK4", "FK4-NO-E", "GAPPT", "GALACTIC"]
 
 
 class UnsupportedTransformError(Exception):
-    def __init__(self, message):
+    def __init__(self, message: str) -> None:
         super().__init__(message)
 
 
 class UnsupportedProjectionError(Exception):
-    def __init__(self, code):
+    def __init__(self, code: str) -> None:
         message = f"Unsupported projection: {code}"
         super().__init__(message)
 
 
 class RegionError(Exception):
-    def __init__(self, message):
+    def __init__(self, message: str) -> None:
         super().__init__(message)
 
 
 class CoordinateFrameError(Exception):
-    def __init__(self, message):
+    def __init__(self, message: str) -> None:
         super().__init__(message)
 
 
-def to_index(value):
+def to_index(value: LowLevelArrayValue) -> LowLevelIndexArray:
     """
     Convert value to an int or an int array.
 
@@ -108,7 +140,7 @@ def to_index(value):
     return np.asarray(np.floor(np.asarray(value) + 0.5), dtype=int)
 
 
-def _toindex(value):
+def _toindex(value: LowLevelArrayValue) -> LowLevelIndexArray:
     msg = "_toindex is deprecated, use to_index instead."
     warnings.warn(DeprecationWarning(msg), stacklevel=2)
 
@@ -130,7 +162,7 @@ def combine_transforms(transforms: list[Mdl]) -> core.Model:
     return functools.reduce(lambda x, y: x | y, _transforms)
 
 
-def get_values(units, *args):
+def get_values(units: Sequence[u.Unit] | None, *args: u.Quantity) -> list[Any]:
     """
     Return the values of Quantity objects after optionally converting to units.
 
@@ -149,7 +181,10 @@ def get_values(units, *args):
     return result
 
 
-def _compute_lon_pole(skycoord, projection):
+def _compute_lon_pole(
+    skycoord: coords.SkyCoord | tuple[float | u.Quantity, float | u.Quantity],
+    projection: projections.Projection,
+) -> float | u.Quantity:
     """
     Compute the longitude of the celestial pole of a standard
     frame in the native frame.
@@ -209,19 +244,19 @@ def _compute_lon_pole(skycoord, projection):
     return lonpole
 
 
-def get_projcode(wcs_info):
+def get_projcode(wcs_info: WCSInfo) -> str | None:
     # CTYPE here is only the imaging CTYPE keywords
     sky_axes, _, _ = get_axes(wcs_info)
     if not sky_axes:
         return None
-    projcode = wcs_info["CTYPE"][sky_axes[0]][5:8].upper()
+    projcode = str(wcs_info["CTYPE"][sky_axes[0]][5:8]).upper()
     if projcode not in projections.projcodes:
         msg = f"Projection code {projcode}, not recognized"
         raise UnsupportedProjectionError(msg)
     return projcode
 
 
-def read_wcs_from_header(header):
+def read_wcs_from_header(header: fits.Header) -> WCSInfo:
     """
     Extract basic FITS WCS keywords from a FITS Header.
 
@@ -235,7 +270,7 @@ def read_wcs_from_header(header):
     wcs_info : dict
         A dictionary with WCS keywords.
     """
-    wcs_info = {}
+    wcs_info: WCSInfo = {}
 
     try:
         wcs_info["WCSAXES"] = header["WCSAXES"]
@@ -291,7 +326,7 @@ def read_wcs_from_header(header):
     return wcs_info
 
 
-def get_axes(header):
+def get_axes(header: HeaderLike) -> tuple[list[int], list[int], list[int]]:
     """
     Matches input with spectral and sky coordinate axes.
 
@@ -309,7 +344,7 @@ def get_axes(header):
     if isinstance(header, fits.Header):
         wcs_info = read_wcs_from_header(header)
     elif isinstance(header, dict):
-        wcs_info = header
+        wcs_info = cast(WCSInfo, header)
     else:
         msg = "Expected a FITS Header or a dict."
         raise TypeError(msg)
@@ -336,7 +371,7 @@ def get_axes(header):
     return sky_inmap, spec_inmap, unknown
 
 
-def _is_skysys_consistent(ctype, sky_inmap):
+def _is_skysys_consistent(ctype: list[str], sky_inmap: list[int]) -> None:
     """Determine if the sky axes in CTYPE match to form a standard celestial system."""
 
     for item in sky_pairs.values():
@@ -376,7 +411,7 @@ sky_systems_map = {
 }
 
 
-def make_fitswcs_transform(header):
+def make_fitswcs_transform(header: HeaderLike) -> core.Model:
     """
     Create a basic FITS WCS transform.
     It does not include distortions.
@@ -390,7 +425,7 @@ def make_fitswcs_transform(header):
     if isinstance(header, fits.Header):
         wcs_info = read_wcs_from_header(header)
     elif isinstance(header, dict):
-        wcs_info = header
+        wcs_info = cast(WCSInfo, header)
     else:
         msg = "Expected a FITS Header or a dict."
         raise TypeError(msg)
@@ -403,7 +438,7 @@ def make_fitswcs_transform(header):
     return combine_transforms(transforms)
 
 
-def fitswcs_linear(header):
+def fitswcs_linear(header: HeaderLike) -> core.Model:
     """
     Create a WCS linear transform from a FITS header.
 
@@ -416,7 +451,7 @@ def fitswcs_linear(header):
     if isinstance(header, fits.Header):
         wcs_info = read_wcs_from_header(header)
     elif isinstance(header, dict):
-        wcs_info = header
+        wcs_info = cast(WCSInfo, header)
     else:
         msg = "Expected a FITS Header or a dict."
         raise TypeError(msg)
@@ -471,7 +506,7 @@ def fitswcs_linear(header):
     return wcs_linear
 
 
-def fitswcs_nonlinear(header):
+def fitswcs_nonlinear(header: HeaderLike) -> core.Model | None:
     """
     Create a WCS linear transform from a FITS header.
 
@@ -483,7 +518,7 @@ def fitswcs_nonlinear(header):
     if isinstance(header, fits.Header):
         wcs_info = read_wcs_from_header(header)
     elif isinstance(header, dict):
-        wcs_info = header
+        wcs_info = cast(WCSInfo, header)
     else:
         msg = "Expected a FITS Header or a dict."
         raise TypeError(msg)
@@ -505,7 +540,7 @@ def fitswcs_nonlinear(header):
     return None
 
 
-def create_projection_transform(projcode):
+def create_projection_transform(projcode: str) -> core.Model:
     """
     Create the non-linear projection transform.
 
@@ -526,11 +561,11 @@ def create_projection_transform(projcode):
     except AttributeError as err:
         raise UnsupportedProjectionError(projcode) from err
 
-    projparams = {}
+    projparams: dict[str, Any] = {}
     return projklass(**projparams)
 
 
-def is_high_level(*args, low_level_wcs):
+def is_high_level(*args: object, low_level_wcs: Any) -> bool:
     """
     Determine if args matches the high level classes as defined by
     ``low_level_wcs``.
@@ -541,4 +576,4 @@ def is_high_level(*args, low_level_wcs):
         DeprecationWarning,
         stacklevel=2,
     )
-    return low_level_wcs.output_frame.is_high_level(*args)
+    return bool(low_level_wcs.output_frame.is_high_level(*args))

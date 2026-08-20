@@ -86,7 +86,7 @@ if len(TRANSFORM_EXTENSIONS) > 1:
     TRANSFORM_EXTENSIONS.append(_EmptyExtension())
 
 
-def get_extensions():
+def get_extensions() -> list[Extension]:
     """
     Get the gwcs.converters extension.
     This method is registered with the asdf.extensions entry point.

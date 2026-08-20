@@ -53,6 +53,7 @@ if TYPE_CHECKING:
     from gwcs.typing import (
         BoundingBoxInput,
         Degree,
+        FITSProjection,
         ForwardTransform,
         FrameLike,
         HighLevelCoordinate,
@@ -65,6 +66,7 @@ if TYPE_CHECKING:
         LowLevelValue,
         Numeric,
         OptionalFrameLike,
+        ReferencePixel,
         Sampling,
         StepSpec,
     )
@@ -1581,8 +1583,8 @@ class WCS(Pipeline, WCSAPIMixin):
         max_inv_pix_error: float | None = 0.25,
         inv_degree: Degree = None,
         npoints: int = 32,
-        crpix: Sequence[float] | None = None,
-        projection: str | projections.Sky2PixProjection = "TAN",
+        crpix: ReferencePixel = None,
+        projection: FITSProjection = "TAN",
         verbose: bool = False,
     ) -> fits.Header:
         """
@@ -1712,8 +1714,8 @@ class WCS(Pipeline, WCSAPIMixin):
         max_inv_pix_error: float | None,
         inv_degree: Degree,
         npoints: int,
-        crpix: Sequence[float] | None,
-        projection: str | projections.Sky2PixProjection,
+        crpix: ReferencePixel,
+        projection: FITSProjection,
         matrix_type: str,
         verbose: bool,
     ) -> fits.Header:
@@ -2457,8 +2459,8 @@ class WCS(Pipeline, WCSAPIMixin):
         max_inv_pix_error: float | None = 0.25,
         inv_degree: Degree = None,
         npoints: int = 32,
-        crpix: Sequence[float] | None = None,
-        projection: str | projections.Sky2PixProjection = "TAN",
+        crpix: ReferencePixel = None,
+        projection: FITSProjection = "TAN",
         bin_ext_name: str = "WCS-TABLE",
         coord_col_name: str = "coordinates",
         sampling: Sampling = 1,

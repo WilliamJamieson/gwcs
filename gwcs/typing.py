@@ -7,14 +7,14 @@ making them available for users and improving Sphinx documentation resolution.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TypeAlias, TypeVar, Union
+from typing import Any, TypeAlias, TypeVar, Union
 
 from astropy.coordinates import BaseCoordinateFrame
-from astropy.modeling import Model
+from astropy.modeling import Model, projections
 from astropy.modeling.bounding_box import CompoundBoundingBox, ModelBoundingBox
 from astropy.time import Time
 from astropy.units import Quantity, Unit
-from numpy import dtype, generic, ndarray, number
+from numpy import dtype, generic, integer, ndarray, number
 
 from .coordinate_frames import (
     AxisType,
@@ -37,6 +37,7 @@ __all__ = [
     "BoundingBoxInput",
     "BoundingBoxLike",
     "Degree",
+    "FITSProjection",
     "ForwardTransform",
     "FrameLike",
     "HighLevelCoordinate",
@@ -44,12 +45,17 @@ __all__ = [
     "LowLevelArray",
     "LowLevelArrayOutputs",
     "LowLevelArrayValue",
+    "LowLevelIndexArray",
+    "LowLevelIndexArrayOutputs",
     "LowLevelInput",
     "LowLevelOutputs",
     "LowLevelValue",
     "Mdl",
     "Numeric",
     "OptionalFrameLike",
+    "PixelBounds",
+    "PixelShape",
+    "ReferencePixel",
     "Sampling",
     "StepSpec",
     "WorldAxisObjectClasses",
@@ -84,12 +90,20 @@ LowLevelValue: TypeAlias = LowLevelInput | Numeric
 LowLevelArrayValue: TypeAlias = LowLevelArray | Numeric
 LowLevelArrayOutputs: TypeAlias = tuple[LowLevelArrayValue, ...] | LowLevelArrayValue
 LowLevelOutputs: TypeAlias = tuple[LowLevelInput, ...] | LowLevelInput
+LowLevelIndexArray: TypeAlias = LowLevelArray[integer[Any]]
+LowLevelIndexArrayOutputs: TypeAlias = (
+    tuple[LowLevelIndexArray, ...] | LowLevelIndexArray
+)
 
 # FITS and approximation configuration
 BoundingBoxLike: TypeAlias = ModelBoundingBox | CompoundBoundingBox
 BoundingBoxInput: TypeAlias = BoundingBoxLike | LowLevelInput | Sequence[LowLevelInput]
 Degree: TypeAlias = int | Sequence[int] | None
 Sampling: TypeAlias = float | Sequence[float]
+PixelShape: TypeAlias = tuple[int, ...] | None
+PixelBounds: TypeAlias = tuple[tuple[float, float], ...] | None
+ReferencePixel: TypeAlias = Sequence[float] | None
+FITSProjection: TypeAlias = str | projections.Sky2PixProjection
 
 # Models and pipeline types
 Mdl: TypeAlias = Union[Model, None]  # noqa: UP007
