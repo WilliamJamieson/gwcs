@@ -209,7 +209,7 @@ def grid_from_bounding_box(
     bounding_box: BoundingBoxLike | BoundingBoxInterval | BoundingBoxBounds,
     step: Sampling = 1,
     center: bool = True,
-    selector: tuple[Any, ...] | None = None,
+    selector: tuple[int, ...] | None = None,
 ) -> LowLevelArray:
     """
     Create a grid of input points from the WCS bounding_box.
@@ -263,14 +263,14 @@ def grid_from_bounding_box(
 
     def _bbox_to_pixel(
         bbox: tuple[float | u.Quantity, float | u.Quantity],
-    ) -> tuple[Any, Any]:
+    ) -> BoundingBoxInterval:
         return (np.floor(bbox[0] + 0.5), np.ceil(bbox[1] - 0.5))
 
     if selector is not None and not isinstance(bounding_box, CompoundBoundingBox):
         msg = "Cannot use selector with a non-CompoundBoundingBox"
         raise ValueError(msg)
 
-    bbox: tuple[tuple[Any, Any], ...]
+    bbox: BoundingBoxBounds
     if isinstance(bounding_box, CompoundBoundingBox):
         if selector is None:
             msg = "selector must be set when bounding_box is a CompoundBoundingBox"
@@ -289,9 +289,9 @@ def grid_from_bounding_box(
         )
     # Normalize a one-dimensional interval to the same shape as multi-axis bounds.
     elif np.isscalar(bounding_box[0]):
-        bbox = (cast(tuple[Any, Any], bounding_box),)
+        bbox = (cast("BoundingBoxInterval", bounding_box),)
     else:
-        bbox = cast(tuple[tuple[Any, Any], ...], bounding_box)
+        bbox = cast("BoundingBoxBounds", bounding_box)
 
     bb = tuple(_bbox_to_pixel(interval) for interval in bbox) if center else bbox
     step_values: LowLevelArray = np.atleast_1d(step)

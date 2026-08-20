@@ -380,7 +380,9 @@ class _LegacyCoordinateFrameProtocol(Protocol):
         )
 
 
-def _is_high_level(self: CoordinateFrameProtocol, *args: HighLevelCoordinate) -> bool:
+def _is_high_level(
+    self: CoordinateFrameProtocol, *args: LowLevelInput | HighLevelCoordinate
+) -> bool:
     """
     Return `True` if the input coordinates are already high level objects
     described by this frame.
@@ -437,7 +439,7 @@ class CoordinateFrameProtocol(_LegacyCoordinateFrameProtocol, Protocol):
     API Definition for a Coordinate frame
     """
 
-    def is_high_level(self, *args: HighLevelCoordinate) -> bool:
+    def is_high_level(self, *args: LowLevelInput | HighLevelCoordinate) -> bool:
         """
         Return `True` if the input coordinates are already high level objects
         described by this frame.

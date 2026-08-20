@@ -12,14 +12,20 @@ from __future__ import annotations
 import abc
 import warnings
 from collections import OrderedDict
-from typing import TYPE_CHECKING, Any, TypeAlias, cast
+from typing import TYPE_CHECKING, TypeAlias, cast
 
 import numpy as np
 from astropy.utils import deprecated
 
 if TYPE_CHECKING:
     from .coordinate_frames import CoordinateFrameProtocol
-    from .typing import LowLevelArray, PolygonVertex, PolygonVertices, RegionLabel
+    from .typing import (
+        LowLevelArray,
+        Numeric,
+        PolygonVertex,
+        PolygonVertices,
+        RegionLabel,
+    )
 
 __all__ = (
     "Edge",
@@ -172,11 +178,11 @@ class Polygon(_Region):
         # constructs a Global Edge Table (GET) in bbox coordinates
         self._GET = self._construct_ordered_GET()
 
-    def _get_bounding_box(self) -> tuple[Any, Any, Any, Any]:
-        x = self._vertices[:, 0].min()
-        y = self._vertices[:, 1].min()
-        w = self._vertices[:, 0].max() - x
-        h = self._vertices[:, 1].max() - y
+    def _get_bounding_box(self) -> tuple[int, int, int, int]:
+        x = int(self._vertices[:, 0].min())
+        y = int(self._vertices[:, 1].min())
+        w = int(self._vertices[:, 0].max() - x)
+        h = int(self._vertices[:, 1].max() - y)
         return (x, y, w, h)
 
     def _construct_ordered_GET(self) -> OrderedDict[int, list[_Edge] | None]:
@@ -377,7 +383,7 @@ class _Edge:
         self.GET_entry = self.compute_GET_entry()
 
     @property
-    def ymin(self) -> Any:
+    def ymin(self) -> Numeric | None:
         return self._ymin
 
     @property
@@ -389,7 +395,7 @@ class _Edge:
         return cast("LowLevelArray", self._stop)
 
     @property
-    def ymax(self) -> Any:
+    def ymax(self) -> Numeric | None:
         return self._ymax
 
     @property
@@ -397,7 +403,7 @@ class _Edge:
     def name(self) -> str | None:
         return self._name
 
-    def compute_GET_entry(self) -> list[Any] | None:
+    def compute_GET_entry(self) -> list[Numeric | None] | None:
         """
         Compute the entry in the Global Edge Table
 
@@ -418,7 +424,7 @@ class _Edge:
             ]
         return entry
 
-    def compute_AET_entry(self, edge: _Edge) -> list[Any]:
+    def compute_AET_entry(self, edge: _Edge) -> list[Numeric | None]:
         """
         Compute the entry for an edge in the current Active Edge Table
 
@@ -502,7 +508,7 @@ class Edge(_Edge):
         super().__init__(name=name, start=start, stop=stop, next=next)
 
 
-def _det(u: LowLevelArray, v: LowLevelArray) -> Any:
+def _det(u: LowLevelArray, v: LowLevelArray) -> Numeric:
     """
     Find the determinant of the matrix formed by the vectors u and v
 

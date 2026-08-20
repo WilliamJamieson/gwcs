@@ -4,7 +4,7 @@ import sys
 import warnings
 from copy import copy
 from inspect import getattr_static
-from typing import TYPE_CHECKING, NamedTuple, Self
+from typing import TYPE_CHECKING, NamedTuple, Self, TypeGuard, cast
 
 from astropy.modeling.core import Model
 
@@ -28,18 +28,22 @@ __all__ = ["IndexedStep", "Step"]
 #    evaluate the properties of the object, so it does not cause an error.
 if sys.version_info >= (3, 12):
 
-    def _is_coordinate_frame(frame: FrameLike) -> bool:
+    def _is_coordinate_frame(
+        frame: FrameLike,
+    ) -> TypeGuard[CoordinateFrameProtocol]:
         return isinstance(frame, CoordinateFrameProtocol)
 
     def _is_legacy_coordinate_frame(
         frame: FrameLike | _LegacyCoordinateFrameProtocol,
-    ) -> bool:
+    ) -> TypeGuard[CoordinateFrameProtocol]:
         return isinstance(frame, _LegacyCoordinateFrameProtocol) and not isinstance(
             frame, CoordinateFrameProtocol
         )
 else:
 
-    def _is_coordinate_frame(frame: FrameLike) -> bool:
+    def _is_coordinate_frame(
+        frame: FrameLike,
+    ) -> TypeGuard[CoordinateFrameProtocol]:
         return isinstance(frame, BaseCoordinateFrame | CoordinateFrame | EmptyFrame)
 
     def _has_legacy_coordinate_frame_interface(frame: object) -> bool:
@@ -74,7 +78,7 @@ else:
 
     def _is_legacy_coordinate_frame(
         frame: FrameLike,
-    ) -> bool:
+    ) -> TypeGuard[CoordinateFrameProtocol]:
         return _has_legacy_coordinate_frame_interface(frame) and not hasattr(
             frame, "is_high_level"
         )
@@ -96,12 +100,12 @@ class Step:
     def __init__(self, frame: FrameLike, transform: Mdl = None) -> None:
         # Allow for a string to be passed in for the frame but be turned into a
         # frame object
-        # This is correct type-wise, but the Python 3.11 bugfix causes a MyPy error
-        self.frame = (
-            frame
-            if _is_coordinate_frame(frame) or _is_legacy_coordinate_frame(frame)
-            else EmptyFrame.from_transform(frame, transform)  # type: ignore[assignment, arg-type]
-        )
+        if _is_coordinate_frame(frame) or _is_legacy_coordinate_frame(frame):
+            self.frame = frame
+        else:
+            # `FrameLike` guarantees `frame` is a `str` here, since it is neither
+            # a coordinate frame nor a legacy duck-typed coordinate frame.
+            self.frame = EmptyFrame.from_transform(cast(str, frame), transform)
         self.transform = transform
 
     @property
@@ -119,7 +123,9 @@ class Step:
             warnings.warn(msg, DeprecationWarning, stacklevel=2)
             # Copy the value to avoid mutating the original object.
             val = copy(val)
-            val.is_high_level = lambda *args: _is_high_level(val, *args)  # type: ignore[method-assign]
+            # Monkey-patch the missing method; `setattr` avoids mypy's
+            # `method-assign` check, which disallows overriding methods directly.
+            setattr(val, "is_high_level", lambda *args: _is_high_level(val, *args))  # noqa: B010
 
         if not (_is_coordinate_frame(val) or is_legacy):
             msg = '"frame" should be an instance of CoordinateFrameProtocol.'
