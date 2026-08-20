@@ -26,13 +26,13 @@ MODEL_2D_SHIFT = models.Shift(1) & models.Shift(2)
 MODEL_1D_SCALE = models.Scale(2)
 
 
-def gwcs_simple_2d():
+def gwcs_simple_2d() -> wcs.WCS:
     output_frame = cf.Frame2D(name="world")
     input_frame = cf.Frame2D(name="detector")
     return wcs.WCS(MODEL_2D_SHIFT, input_frame=input_frame, output_frame=output_frame)
 
 
-def gwcs_empty_output_2d():
+def gwcs_empty_output_2d() -> wcs.WCS:
     return wcs.WCS(
         MODEL_2D_SHIFT,
         input_frame="detector",
@@ -40,7 +40,7 @@ def gwcs_empty_output_2d():
     )
 
 
-def gwcs_2d_quantity_shift():
+def gwcs_2d_quantity_shift() -> wcs.WCS:
     frame = cf.CoordinateFrame(
         name="quantity",
         axes_order=(0, 1),
@@ -53,7 +53,7 @@ def gwcs_2d_quantity_shift():
     return wcs.WCS(pipe)
 
 
-def gwcs_2d_spatial_shift():
+def gwcs_2d_spatial_shift() -> wcs.WCS:
     """
     A simple one step spatial WCS, in ICRS with a 1 and 2 px shift.
     """
@@ -61,7 +61,7 @@ def gwcs_2d_spatial_shift():
     return wcs.WCS(pipe)
 
 
-def gwcs_2d_spatial_reordered():
+def gwcs_2d_spatial_reordered() -> wcs.WCS:
     """
     A simple one step spatial WCS, in ICRS with a 1 and 2 px shift.
     """
@@ -73,11 +73,11 @@ def gwcs_2d_spatial_reordered():
     )
 
 
-def gwcs_1d_freq():
+def gwcs_1d_freq() -> wcs.WCS:
     return wcs.WCS([(DETECTOR_1D_FRAME, MODEL_1D_SCALE), (FREQ_FRAME, None)])
 
 
-def gwcs_3d_spatial_wave():
+def gwcs_3d_spatial_wave() -> wcs.WCS:
     comp1 = cf.CompositeFrame([ICRC_SKY_FRAME, WAVE_FRAME])
     m = MODEL_2D_SHIFT & MODEL_1D_SCALE
 
@@ -93,7 +93,7 @@ def gwcs_3d_spatial_wave():
     return wcs.WCS([(detector_frame, m), (comp1, None)])
 
 
-def gwcs_2d_shift_scale():
+def gwcs_2d_shift_scale() -> wcs.WCS:
     m1 = models.Shift(1) & models.Shift(2)
     m2 = models.Scale(5) & models.Scale(10)
     m3 = m1 | m2
@@ -101,7 +101,7 @@ def gwcs_2d_shift_scale():
     return wcs.WCS(pipe)
 
 
-def gwcs_2d_bad_bounding_box_order():
+def gwcs_2d_bad_bounding_box_order() -> wcs.WCS:
     m1 = models.Shift(1) & models.Shift(2)
     m2 = models.Scale(5) & models.Scale(10)
     m3 = m1 | m2
@@ -113,7 +113,7 @@ def gwcs_2d_bad_bounding_box_order():
     return wcs.WCS(pipe)
 
 
-def gwcs_1d_freq_quantity():
+def gwcs_1d_freq_quantity() -> wcs.WCS:
     detector_1d = cf.CoordinateFrame(
         name="detector", axes_order=(0,), naxes=1, unit=u.pix, axes_type="detector"
     )
@@ -122,7 +122,7 @@ def gwcs_1d_freq_quantity():
     )
 
 
-def gwcs_2d_shift_scale_quantity():
+def gwcs_2d_shift_scale_quantity() -> wcs.WCS:
     m4 = models.Shift(1 * u.pix) & models.Shift(2 * u.pix)
     m5 = models.Scale(5 * u.deg)
     m6 = models.Scale(10 * u.deg)
@@ -138,7 +138,7 @@ def gwcs_2d_shift_scale_quantity():
     return wcs.WCS(pipe2)
 
 
-def gwcs_3d_identity_units():
+def gwcs_3d_identity_units() -> wcs.WCS:
     """
     A simple 1-1 gwcs that converts from pixels to arcseconds
     """
@@ -174,7 +174,7 @@ def gwcs_3d_identity_units():
     )
 
 
-def gwcs_4d_identity_units():
+def gwcs_4d_identity_units() -> wcs.WCS:
     """
     A simple 1-1 gwcs that converts from pixels to arcseconds
     """
@@ -208,7 +208,7 @@ def gwcs_4d_identity_units():
     )
 
 
-def gwcs_simple_imaging_units():
+def gwcs_simple_imaging_units() -> wcs.WCS:
     shift_by_crpix = models.Shift(-2048 * u.pix) & models.Shift(-1024 * u.pix)
     matrix = np.array(
         [
@@ -245,7 +245,7 @@ def gwcs_simple_imaging_units():
     return wcs.WCS(pipeline)
 
 
-def gwcs_simple_imaging():
+def gwcs_simple_imaging() -> wcs.WCS:
     shift_by_crpix = models.Shift(-2048) & models.Shift(-1024)
     matrix = np.array(
         [
@@ -270,7 +270,7 @@ def gwcs_simple_imaging():
     return wcs.WCS(pipeline)
 
 
-def gwcs_stokes_lookup():
+def gwcs_stokes_lookup() -> wcs.WCS:
     transform = models.Tabular1D(
         [0, 1, 2, 3] * u.pix,
         [1, 2, 3, 4] * u.one,
@@ -294,7 +294,7 @@ def gwcs_stokes_lookup():
     )
 
 
-def gwcs_3spectral_orders():
+def gwcs_3spectral_orders() -> wcs.WCS:
     comp1 = cf.CompositeFrame([ICRC_SKY_FRAME, WAVE_FRAME])
     detector_frame = cf.Frame2D(
         name="detector", axes_names=("x", "y"), unit=(u.pix, u.pix)
@@ -304,19 +304,22 @@ def gwcs_3spectral_orders():
     return wcs.WCS([(detector_frame, m), (comp1, None)])
 
 
-def gwcs_with_frames_strings():
+def gwcs_with_frames_strings() -> wcs.WCS:
     transform = models.Shift(1) & models.Shift(1) & models.Polynomial2D(1)
     pipe = [("detector", transform), ("world", None)]
-    return wcs.WCS(pipe)
+    # This is specifically testing a legacy support mode for strings as frames
+    #   a warning is expected when this is used. So the type hint does not match
+    #   the actual supported types on purpose.
+    return wcs.WCS(pipe)  # type: ignore[arg-type]
 
 
-def sellmeier_glass():
+def sellmeier_glass() -> sp.SellmeierGlass:
     B_coef = [0.58339748, 0.46085267, 3.8915394]
     C_coef = [0.00252643, 0.010078333, 1200.556]
     return sp.SellmeierGlass(B_coef, C_coef)
 
 
-def sellmeier_zemax():
+def sellmeier_zemax() -> sp.SellmeierZemax:
     B_coef = [0.58339748, 0.46085267, 3.8915394]
     C_coef = [0.00252643, 0.010078333, 1200.556]
     D_coef = [-2.66e-05, 0.0, 0.0]
@@ -326,7 +329,7 @@ def sellmeier_zemax():
     )
 
 
-def gwcs_3d_galactic_spectral():
+def gwcs_3d_galactic_spectral() -> wcs.WCS:
     """
     This fixture has the axes ordered as lat, spectral, lon.
     """
@@ -374,7 +377,7 @@ def gwcs_3d_galactic_spectral():
     return owcs
 
 
-def gwcs_1d_spectral():
+def gwcs_1d_spectral() -> wcs.WCS:
     """
     A simple 1D spectral WCS.
     """
@@ -397,7 +400,7 @@ def gwcs_1d_spectral():
     return owcs
 
 
-def gwcs_spec_cel_time_4d():
+def gwcs_spec_cel_time_4d() -> wcs.WCS:
     """
     A complex 4D mixed celestial + spectral + time WCS.
     """
@@ -453,7 +456,7 @@ def gwcs_spec_cel_time_4d():
     return w
 
 
-def gwcs_cube_with_separable_spectral(axes_order):
+def gwcs_cube_with_separable_spectral(axes_order: tuple[int, int, int]) -> wcs.WCS:
     """
     GWCS cube with spectral axis separable from the celestial axes.
 
@@ -485,9 +488,7 @@ def gwcs_cube_with_separable_spectral(axes_order):
     )
     spec = cf.SpectralFrame(
         name="wave",
-        unit=[
-            u.m,
-        ],
+        unit=(u.m,),
         axes_order=spectral_axes_order,
         axes_names=("lambda",),
     )
@@ -519,7 +520,7 @@ def gwcs_cube_with_separable_spectral(axes_order):
     return w
 
 
-def gwcs_cube_with_separable_time(axes_order):
+def gwcs_cube_with_separable_time(axes_order: tuple[int, int, int]) -> wcs.WCS:
     """
     A mixed celestial + time WCS.
 
@@ -577,7 +578,7 @@ def gwcs_cube_with_separable_time(axes_order):
     return w
 
 
-def gwcs_7d_complex_mapping():
+def gwcs_7d_complex_mapping() -> wcs.WCS:
     """
     Useful features of this WCS (axes indices here are 0-based):
         - includes two celestial axes: input (0, 1) maps to world (2 - RA, 1 - Dec)
@@ -598,13 +599,13 @@ def gwcs_7d_complex_mapping():
         reference_frame=coord.ICRS(), name="sky", axes_order=(2, 1)
     )
     spec = cf.SpectralFrame(
-        name="wave", unit=[u.m], axes_order=(4,), axes_names=("lambda",)
+        name="wave", unit=(u.m,), axes_order=(4,), axes_names=("lambda",)
     )
     cmplx = cf.CoordinateFrame(
         name="complex",
         naxes=4,
         axes_order=(3, 5, 0, 6),
-        axis_physical_types=(["em.wl", "em.wl", "time", "time"]),
+        axis_physical_types=("em.wl", "em.wl", "time", "time"),
         axes_type=(
             cf.AxisType.SPATIAL,
             cf.AxisType.SPATIAL,
@@ -642,9 +643,9 @@ def gwcs_7d_complex_mapping():
     return w
 
 
-def gwcs_with_pipeline_celestial():
+def gwcs_with_pipeline_celestial() -> wcs.WCS:
     input_frame = cf.CoordinateFrame(
-        2, ["PIXEL"] * 2, axes_order=list(range(2)), unit=[u.pix] * 2, name="input"
+        2, ("PIXEL",) * 2, axes_order=tuple(range(2)), unit=(u.pix,) * 2, name="input"
     )
 
     spatial = models.Multiply(20 * u.arcsec / u.pix) & models.Multiply(
@@ -661,7 +662,11 @@ def gwcs_with_pipeline_celestial():
     custom = models.Shift(1 * u.deg) & models.Shift(2 * u.deg)
 
     output_frame = cf.CoordinateFrame(
-        2, ["CUSTOM"] * 2, axes_order=list(range(2)), unit=[u.arcsec] * 2, name="output"
+        2,
+        ("CUSTOM",) * 2,
+        axes_order=tuple(range(2)),
+        unit=(u.arcsec,) * 2,
+        name="output",
     )
 
     pipeline = [
@@ -673,7 +678,7 @@ def gwcs_with_pipeline_celestial():
     return wcs.WCS(pipeline)
 
 
-def gwcs_romanisim():
+def gwcs_romanisim() -> wcs.WCS:
     targ_pos = coord.SkyCoord(ra=0 * u.deg, dec=0 * u.deg)
 
     ra_ref = targ_pos.ra.to(u.deg).value
@@ -726,7 +731,7 @@ def gwcs_romanisim():
     return wcs.WCS(pipeline)
 
 
-def fits_wcs_imaging_simple(params):
+def fits_wcs_imaging_simple(params: tuple[float, float]) -> tuple[wcs.WCS, ASTWCS]:
     """A simple FITS WCS imaging transform without distortion."""
     # Check for several values of cravl2, including at the poles
     lon, lat = params
@@ -755,7 +760,7 @@ def fits_wcs_imaging_simple(params):
     return gw, w
 
 
-def gwcs_2d_spatial_shift_reverse():
+def gwcs_2d_spatial_shift_reverse() -> wcs.WCS:
     """
     A simple one step spatial WCS with forward from sky to detector.
     """
@@ -763,7 +768,7 @@ def gwcs_2d_spatial_shift_reverse():
     return wcs.WCS(pipe)
 
 
-def gwcs_multi_stage():
+def gwcs_multi_stage() -> wcs.WCS:
     """
     A 3-step pipeline where the intermediate step is 1D and the final is 2D.
     """

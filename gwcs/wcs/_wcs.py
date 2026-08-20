@@ -398,8 +398,8 @@ class WCS(Pipeline, WCSAPIMixin):
     @overload
     def __init__(
         self,
-        forward_transform: list[StepSpec] | _BasePipeline,
-        input_frame: None = None,
+        forward_transform: Sequence[StepSpec] | _BasePipeline,
+        input_frame: OptionalFrameLike = None,
         output_frame: None = None,
         name: str | None = None,
     ) -> None: ...
