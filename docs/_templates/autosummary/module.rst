@@ -2,6 +2,14 @@
 
 .. automodule:: {{ fullname }}
 
+   {% if fullname == "gwcs.typing" %}
+   .. rubric:: Type aliases
+
+   {% for item in typing_type_aliases | sort %}
+   .. autotype:: {{ item }}
+   {% endfor %}
+   {% endif %}
+
    {% block classes %}
    {% if all_classes %}
    .. rubric:: Classes

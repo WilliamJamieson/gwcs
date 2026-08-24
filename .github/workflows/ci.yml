@@ -22,8 +22,7 @@ jobs:
     uses: OpenAstronomy/github-actions-workflows/.github/workflows/tox.yml@8c8bb6c6c962542921f993d47d26df38dccd50b1 # v3.0.2
     with:
       envs: |
-        - linux: py311-oldestdeps
-        - linux: py311
+        - linux: py312-oldestdeps
         - linux: py312
         - linux: py314
         # `tox` does not currently respect `requires-python` versions when creating testing environments;
