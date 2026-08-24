@@ -1,0 +1,1 @@
+Centralize the type hint aliases.
