@@ -3,6 +3,14 @@ name = "gwcs"
 description = "Generalized World Coordinate System"
 requires-python = ">=3.12"
 authors = [{ name = "gwcs developers" }]
+classifiers = [
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+]
 dependencies = [
   "asdf >= 4.0.0",
   "astropy >= 7.0",
