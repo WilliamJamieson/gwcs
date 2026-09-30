@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -54,6 +55,29 @@ class PythonSupport:
         This is intended to be the default version of python used for CI testing
         """
         return self.versions[-2]
+
+    @classmethod
+    def from_pyproject(cls, pyproject_path: Path) -> PythonSupport:
+        """
+        Read the supported Python versions from a pyproject.toml file.
+
+        Parameters
+        ----------
+        pyproject_path :
+            The path to the pyproject.toml file.
+
+        Returns
+        -------
+            An instance of PythonSupport populated with the supported Python versions
+            specified in the pyproject.toml file.
+        """
+        return cls(
+            versions=tuple(
+                sorted(
+                    nox.project.python_versions(nox.project.load_toml(pyproject_path))
+                )
+            )
+        )
 
     @classmethod
     def from_python(cls, requires_python: SpecifierSet | None = None) -> PythonSupport:
@@ -149,6 +173,9 @@ class PythonSupport:
                 else None
             ),
         )
+
+
+PYTHON_SUPPORT = PythonSupport.from_pyproject(Path("pyproject.toml"))
 
 
 @dataclass(frozen=True, slots=True)
@@ -315,3 +342,155 @@ def check_python_classifiers(session: nox.Session) -> None:
         )
 
     session.log(f"Python classifiers are consistent with: {project.python_support}")
+
+
+def _list_dependencies(session: nox.Session) -> None:
+    """List the packages installed in a session's environment."""
+    if session.venv_backend == "uv":
+        session.run(
+            "uv",
+            "pip",
+            "list",
+            "--python",
+            session.virtualenv.location,
+            external=True,
+        )
+    else:
+        session.run("python", "-m", "pip", "list")
+
+
+def _add_standard_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add the standard command-line arguments to the parser."""
+    parser.add_argument(
+        "--xdist",
+        nargs="?",
+        const=True,
+        default=False,
+        type=int,
+        help="Enable pytest-xdist for parallel test execution",
+    )
+
+    # Ensure that only one of --editable or --wheel can be specified
+    install_group = parser.add_mutually_exclusive_group()
+    install_group.add_argument(
+        "--editable",
+        action="store_true",
+        help="Install gwcs in editable mode",
+    )
+    install_group.add_argument(
+        "--wheel",
+        type=Path,
+        default=None,
+        help="Install gwcs from a built wheel file instead of the source tree",
+    )
+
+
+def _install_gwcs(
+    session: nox.Session,
+    args: argparse.Namespace,
+    install_args: list[str] | None = None,
+) -> None:
+    """Install gwcs in the virtual environment based on the command-line arguments."""
+    install_args = install_args or []
+
+    # Setup the install arguments for gwcs itself
+    if args.wheel is not None:
+        install_args += [f"{args.wheel}[test]"]
+    elif args.editable:
+        install_args += ["-e", ".[test]"]
+    else:
+        install_args += [".[test]"]
+
+    session.log("Installing the gwcs package for testing:")
+
+    # Add pytest-xdist if requested
+    if args.xdist:
+        session.log("  Including pytest-xdist for parallel test execution")
+        install_args += ["pytest-xdist"]
+
+    session.install(*install_args)
+
+
+def _init_pytest_arguments(session: nox.Session, args: argparse.Namespace) -> list[str]:
+    """Initialize the pytest arguments based on the command-line options."""
+    session.log("Running tests:")
+
+    arguments: list[str] = []
+    if args.xdist:
+        session.log("  Including pytest-xdist for parallel test execution")
+        arguments += ["-n", "auto" if args.xdist is True else str(args.xdist)]
+
+    return arguments
+
+
+@nox.session(python=None)
+def tests(session: nox.Session) -> None:
+    """Run the unit tests."""
+    if session.posargs and session.posargs[0] in PYTHON_SUPPORT.versions:
+        target_python = session.posargs.pop(0)
+    else:
+        target_python = PYTHON_SUPPORT.default
+
+    session.log(f"Target Python interpreter: {target_python}")
+    session.notify(f"run_tests-{target_python}", session.posargs)
+
+
+@nox.session(python=PYTHON_SUPPORT.versions)
+def run_tests(session: nox.Session) -> None:
+    """Run the tests for python versions"""
+    parser = argparse.ArgumentParser(
+        prog="nox -s test --",
+        allow_abbrev=False,
+        description="Run the gwcs test suite.",
+    )
+    _add_standard_arguments(parser)
+
+    # Build the parser, adding the options as we go
+    parser.add_argument(
+        "--coverage", action="store_true", help="Enable coverage reporting"
+    )
+
+    # Ensure that only one of --dev or --oldest can be specified
+    dependency_group = parser.add_mutually_exclusive_group()
+    dependency_group.add_argument(
+        "--dev", action="store_true", help="Install development dependencies"
+    )
+    dependency_group.add_argument(
+        "--oldest",
+        action="store_true",
+        help="Install the oldest compatible dependencies",
+    )
+    args, pytest_args = parser.parse_known_args(session.posargs)
+    install_args: list[str] = []
+
+    # Prepare the install arguments for dev/oldest if required
+    if args.dev:
+        install_args += ["-r", "requirements-dev.txt"]
+    if args.oldest:
+        if session.venv_backend != "uv":
+            session.error("--oldest requires the uv backend")
+
+        install_args += ["--resolution", "lowest-direct"]
+
+    _install_gwcs(session, args, install_args)
+
+    # Install coverage if requested
+    if args.coverage:
+        session.log("Installing coverage dependencies:")
+        session.install("pytest-cov")
+
+    _list_dependencies(session)
+
+    # Configure the pytest arguments
+    arguments = _init_pytest_arguments(session, args)
+    if args.coverage:
+        session.log("  Enabling coverage reporting")
+        arguments += [
+            "--cov=.",
+            "--cov-config=pyproject.toml",
+            "--cov-report=term-missing",
+            "--cov-report=xml",
+        ]
+    arguments += pytest_args
+
+    session.run("pytest", *arguments)
