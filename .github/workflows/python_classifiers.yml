@@ -1,0 +1,63 @@
+name: python classifiers
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check_python_classifiers:
+    name: check python classifiers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        with:
+          enable-cache: true
+      - name: Run check_python_classifiers session
+        id: check
+        run: |
+          CHANGES=0
+          if ! uv run --with nox --with packaging --with requests --with tomlkit nox -s check_python_classifiers; then
+            if git diff --quiet; then
+              echo "Session failed without producing any changes"
+              exit 1
+            fi
+            CHANGES=1
+          fi
+          echo "available=$CHANGES" >> "$GITHUB_OUTPUT"
+      - if: steps.check.outputs.available == '1'
+        id: branch
+        run: echo "name=classifiers/update-$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
+      - if: steps.check.outputs.available == '1'
+        name: Configure git credentials
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+      - if: steps.check.outputs.available == '1'
+        name: Commit changes to `${{ steps.branch.outputs.name }}`
+        run: |
+          git checkout -b ${{ steps.branch.outputs.name }}
+          git commit -a -m "updating python classifiers"
+          git push -u origin ${{ steps.branch.outputs.name }}
+      - if: steps.check.outputs.available == '1'
+        name: Create pull request
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create --head=${{ steps.branch.outputs.name }} \
+          --title='Update python classifiers' \
+          --body='The `check_python_classifiers` nox session detected that the Python classifiers in `pyproject.toml` were inconsistent with `requires-python` and the Python versions published on python.org.
+
+          The classifiers have been updated automatically. Please review the changes.'
