@@ -340,6 +340,7 @@ def check_python_classifiers(session: nox.Session) -> None:
 
     if not project.has_classifiers:
         project.update_classifiers(pyproject)
+        session.notify("check-style")
         session.error(
             "Python classifiers were missing and have been updated. "
             "Please review and commit the changes!"
@@ -535,6 +536,16 @@ def build(session: nox.Session) -> None:
         if not wheels:
             session.error("No wheel found in dist/ to test")
         session.notify("tests", posargs=["--wheel", str(wheels[-1]), *test_posargs])
+
+
+@nox.session(name="check-style")
+def check_style(session: nox.Session) -> None:
+    """Run all style and file checks with prek."""
+    default_args = ("--color", "always", "--all-files", "--show-diff-on-failure")
+
+    session.install("prek")
+    session.run("prek", "prepare-hooks")
+    session.run("prek", "run", *(session.posargs or default_args))
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
