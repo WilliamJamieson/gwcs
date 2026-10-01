@@ -20,11 +20,14 @@ jobs:
           fetch-tags: true
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3"
-      - run: pip install --upgrade build
-      - run: python -m build --sdist --wheel
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+      - name: Build package
+        run: |
+          if [ "${{ github.event_name }}" = "release" ] && [ "${{ github.event.action }}" = "released" ]; then
+            uv tool run --with packaging --with requests --with tomlkit nox -s build -- --test
+          else
+            uv tool run --with packaging --with requests --with tomlkit nox -s build
+          fi
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: dist

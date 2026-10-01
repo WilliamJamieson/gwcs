@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -497,6 +498,43 @@ def run_tests(session: nox.Session) -> None:
     arguments += pytest_args
 
     session.run("pytest", *arguments)
+
+
+@nox.session(python=PYTHON_SUPPORT.default)
+def build(session: nox.Session) -> None:
+    """Build the sdist and wheel into dist/."""
+    parser = argparse.ArgumentParser(
+        prog="nox -s build --",
+        allow_abbrev=False,
+        description="Build the sdist and wheel, optionally testing the wheel.",
+    )
+    parser.add_argument(
+        "--test",
+        action="store_true",
+        help="Run the test session installing gwcs from the built wheel",
+    )
+    args, test_posargs = parser.parse_known_args(session.posargs)
+
+    # Remove the existing dist/ directory if it exists before building new
+    # distributions.
+    dist = Path("dist")
+    shutil.rmtree(dist, ignore_errors=True)
+
+    # Install the build and twine packages for building the distributions.
+    session.install("build", "twine")
+
+    # Build the distributions
+    session.run("python", "-m", "build")
+
+    # Check the built distributions with twine
+    session.run("twine", "check", "--strict", *(str(p) for p in dist.glob("*")))
+
+    # If requested, run the test session using the built wheel
+    if args.test:
+        wheels = sorted(dist.glob("*.whl"))
+        if not wheels:
+            session.error("No wheel found in dist/ to test")
+        session.notify("tests", posargs=["--wheel", str(wheels[-1]), *test_posargs])
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
