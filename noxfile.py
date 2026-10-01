@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import re
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
@@ -509,8 +510,6 @@ class MatrixEntry:
     """The name of the session that will execute this matrix entry."""
     python: str = PYTHON_SUPPORT.default
     """The Python version for this matrix entry."""
-    args: tuple[str, ...] = field(default_factory=tuple)
-    """The positional arguments for this matrix entry."""
     options: tuple[str | tuple[str, str], ...] = field(default_factory=tuple)
     """
     The options for this matrix entry
@@ -529,6 +528,11 @@ class MatrixEntry:
         -> Empty tuple means no tags are required for this entry.
         -> Downstream-CI, in this means entries that should run in the downstream CI.
     """
+
+    @property
+    def args(self) -> tuple[str, ...]:
+        """The positional arguments for this matrix entry."""
+        return ()
 
     @property
     def python_id(self) -> str:
@@ -578,7 +582,7 @@ class MatrixEntry:
     @property
     def nox_param(self) -> nox.param:
         """The nox parameter for this matrix entry."""
-        return nox.param(self, id=self.nox_id)
+        return nox.param(self, id=self.nox_id, tags=self.tags if self.tags else None)
 
     @staticmethod
     def check_session(session: str, python: str) -> str:
@@ -706,7 +710,7 @@ class MatrixEntry:
         return None
 
 
-CI_MATRIX = [
+CI_MATRIX = (
     MatrixEntry(
         execute_session="run_tests",
         python=PYTHON_SUPPORT.oldest,
@@ -739,12 +743,233 @@ CI_MATRIX = [
         )
         for python in PYTHON_SUPPORT.versions
     ],
-]
+)
 
 
 @nox.session(venv_backend="none")
 @nox.parametrize("matrix_entry", [entry.nox_param for entry in CI_MATRIX])
 def run_ci(session: nox.session, matrix_entry: MatrixEntry) -> None:
+    """Run the CI session for the given matrix entry."""
+    matrix_entry.run_session(session, posargs=session.posargs)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DownstreamEntry(MatrixEntry):
+    """Represents an entry for downstream testing."""
+
+    JWST_CRDS: ClassVar[dict[str, str]] = {
+        "CRDS_SERVER_URL": "https://jwst-crds.stsci.edu"
+    }
+    ROMAN_CRDS: ClassVar[dict[str, str]] = {
+        "CRDS_SERVER_URL": "https://roman-crds.stsci.edu"
+    }
+
+    package: str
+    """The name of the downstream package."""
+    repo: str
+    """The URL of the downstream repository."""
+    branch: str
+    """The branch of the downstream repository to clone."""
+    extra: tuple[str, ...] | None = None
+    """The extra requirements to install for the downstream package."""
+
+    pytest_extra: tuple[str, ...] = field(default_factory=tuple)
+    """
+    Additional arguments to pass to pytest when running the downstream package's tests.
+    """
+    env: dict[str, str] = field(default_factory=dict)
+    """The environment variables to set when running the downstream package's tests."""
+
+    @property
+    def args(self) -> tuple[str, ...]:
+        """The positional arguments for this matrix entry."""
+        return (self.package,)
+
+    def install(self, session: nox.Session, path: Path) -> Path:
+        """
+        Clone and then install the downstream repository to the specified path.
+
+        Returns the path to the cloned downstream repository.
+        """
+        downstream = path / self.package
+
+        session.run(
+            "git",
+            "clone",
+            "--branch",
+            self.branch,
+            # A blobless clone keeps the tags that setuptools-scm needs to
+            # determine a version, without paying for the full file history.
+            "--filter=blob:none",
+            self.repo,
+            str(downstream),
+            external=True,
+        )
+
+        with session.chdir(downstream):
+            session.log(f"Installing the downstream package: {self.package}")
+            # -e fixes issues with C extensions not being available for some reason
+            session.install(
+                "-e",
+                f".[{', '.join(self.extra)}]" if self.extra is not None else ".",
+            )
+
+        return downstream
+
+    def run_downstream(
+        self,
+        session: nox.Session,
+        path: Path,
+        session_args: list[str],
+        pytest_args: list[str],
+    ) -> None:
+        """
+        Run the downstream package's tests in the specified path.
+
+        Assumes the downstream package has already been installed.
+
+        Parameters
+        ----------
+        session :
+            The Nox session to use for running the tests.
+        path :
+            The path to the downstream package.
+        session_args :
+            The arguments to pytest created by the session running the tests.
+        pytest_args :
+            The additional posargs that are not processed by the session and are
+            passed directly to pytest.
+        """
+        # Combine all the provided arguments together for pytest
+        arguments = session_args + list(self.pytest_extra) + pytest_args
+
+        # Change into the directory that contains the downstream package before
+        #   running tests.
+        with session.chdir(path):
+            # Note that we will run this with specific environment variables set.
+            session.run("pytest", *arguments, env=self.env)
+
+
+DOWNSTREAM_MATRIX = (
+    DownstreamEntry(
+        execute_session="run_downstream",
+        package="jwst",
+        repo="https://github.com/spacetelescope/jwst.git",
+        branch="main",
+        extra=("test",),
+        env=DownstreamEntry.JWST_CRDS,
+        options=("xdist",),
+    ),
+    DownstreamEntry(
+        execute_session="run_downstream",
+        package="romancal",
+        repo="https://github.com/spacetelescope/romancal.git",
+        branch="main",
+        extra=("test",),
+        env=DownstreamEntry.ROMAN_CRDS,
+        options=("xdist",),
+    ),
+    DownstreamEntry(
+        execute_session="run_downstream",
+        package="stcal",
+        repo="https://github.com/spacetelescope/stcal.git",
+        branch="main",
+        extra=("test",),
+        env=DownstreamEntry.JWST_CRDS,
+        options=("xdist",),
+    ),
+    DownstreamEntry(
+        execute_session="run_downstream",
+        package="romanisim",
+        repo="https://github.com/spacetelescope/romanisim.git",
+        branch="main",
+        extra=("test",),
+        env=DownstreamEntry.ROMAN_CRDS,
+        options=("xdist",),
+    ),
+    DownstreamEntry(
+        execute_session="run_downstream",
+        package="specutils",
+        repo="https://github.com/astropy/specutils.git",
+        branch="main",
+        extra=("test",),
+        tags=("Downstream CI",),
+    ),
+    DownstreamEntry(
+        execute_session="run_downstream",
+        package="dkist",
+        repo="https://github.com/DKISTDC/dkist.git",
+        branch="main",
+        extra=("tests",),
+        pytest_extra=("--benchmark-skip",),
+        options=("xdist",),
+        tags=("Downstream CI",),
+    ),
+    DownstreamEntry(
+        execute_session="run_downstream",
+        package="ndcube",
+        repo="https://github.com/sunpy/ndcube.git",
+        branch="main",
+        extra=("dev",),
+        options=("xdist",),
+        tags=("Downstream CI",),
+    ),
+)
+DOWNSTREAM = MappingProxyType({entry.package: entry for entry in DOWNSTREAM_MATRIX})
+
+
+@nox.session(python=None)
+def downstream(session: nox.Session) -> None:
+    """Run the downstream package tests."""
+    if session.posargs and session.posargs[0] in PYTHON_SUPPORT.versions:
+        target_python = session.posargs.pop(0)
+    else:
+        target_python = PYTHON_SUPPORT.default
+
+    session.log(f"Target Python interpreter: {target_python}")
+    session.notify(f"run_downstream-{target_python}", session.posargs)
+
+
+@nox.session(python=PYTHON_SUPPORT.versions, reuse_venv=False)
+def run_downstream(session: nox.Session) -> None:
+    """Run the downstream package tests for python versions"""
+
+    parser = argparse.ArgumentParser(
+        prog="nox -s downstream --",
+        allow_abbrev=False,
+        description="Run a downstream package's tests against this version of gwcs.",
+    )
+    parser.add_argument(
+        "package",
+        choices=sorted(DOWNSTREAM),
+        help="Downstream package to test against gwcs",
+    )
+    _add_standard_arguments(parser)
+
+    args, pytest_args = parser.parse_known_args(session.posargs)
+    downstream = DOWNSTREAM[args.package]
+
+    # Clone into a temporary directory so stale state cannot leak between runs
+    # and the repo working tree is never touched.
+    # This uses the tempfile module instead of the session.create_tmp() method
+    # so that the clone is performed freshly each time the session is run.
+    with tempfile.TemporaryDirectory(prefix="gwcs-downstream-") as tmp_dir:
+        # Install the downstream package and then gwcs
+        #    Note the downstream must be first so that it does not clobber the
+        #    gwcs installation.
+        path = downstream.install(session, Path(tmp_dir))
+        _install_gwcs(session, args)
+
+        _list_dependencies(session)
+
+        downstream.run_downstream(
+            session, path, _init_pytest_arguments(session, args), pytest_args
+        )
+
+
+@nox.session(venv_backend="none")
+@nox.parametrize("matrix_entry", [entry.nox_param for entry in DOWNSTREAM_MATRIX])
+def run_downstream_ci(session: nox.session, matrix_entry: MatrixEntry) -> None:
     """Run the CI session for the given matrix entry."""
     matrix_entry.run_session(session, posargs=session.posargs)
 
@@ -850,7 +1075,29 @@ def ci_matrix(session: nox.Session) -> None:
     _write_github_output(
         session,
         "run_ci",
-        tuple(CI_MATRIX),
+        CI_MATRIX,
+        args.labels,
+        force_run=args.force_run,
+    )
+
+
+@nox.session(venv_backend="none")
+def downstream_ci_matrix(session: nox.Session) -> None:
+    """
+    Write the GitHub Actions matrix to the environment for the downstream CI matrix.
+    """
+    parser = argparse.ArgumentParser(
+        prog="nox -s downstream_ci_matrix --",
+        allow_abbrev=False,
+        description="Setup the GitHub Actions downstream CI matrix.",
+    )
+    _add_github_matrix_arguments(parser)
+    args = parser.parse_args(session.posargs)
+
+    _write_github_output(
+        session,
+        "run_downstream_ci",
+        DOWNSTREAM_MATRIX,
         args.labels,
         force_run=args.force_run,
     )
