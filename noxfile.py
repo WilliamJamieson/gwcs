@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, ClassVar
@@ -16,7 +18,7 @@ if TYPE_CHECKING:
 nox.options.default_venv_backend = "uv|virtualenv"
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class PythonSupport:
     """Information about supported Python versions."""
 
@@ -178,7 +180,7 @@ class PythonSupport:
 PYTHON_SUPPORT = PythonSupport.from_pyproject(Path("pyproject.toml"))
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class PythonProject:
     """Represents the Python project's classifiers and support information."""
 
@@ -435,7 +437,7 @@ def tests(session: nox.Session) -> None:
     session.notify(f"run_tests-{target_python}", session.posargs)
 
 
-@nox.session(python=PYTHON_SUPPORT.versions)
+@nox.session(python=PYTHON_SUPPORT.versions, reuse_venv=False)
 def run_tests(session: nox.Session) -> None:
     """Run the tests for python versions"""
     parser = argparse.ArgumentParser(
@@ -453,7 +455,7 @@ def run_tests(session: nox.Session) -> None:
     # Ensure that only one of --dev or --oldest can be specified
     dependency_group = parser.add_mutually_exclusive_group()
     dependency_group.add_argument(
-        "--dev", action="store_true", help="Install development dependencies"
+        "--develop", action="store_true", help="Install development dependencies"
     )
     dependency_group.add_argument(
         "--oldest",
@@ -464,7 +466,7 @@ def run_tests(session: nox.Session) -> None:
     install_args: list[str] = []
 
     # Prepare the install arguments for dev/oldest if required
-    if args.dev:
+    if args.develop:
         install_args += ["-r", "requirements-dev.txt"]
     if args.oldest:
         if session.venv_backend != "uv":
@@ -494,3 +496,361 @@ def run_tests(session: nox.Session) -> None:
     arguments += pytest_args
 
     session.run("pytest", *arguments)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class MatrixEntry:
+    """Represents an entry in a github workflow job matrix."""
+
+    DEFAULT_RUNS_ON: ClassVar[str] = "ubuntu-latest"
+    MACOS_RUNS_ON: ClassVar[str] = "macos-latest"
+
+    execute_session: str
+    """The name of the session that will execute this matrix entry."""
+    python: str = PYTHON_SUPPORT.default
+    """The Python version for this matrix entry."""
+    args: tuple[str, ...] = field(default_factory=tuple)
+    """The positional arguments for this matrix entry."""
+    options: tuple[str | tuple[str, str], ...] = field(default_factory=tuple)
+    """
+    The options for this matrix entry
+
+    Each option can be either a string or a tuple of two strings.
+    -> A single string will be used as `--option` in the nox command.
+    -> A tuple of two strings will be used as `--option=value` in the nox command.
+    """
+    runs_on: str = field(default=DEFAULT_RUNS_ON)
+    """The runner environment for this matrix entry."""
+    tags: tuple[str, ...] = field(default_factory=tuple)
+    """
+    The tags for this matrix entry.
+
+    These will be the GitHub labels that need to be applied for this entry to run.
+        -> Empty tuple means no tags are required for this entry.
+        -> Downstream-CI, in this means entries that should run in the downstream CI.
+    """
+
+    @property
+    def python_id(self) -> str:
+        """The Python identifier for this matrix entry."""
+        return f"py{self.python}"
+
+    @property
+    def args_id(self) -> str:
+        """The arguments identifier for this matrix entry."""
+        return "-".join(self.args)
+
+    @property
+    def option_id(self) -> str:
+        """The option identifier for this matrix entry."""
+        return "-".join(
+            f"{option[0]}-{option[1]}" if isinstance(option, tuple) else option
+            for option in self.options
+        )
+
+    @property
+    def runs_on_id(self) -> str:
+        """The runner environment identifier for this matrix entry."""
+        return self.runs_on
+
+    @property
+    def nox_id(self) -> str:
+        """
+        The identifier for this matrix entry.
+
+        This is the string that shows as an argument to the origin_session when invoking
+        nox.
+        -> `nox -s origin_session(nox_id)` will invoke the represented session
+        """
+        nox_id = f"{self.python_id}"
+
+        # Append the the arguments, options, and runner environment identifiers
+        #    to the nox_id.
+        if self.args:
+            nox_id += f"--{self.args_id}"
+        if self.options:
+            nox_id += f"--{self.option_id}"
+        if self.runs_on != self.DEFAULT_RUNS_ON:
+            nox_id += f"--{self.runs_on_id}"
+
+        return nox_id
+
+    @property
+    def nox_param(self) -> nox.param:
+        """The nox parameter for this matrix entry."""
+        return nox.param(self, id=self.nox_id)
+
+    @staticmethod
+    def check_session(session: str, python: str) -> str:
+        """
+        Check if the given session and python version are valid
+
+        Parameters
+        ----------
+        session :
+            The name of the nox session to check.
+        python :
+            The python version to check, by default None.
+
+        Raises
+        ------
+        ValueError
+            If the session or python version is not valid.
+
+        Returns
+        -------
+            The session name if the session and python version are valid.
+        """
+        # Check that the execute_session has been registered as a nox session.
+        func = nox.registry.get().get(session)
+        if func is None:
+            msg = f"{session!r} is not a valid nox session!"
+            raise ValueError(msg)
+
+        # nox drops the python suffix from session names when there is no venv
+        #   it will fail if we include the python suffix in that case.
+        if func.venv_backend == "none":
+            return session
+
+        # Check that the specified python version is specified and supported by
+        #   the execute_session.
+        pythons = [func.python] if isinstance(func.python, str) else func.python
+        if not isinstance(pythons, list | tuple) or python not in pythons:
+            msg = (
+                f"{session!r} is not a valid nox session: {session!r} "
+                f"supports python {func.python!r}"
+            )
+            raise ValueError(msg)
+
+        return f"{session}-{python}"
+
+    def nox_session(self, session: str) -> str:
+        """
+        The session name for this matrix entry.
+
+        GitHub Actions will run nox with this session name.
+        -> `nox -s nox_session`
+        """
+        return f"{self.check_session(session, self.python)}({self.nox_id})"
+
+    @property
+    def nox_name(self) -> str:
+        """The name for the GitHub Actions job that will run this entry"""
+        if self.runs_on == self.DEFAULT_RUNS_ON:
+            return f"{self.nox_id}"
+
+        return f"{self.nox_id} ({self.runs_on})"
+
+    @property
+    def option_args(self) -> tuple[str, ...]:
+        """Return the option arguments for this matrix entry."""
+        return tuple(
+            f"--{option[0]}={option[1]}" if isinstance(option, tuple) else f"--{option}"
+            for option in self.options
+        )
+
+    @property
+    def posargs(self) -> tuple[str, ...]:
+        """Return the positional arguments for this matrix entry."""
+        return (*self.args, *self.option_args)
+
+    @property
+    def session(self) -> str:
+        """Return the name of the session to execute for this matrix entry."""
+        return self.check_session(self.execute_session, self.python)
+
+    def run_session(
+        self, session: nox.session, posargs: list[str] | None = None
+    ) -> None:
+        """
+        Run the nox session for this matrix entry.
+
+        Parameters
+        ----------
+        session :
+            The nox session to run.
+        posargs :
+            The positional arguments to pass to the session, by default None.
+        """
+        if posargs := [*self.posargs, *(posargs or [])]:
+            posargs = ["--", *posargs]
+
+        session.run(
+            "nox",
+            "-s",
+            self.session,
+            *posargs,
+            external=True,
+        )
+
+    def github_matrix_entry(
+        self, session: str, labels: list[str], force_run: bool = False
+    ) -> dict[str, str] | None:
+        """Return the github matrix entry for this matrix entry."""
+        # Only include this matrix entry if it has no tags or if at least one of
+        #     the labels matches a tag.
+        if force_run or not self.tags or any(label in self.tags for label in labels):
+            # Ensure that the session that this matrix entry will actually run is
+            #   valid
+            _ = self.session
+
+            return {
+                "name": self.nox_name,
+                # Note that nox_session checks that the session represented by
+                #   this matrix entry is valid.
+                "session": self.nox_session(session),
+                "python": self.python,
+                "runs-on": self.runs_on,
+            }
+
+        return None
+
+
+CI_MATRIX = [
+    MatrixEntry(
+        execute_session="run_tests",
+        python=PYTHON_SUPPORT.oldest,
+        options=("oldest",),
+    ),
+    MatrixEntry(
+        execute_session="run_tests",
+        python=PYTHON_SUPPORT.latest,
+        options=("develop",),
+    ),
+    MatrixEntry(
+        execute_session="run_tests",
+        python=PYTHON_SUPPORT.default,
+        options=("coverage",),
+    ),
+    MatrixEntry(
+        execute_session="run_tests",
+        python=PYTHON_SUPPORT.default,
+        options=("editable",),
+    ),
+    MatrixEntry(
+        execute_session="run_tests",
+        python=PYTHON_SUPPORT.default,
+        runs_on=MatrixEntry.MACOS_RUNS_ON,
+    ),
+    *[
+        MatrixEntry(
+            execute_session="run_tests",
+            python=python,
+        )
+        for python in PYTHON_SUPPORT.versions
+    ],
+]
+
+
+@nox.session(venv_backend="none")
+@nox.parametrize("matrix_entry", [entry.nox_param for entry in CI_MATRIX])
+def run_ci(session: nox.session, matrix_entry: MatrixEntry) -> None:
+    """Run the CI session for the given matrix entry."""
+    matrix_entry.run_session(session, posargs=session.posargs)
+
+
+def _parse_github_labels(value: str) -> list[str]:
+    """
+    Parse the JSON output of ``toJSON(github.event.pull_request.labels.*.name)``.
+
+    Non-PR events produce ``null`` (or an empty string), which yields no labels.
+    """
+    if not value.strip():
+        return []
+
+    try:
+        labels = json.loads(value)
+    except json.JSONDecodeError as err:
+        msg = f"labels must be a JSON array of strings, got {value!r}"
+        raise argparse.ArgumentTypeError(msg) from err
+
+    if labels is None:
+        return []
+
+    if not isinstance(labels, list) or not all(isinstance(lbl, str) for lbl in labels):
+        msg = f"labels must be a JSON array of strings, got {value!r}"
+        raise argparse.ArgumentTypeError(msg)
+
+    return labels
+
+
+def _parse_github_bool(value: str) -> bool:
+    """Parse a GitHub Actions boolean expression result (``true``/``false``)."""
+    normalized = value.strip().lower()
+    if normalized == "true":
+        return True
+    if normalized in ("false", ""):
+        return False
+
+    msg = f"expected 'true' or 'false', got {value!r}"
+    raise argparse.ArgumentTypeError(msg)
+
+
+def _add_github_matrix_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--labels",
+        type=_parse_github_labels,
+        default=[],
+        help=(
+            "JSON array of PR label names, e.g. the output of "
+            "${{ toJSON(github.event.pull_request.labels.*.name) }}"
+        ),
+    )
+    parser.add_argument(
+        "--force-run",
+        type=_parse_github_bool,
+        default=False,
+        help="Include every matrix entry regardless of labels ('true' or 'false')",
+    )
+
+
+def _write_github_output(
+    session: nox.Session,
+    session_name: str,
+    matrix: tuple[MatrixEntry, ...],
+    labels: list[str],
+    force_run: bool = False,
+) -> None:
+    """Write the GitHub Actions matrix to the environment."""
+
+    outputs = [
+        github_entry
+        for entry in matrix
+        if (
+            github_entry := entry.github_matrix_entry(
+                session_name, labels, force_run=force_run
+            )
+        )
+        is not None
+    ]
+
+    if (github_output := os.getenv("GITHUB_OUTPUT")) is None:
+        session.log("GITHUB_OUTPUT environment variable is not set, listing matrix:")
+        for output in outputs:
+            session.log(f"    {output}")
+
+        session.error("GITHUB_OUTPUT environment variable is not set")
+        return  # For mypy type checking the error should stop nox
+
+    with Path(github_output).open("a", encoding="utf-8") as out:
+        out.write(f"matrix={json.dumps(outputs)}\n")
+
+
+@nox.session(venv_backend="none")
+def ci_matrix(session: nox.Session) -> None:
+    """Write the GitHub Actions matrix to the environment for the CI matrix."""
+    parser = argparse.ArgumentParser(
+        prog="nox -s ci_matrix --",
+        allow_abbrev=False,
+        description="Setup the GitHub Actions CI matrix.",
+    )
+    _add_github_matrix_arguments(parser)
+    args = parser.parse_args(session.posargs)
+
+    _write_github_output(
+        session,
+        "run_ci",
+        tuple(CI_MATRIX),
+        args.labels,
+        force_run=args.force_run,
+    )

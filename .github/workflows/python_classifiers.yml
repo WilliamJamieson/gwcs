@@ -28,7 +28,7 @@ jobs:
         id: check
         run: |
           CHANGES=0
-          if ! uv run --with nox --with packaging --with requests --with tomlkit nox -s check_python_classifiers; then
+          if ! uv tool run --with packaging --with requests --with tomlkit nox -s check_python_classifiers; then
             if git diff --quiet; then
               echo "Session failed without producing any changes"
               exit 1

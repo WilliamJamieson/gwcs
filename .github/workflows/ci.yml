@@ -3,10 +3,19 @@ name: test
 on:
   push:
     branches:
-      - "*"
+      - main
+      # Release branches, e.g. 1.1.x or 0.26.0x
+      - "[0-9]+.[0-9]+.x"
+      - "[0-9]+.[0-9]+.[0-9]+x"
     tags:
       - "*"
   pull_request:
+    # `labeled` re-runs ci_matrix so label-tagged entries get added to the matrix
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - labeled
   workflow_dispatch:
   schedule:
     # Weekly Monday 9AM build
@@ -19,19 +28,12 @@ concurrency:
 
 jobs:
   test:
-    uses: OpenAstronomy/github-actions-workflows/.github/workflows/tox.yml@22ddf09dfabb443adddfb9f861b7d41a787d6b1a # v3.0.3
+    # Fork PRs into gwcs still run here, since their github.repository is the base repo
+    if: github.repository == 'spacetelescope/gwcs' || github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/nox_matrix.yml
     with:
-      envs: |
-        - linux: py312-oldestdeps
-        - linux: py312
-        - linux: py314
-        # `tox` does not currently respect `requires-python` versions when creating testing environments;
-        # if this breaks, add an upper pin to `requires-python` and revert this py3 to the latest working version
-        - linux: py313-cov
-          coverage: codecov
-          pytest-results-summary: true
-        - macos: py313
-          pytest-results-summary: true
-        - linux: py314-dev
+      matrix_session: ci_matrix
+      pr_labels: ${{ github.repository == 'spacetelescope/gwcs' && toJSON(github.event.pull_request.labels.*.name) || '[]' }}
+      force_on: ${{ github.event_name == 'workflow_dispatch' || (github.repository == 'spacetelescope/gwcs' && (github.event_name == 'schedule' || github.event_name == 'push')) }}
     secrets:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

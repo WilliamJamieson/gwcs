@@ -1,0 +1,111 @@
+name: nox matrix
+
+on:
+  workflow_call:
+    inputs:
+      matrix_session:
+        description: "nox session that writes the job matrix to $GITHUB_OUTPUT (e.g. ci_matrix)"
+        required: true
+        type: string
+      pr_labels:
+        description: "JSON array of PR label names, e.g. toJSON(github.event.pull_request.labels.*.name)"
+        required: false
+        type: string
+        default: "[]"
+      force_on:
+        description: "Run every matrix entry regardless of labels"
+        required: false
+        type: boolean
+        default: false
+      setenv:
+        description: Newline separated KEY=value pairs exported to each session job
+        type: string
+        required: false
+        default: ""
+      cache-path:
+        description: Path to cache between runs of each session job
+        type: string
+        required: false
+        default: ""
+      cache-key:
+        description: Cache key used together with cache-path
+        type: string
+        required: false
+        default: ""
+      restore-cache-path:
+        description: Path of a read-only cache to restore into each session job
+        type: string
+        required: false
+        default: ""
+      restore-cache-key:
+        description: Cache key used together with restore-cache-path
+        type: string
+        required: false
+        default: ""
+    secrets:
+      CODECOV_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  # The matrix entries are defined by the noxfile, so they have to be
+  #   discovered from nox rather than hard-coded here.
+  discover:
+    name: discover nox sessions
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.discover.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+      - id: discover
+        run: >-
+          uv tool run --with packaging --with requests --with tomlkit nox -s "${{ inputs.matrix_session }}" --
+          --labels "$PR_LABELS" --force-run "${{ inputs.force_on }}"
+        # Passed via env so label names can't inject into the shell.
+        env:
+          PR_LABELS: ${{ inputs.pr_labels }}
+
+  session:
+    name: ${{ matrix.name }}
+    needs: discover
+    if: needs.discover.outputs.matrix != '[]'
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.discover.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - if: inputs.setenv != ''
+        run: |
+          cat <<'EOF' >> "$GITHUB_ENV"
+          ${{ inputs.setenv }}
+          EOF
+      - if: inputs.cache-path != ''
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ${{ inputs.cache-path }}
+          key: ${{ inputs.cache-key }}
+      - if: inputs.restore-cache-key != ''
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ${{ inputs.restore-cache-path }}
+          key: ${{ inputs.restore-cache-key }}
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        with:
+          python-version: ${{ matrix.python }}
+      - run: uv tool run --with packaging --with requests --with tomlkit nox -s "${{ matrix.session }}"
+      - if: contains(matrix.session, 'coverage')
+        uses: codecov/codecov-action@5975040f7f7d40edaff8d784b576fd65ae95c073 # v5.5.5
+        with:
+          files: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
