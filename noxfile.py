@@ -349,6 +349,33 @@ def check_python_classifiers(session: nox.Session) -> None:
     session.log(f"Python classifiers are consistent with: {project.python_support}")
 
 
+@nox.session(venv_backend="none")
+def check_rtd_python(session: nox.Session) -> None:
+    """Check and update the Read the Docs Python version to match the docs session."""
+    from ruyaml import YAML
+
+    rtd_config = Path(".readthedocs.yaml")
+    yaml = YAML()
+    yaml.preserve_quotes = True
+    yaml.indent(mapping=2, sequence=4, offset=2)
+    config = yaml.load(rtd_config.read_text(encoding="utf-8"))
+    rtd_python = config["build"]["tools"]["python"]
+    default_python = PYTHON_SUPPORT.default
+
+    if rtd_python != default_python:
+        config["build"]["tools"]["python"] = default_python
+        with rtd_config.open("w", encoding="utf-8") as stream:
+            yaml.dump(config, stream)
+        session.notify("check-style")
+        session.error(
+            f"Read the Docs Python {rtd_python} did not match the default Python "
+            f"{default_python}. Updated .readthedocs.yaml. "
+            "Please review and commit the changes!"
+        )
+
+    session.log(f"Read the Docs Python matches the default Python: {default_python}")
+
+
 def _list_dependencies(session: nox.Session) -> None:
     """List the packages installed in a session's environment."""
     if session.venv_backend == "uv":

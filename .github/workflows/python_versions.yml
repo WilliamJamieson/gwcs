@@ -1,4 +1,4 @@
-name: python classifiers
+name: Update Python Versions
 
 on:
   schedule:
@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   check_python_classifiers:
-    name: check python classifiers
+    name: check python classifiers and RTD Python
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -24,15 +24,28 @@ jobs:
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         with:
           enable-cache: true
-      - name: Run check_python_classifiers session
+      - name: Update Python classifiers and RTD Python
         id: check
         run: |
-          CHANGES=0
-          if ! uv tool run --with packaging --with requests --with tomlkit nox -s check_python_classifiers; then
-            if git diff --quiet; then
-              echo "Session failed without producing any changes"
-              exit 1
+          run_check() {
+            local session="$1"
+            local config="$2"
+            local before
+            before=$(git diff -- "$config")
+            if ! uv tool run --with packaging --with requests --with tomlkit --with ruyaml nox -s "$session"; then
+              if [[ "$(git diff -- "$config")" == "$before" ]]; then
+                echo "$session failed without updating $config"
+                exit 1
+              fi
             fi
+          }
+
+          # Separate Nox processes reload the classifiers before selecting RTD's Python.
+          run_check check_python_classifiers pyproject.toml
+          run_check check_rtd_python .readthedocs.yaml
+
+          CHANGES=0
+          if ! git diff --quiet; then
             CHANGES=1
           fi
           echo "available=$CHANGES" >> "$GITHUB_OUTPUT"
@@ -49,7 +62,7 @@ jobs:
         name: Commit changes to `${{ steps.branch.outputs.name }}`
         run: |
           git checkout -b ${{ steps.branch.outputs.name }}
-          git commit -a -m "updating python classifiers"
+          git commit -a -m "Updating Python classifiers and RTD Python"
           git push -u origin ${{ steps.branch.outputs.name }}
       - if: steps.check.outputs.available == '1'
         name: Create pull request
@@ -57,7 +70,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh pr create --head=${{ steps.branch.outputs.name }} \
-          --title='Update python classifiers' \
+          --title='Update python classifiers and RTD Python' \
           --body='The `check_python_classifiers` nox session detected that the Python classifiers in `pyproject.toml` were inconsistent with `requires-python` and the Python versions published on python.org.
 
-          The classifiers have been updated automatically. Please review the changes.'
+          The `check_rtd_python` session then ran in a fresh Nox process to check that `.readthedocs.yaml` uses the recalculated default Python version.
+
+          Any necessary classifier and/or Read the Docs Python updates are included together in this PR. Please review the changes.'
