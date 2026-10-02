@@ -360,7 +360,8 @@ def check_rtd_python(session: nox.Session) -> None:
     yaml.indent(mapping=2, sequence=4, offset=2)
     config = yaml.load(rtd_config.read_text(encoding="utf-8"))
     rtd_python = config["build"]["tools"]["python"]
-    default_python = PYTHON_SUPPORT.default
+    # Re-read so classifier updates earlier in this nox run are picked up.
+    default_python = PythonSupport.from_pyproject(Path("pyproject.toml")).default
 
     if rtd_python != default_python:
         config["build"]["tools"]["python"] = default_python
@@ -374,6 +375,254 @@ def check_rtd_python(session: nox.Session) -> None:
         )
 
     session.log(f"Read the Docs Python matches the default Python: {default_python}")
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Spec0Support:
+    """The minimum dependency versions currently required by SPEC 0."""
+
+    SCHEDULE_URL: ClassVar[str] = (
+        "https://github.com/scientific-python/spec0-action/releases/latest/download/schedule.json"
+    )
+    PACKAGES: ClassVar[tuple[str, ...]] = ("python", "numpy", "scipy")
+    PYPI_URL: ClassVar[str] = "https://pypi.org/pypi/{name}/json"
+    MIN_SUPPORTED_VERSIONS: ClassVar[int] = 3
+    """Fewest stable major.minor versions that must remain supported after a bump."""
+
+    minimums: MappingProxyType[str, str]
+    """Maps package name to its current SPEC 0 minimum version e.g. numpy -> 2.3.0"""
+
+    @classmethod
+    def from_schedule(cls, packages: tuple[str, ...] = PACKAGES) -> Spec0Support:
+        """
+        Read the current SPEC 0 minimum versions from the published schedule.
+
+        The schedule is published quarterly by scientific-python as a list of
+        entries, each giving the new minimum versions of the packages whose
+        support changes on that entry's start date.
+
+        Parameters
+        ----------
+        packages :
+            The package names to look up minimum versions for.
+
+        Returns
+        -------
+            An instance of Spec0Support populated with the minimum versions of the
+            packages which appear in the schedule up to today.
+        """
+        from datetime import UTC, datetime
+
+        import requests
+
+        response = requests.get(cls.SCHEDULE_URL, timeout=15)
+        response.raise_for_status()
+
+        now = datetime.now(UTC)
+        minimums: dict[str, str] = {}
+        for entry in sorted(response.json(), key=lambda entry: entry["start_date"]):
+            if datetime.fromisoformat(entry["start_date"]) > now:
+                break
+            minimums.update(
+                {
+                    name: version
+                    for name, version in entry["packages"].items()
+                    if name in packages
+                }
+            )
+
+        return cls(minimums=MappingProxyType(minimums))
+
+    @staticmethod
+    def raise_lower_bound(specifier: str, minimum: str) -> str | None:
+        """
+        Raise the lower bound of a version specifier to the given minimum.
+
+        Parameters
+        ----------
+        specifier :
+            The version specifier e.g. ">=2.0,<3"
+        minimum :
+            The minimum version the lower bound must be at least.
+
+        Returns
+        -------
+            The updated specifier, or None if the lower bound is already compliant.
+        """
+        from packaging.specifiers import SpecifierSet
+        from packaging.version import Version
+
+        specifiers = SpecifierSet(specifier)
+        lower_operators = (">=", ">")
+        bounds = [
+            Version(s.version) for s in specifiers if s.operator in lower_operators
+        ]
+        if bounds and max(bounds) >= Version(minimum):
+            return None
+
+        kept = [str(s) for s in specifiers if s.operator not in lower_operators]
+        return str(SpecifierSet(",".join([*kept, f">={minimum}"])))
+
+    @classmethod
+    def supported_versions(cls, name: str, specifier: str) -> tuple[str, ...]:
+        """
+        Find the released stable major.minor versions allowed by a specifier.
+
+        Parameters
+        ----------
+        name :
+            The package name, "python" is looked up on python.org and anything
+            else on PyPI.
+        specifier :
+            The version specifier e.g. ">=2.3.0"
+
+        Returns
+        -------
+            The sorted major.minor versions e.g. ("2.3", "2.4")
+        """
+        from packaging.specifiers import SpecifierSet
+        from packaging.version import InvalidVersion, Version
+
+        specifiers = SpecifierSet(specifier)
+        if name == "python":
+            try:
+                return PythonSupport.from_python(specifiers).versions
+            except ValueError:
+                return ()
+
+        import requests
+
+        response = requests.get(cls.PYPI_URL.format(name=name), timeout=15)
+        response.raise_for_status()
+
+        versions: set[tuple[int, int]] = set()
+        for release, files in response.json()["releases"].items():
+            try:
+                version = Version(release)
+            except InvalidVersion:
+                continue
+            if (
+                version.is_prerelease
+                or all(file.get("yanked") for file in files)
+                or version not in specifiers
+            ):
+                continue
+            versions.add((version.major, version.minor))
+
+        return tuple(f"{major}.{minor}" for major, minor in sorted(versions))
+
+    def update_pyproject(
+        self, pyproject_file: Path
+    ) -> tuple[dict[str, tuple[str, str]], dict[str, tuple[str, tuple[str, ...]]]]:
+        """
+        Raise any lower bounds in the pyproject.toml file below the SPEC 0 minimums.
+
+        A lower bound is not raised if fewer than ``MIN_SUPPORTED_VERSIONS``
+        released major.minor versions would remain supported.
+
+        Parameters
+        ----------
+        pyproject_file :
+            The path to the pyproject.toml file to update.
+
+        Returns
+        -------
+            Maps each updated package name to its (old, new) requirement, and
+            maps each deferred package name to its (new, remaining versions).
+        """
+        import tomlkit
+        from packaging.requirements import Requirement
+        from packaging.specifiers import SpecifierSet
+        from packaging.utils import canonicalize_name
+
+        content = pyproject_file.read_text(encoding="utf-8")
+        document = tomlkit.parse(content)
+        project = document["project"]
+        changes: dict[str, tuple[str, str]] = {}
+        deferred: dict[str, tuple[str, tuple[str, ...]]] = {}
+
+        # SPEC 0 assumes releases land on schedule, which they may not.
+        def keeps_enough_versions(name: str, new: str) -> bool:
+            remaining = self.supported_versions(name, new)
+            if len(remaining) < self.MIN_SUPPORTED_VERSIONS:
+                deferred[name] = (new, remaining)
+                return False
+            return True
+
+        if (minimum := self.minimums.get("python")) is not None:
+            old = str(project["requires-python"])
+            new = self.raise_lower_bound(old, minimum)
+            if new is not None and keeps_enough_versions("python", new):
+                project["requires-python"] = new
+                changes["python"] = (old, new)
+
+        dependencies = project["dependencies"]
+        for index, dependency in enumerate(list(dependencies)):
+            requirement = Requirement(str(dependency))
+            name = canonicalize_name(requirement.name)
+            if name == "python" or (minimum := self.minimums.get(name)) is None:
+                continue
+
+            new = self.raise_lower_bound(str(requirement.specifier), minimum)
+            if new is not None and keeps_enough_versions(name, new):
+                requirement.specifier = SpecifierSet(new)
+                dependencies[index] = str(requirement)
+                changes[name] = (str(dependency), str(requirement))
+
+        updated = tomlkit.dumps(document)
+        if updated != content:
+            pyproject_file.write_text(updated, encoding="utf-8")
+
+        return changes, deferred
+
+
+@nox.session(venv_backend="none")
+def check_spec0(session: nox.Session) -> None:
+    """
+    Check the Python, numpy, and scipy lower bounds comply with SPEC 0.
+
+    This checks against the SPEC 0 schedule published by scientific-python, see
+    https://scientific-python.org/specs/spec-0000/. Any lower bound in the
+    pyproject.toml file below the SPEC 0 minimum is raised to that minimum.
+    """
+    pyproject = Path("pyproject.toml")
+    spec0 = Spec0Support.from_schedule()
+
+    for package in Spec0Support.PACKAGES:
+        if package not in spec0.minimums:
+            session.warn(f"No current SPEC 0 minimum found for {package!r}")
+
+    changes, deferred = spec0.update_pyproject(pyproject)
+    for name, (new, remaining) in deferred.items():
+        message = (
+            f"Not raising {name} to {new!r}: only {list(remaining)} would remain "
+            f"supported, at least {Spec0Support.MIN_SUPPORTED_VERSIONS} are required."
+        )
+        session.warn(message)
+        if os.environ.get("GITHUB_ACTIONS") == "true":
+            # Surface as a warning annotation on the GitHub Actions run summary.
+            print(f"::warning title=SPEC 0 bound not raised::{message}", flush=True)  # noqa: T201
+
+    if changes:
+        for name, (old, new) in changes.items():
+            session.log(f"  {name}: {old!r} -> {new!r}")
+        if "python" in changes:
+            session.notify("check_python_classifiers")
+        session.notify("check-style")
+        session.error(
+            "Lower bounds did not comply with SPEC 0 and have been updated. "
+            "Please review and commit the changes!"
+        )
+
+    session.log(f"Lower bounds comply with SPEC 0: {dict(spec0.minimums)}")
+
+
+@nox.session(venv_backend="none")
+def check_python_support(session: nox.Session) -> None:
+    """Run the SPEC 0, Python classifier, and Read the Docs Python checks in order."""
+    # Notified sessions still run when an earlier one fails, so all checks apply.
+    for check in ("check_spec0", "check_python_classifiers", "check_rtd_python"):
+        session.notify(check)
 
 
 def _list_dependencies(session: nox.Session) -> None:

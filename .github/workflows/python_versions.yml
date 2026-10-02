@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   check_python_classifiers:
-    name: check python classifiers and RTD Python
+    name: check SPEC 0, python classifiers, and RTD Python
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -24,25 +24,16 @@ jobs:
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         with:
           enable-cache: true
-      - name: Update Python classifiers and RTD Python
+      - name: Update SPEC 0 lower bounds, Python classifiers, and RTD Python
         id: check
         run: |
-          run_check() {
-            local session="$1"
-            local config="$2"
-            local before
-            before=$(git diff -- "$config")
-            if ! uv tool run --with packaging --with requests --with tomlkit --with ruyaml nox -s "$session"; then
-              if [[ "$(git diff -- "$config")" == "$before" ]]; then
-                echo "$session failed without updating $config"
-                exit 1
-              fi
+          # The checks fail when they update files, so only a failure without changes is an error.
+          if ! uv tool run --with packaging --with requests --with tomlkit --with ruyaml nox -s check_python_support; then
+            if git diff --quiet; then
+              echo "check_python_support failed without updating any files"
+              exit 1
             fi
-          }
-
-          # Separate Nox processes reload the classifiers before selecting RTD's Python.
-          run_check check_python_classifiers pyproject.toml
-          run_check check_rtd_python .readthedocs.yaml
+          fi
 
           CHANGES=0
           if ! git diff --quiet; then
@@ -62,7 +53,7 @@ jobs:
         name: Commit changes to `${{ steps.branch.outputs.name }}`
         run: |
           git checkout -b ${{ steps.branch.outputs.name }}
-          git commit -a -m "Updating Python classifiers and RTD Python"
+          git commit -a -m "Updating SPEC 0 lower bounds, Python classifiers, and RTD Python"
           git push -u origin ${{ steps.branch.outputs.name }}
       - if: steps.check.outputs.available == '1'
         name: Create pull request
@@ -70,9 +61,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh pr create --head=${{ steps.branch.outputs.name }} \
-          --title='Update python classifiers and RTD Python' \
-          --body='The `check_python_classifiers` nox session detected that the Python classifiers in `pyproject.toml` were inconsistent with `requires-python` and the Python versions published on python.org.
+          --title='Update SPEC 0 lower bounds, python classifiers, and RTD Python' \
+          --body='The `check_python_support` nox session ran the following checks in order:
 
-          The `check_rtd_python` session then ran in a fresh Nox process to check that `.readthedocs.yaml` uses the recalculated default Python version.
+          - `check_spec0` checked that the `requires-python`, numpy, and scipy lower bounds in `pyproject.toml` comply with [SPEC 0](https://scientific-python.org/specs/spec-0000/).
+          - `check_python_classifiers` checked whether the Python classifiers in `pyproject.toml` were consistent with `requires-python` and the Python versions published on python.org.
+          - `check_rtd_python` checked that `.readthedocs.yaml` uses the recalculated default Python version.
 
-          Any necessary classifier and/or Read the Docs Python updates are included together in this PR. Please review the changes.'
+          Any necessary SPEC 0 lower bound, classifier, and/or Read the Docs Python updates are included together in this PR. Please review the changes.'
