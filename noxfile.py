@@ -548,6 +548,77 @@ def check_style(session: nox.Session) -> None:
     session.run("prek", "run", *(session.posargs or default_args))
 
 
+@nox.session(python=PYTHON_SUPPORT.default, venv_backend="uv")
+def docs(session: nox.Session) -> None:
+    """Build the documentation in the Read the Docs environment."""
+    parser = argparse.ArgumentParser(
+        prog="nox -s docs --",
+        allow_abbrev=False,
+        description="Build the documentation with pinned or latest dependencies.",
+    )
+    parser.add_argument(
+        "--latest",
+        action="store_true",
+        help="Install the latest dependencies allowed by the docs extra",
+    )
+    options, sphinx_args = parser.parse_known_args(session.posargs)
+
+    # RTD installs Graphviz as a system package rather than a Python dependency.
+    if shutil.which("dot") is None:
+        session.error("Graphviz is required to match the Read the Docs environment")
+
+    if options.latest:
+        session.install(".[docs]")
+    else:
+        session.install("-r", "requirements-docs.txt")
+    _list_dependencies(session)
+
+    # Match `make clean` so stale generated files cannot affect the build.
+    for path in (
+        Path("docs/_build"),
+        Path("docs/api"),
+        Path("docs/generated"),
+        Path("docs/gwcs/generated"),
+    ):
+        shutil.rmtree(path, ignore_errors=True)
+
+    # RTD includes unreleased Towncrier fragments when building a non-tagged commit.
+    # Render them temporarily so a local build does not modify the working tree.
+    changelog = Path("CHANGES.rst")
+    original_changelog = changelog.read_bytes()
+    try:
+        exact_tag = session.run(
+            "git",
+            "describe",
+            "--exact-match",
+            external=True,
+            silent=True,
+            stderr=None,
+            success_codes=(0, 128),
+        )
+        if not exact_tag:
+            draft = session.run(
+                "towncrier", "build", "--draft", silent=True, stderr=None
+            )
+            changelog.write_bytes(draft.encode() + original_changelog)
+        # RTD treats warnings as errors and keeps going to report all warnings.
+        session.run(
+            "sphinx-build",
+            "-W",
+            "--keep-going",
+            "-b",
+            "html",
+            "-d",
+            "docs/_build/doctrees",
+            "docs",
+            "docs/_build/html",
+            *sphinx_args,
+        )
+    finally:
+        # Always restore the tracked changelog, including after a failed build.
+        changelog.write_bytes(original_changelog)
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class MatrixEntry:
     """Represents an entry in a github workflow job matrix."""
